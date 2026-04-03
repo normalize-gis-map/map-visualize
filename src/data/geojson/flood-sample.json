@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "flood-001",
+        "areaName": "Thanh Da",
+        "district": "Binh Thanh",
+        "depth": 0.9,
+        "timestamp": "2026-04-02T08:00:00Z",
+        "severity": "medium",
+        "riskScore": 68
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.715, 10.81],
+            [106.725, 10.81],
+            [106.725, 10.818],
+            [106.715, 10.818],
+            [106.715, 10.81]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "flood-002",
+        "areaName": "Thao Dien",
+        "district": "Thu Duc",
+        "depth": 1.5,
+        "timestamp": "2026-04-02T08:00:00Z",
+        "severity": "high",
+        "riskScore": 88
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.735, 10.795],
+            [106.748, 10.795],
+            [106.748, 10.805],
+            [106.735, 10.805],
+            [106.735, 10.795]
+          ]
+        ]
+      }
+    }
+  ]
+}
