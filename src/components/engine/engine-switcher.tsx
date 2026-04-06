@@ -2,28 +2,23 @@
 
 import { useFloodStore } from "@/features/flood/store/flood.store";
 
-export function MapSwitcher() {
-  const { mapMode, setMapMode, mapEngine } = useFloodStore();
-
-  const options =
-    mapEngine === "maplibre"
-      ? (["2d", "2.5d", "3d"] as const)
-      : (["3d"] as const);
+export function EngineSwitcher() {
+  const { mapEngine, setMapEngine } = useFloodStore();
 
   return (
     <div className="inline-flex rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
-      {options.map((mode) => (
+      {(["maplibre", "cesium"] as const).map((engine) => (
         <button
-          key={mode}
+          key={engine}
           type="button"
-          onClick={() => setMapMode(mode)}
+          onClick={() => setMapEngine(engine)}
           className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            mapMode === mode
-              ? "bg-blue-600 text-white shadow-sm"
+            mapEngine === engine
+              ? "bg-slate-900 text-white"
               : "text-slate-700 hover:bg-slate-100"
           }`}
         >
-          {mode.toUpperCase()}
+          {engine === "maplibre" ? "MapLibre" : "Cesium"}
         </button>
       ))}
     </div>

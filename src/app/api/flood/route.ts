@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getFloodGeoJson } from "@/src/services/flood/flood.service";
+import floodData from "@/data/geojson/flood-sample.json";
 
 export async function GET() {
-  const data = await getFloodGeoJson();
-  return NextResponse.json(data, { status: 200 });
+  return NextResponse.json(floodData, { status: 200 });
 }

@@ -1,15 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MapRef } from "react-map-gl/maplibre";
-import { Search, MapPinned, X } from "lucide-react";
-import { PLACES } from "@/src/data/places";
+import { MapPinned, Search, X } from "lucide-react";
+import { PLACES, type PlaceItem } from "@/data/places";
 
 type SearchPanelProps = {
-  mapRef: React.RefObject<MapRef | null>;
+  onSelectPlace: (place: PlaceItem) => void;
 };
 
-export function SearchPanel({ mapRef }: SearchPanelProps) {
+export function SearchPanel({ onSelectPlace }: SearchPanelProps) {
   const [query, setQuery] = useState("");
 
   const results = useMemo(() => {
@@ -17,53 +16,27 @@ export function SearchPanel({ mapRef }: SearchPanelProps) {
     if (!normalized) return [];
 
     return PLACES.filter((place) =>
-      place.label.toLowerCase().includes(normalized)
+      place.label.toLowerCase().includes(normalized),
     ).slice(0, 6);
   }, [query]);
 
-  const handleMoveToPlace = (placeKey: string) => {
-    const place = PLACES.find((item) => item.key === placeKey);
-    if (!place || !mapRef.current) return;
-
-    if (place.bounds) {
-      mapRef.current.fitBounds(place.bounds, {
-        padding: 60,
-        duration: 1400,
-      });
-    } else {
-      mapRef.current.flyTo({
-        center: place.center,
-        zoom: place.zoom,
-        duration: 1400,
-      });
-    }
-
-    setQuery(place.label);
-  };
-
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <Search className="h-4 w-4" />
-        Search area
-      </div>
-
+    <div className="rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur">
       <div className="relative">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by area name, e.g. Thủ Đức"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-10 text-sm outline-none transition focus:border-blue-500 focus:bg-white"
+          placeholder="Search area, e.g. Thủ Đức"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pr-10 pl-10 text-sm transition outline-none focus:border-blue-500 focus:bg-white"
         />
 
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
         {query && (
           <button
             type="button"
             onClick={() => setQuery("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            aria-label="Clear search"
+            className="absolute top-1/2 right-3 -translate-y-1/2 text-slate-400 hover:text-slate-600"
           >
             <X className="h-4 w-4" />
           </button>
@@ -76,7 +49,10 @@ export function SearchPanel({ mapRef }: SearchPanelProps) {
             <button
               key={place.key}
               type="button"
-              onClick={() => handleMoveToPlace(place.key)}
+              onClick={() => {
+                setQuery(place.label);
+                onSelectPlace(place);
+              }}
               className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left transition hover:border-blue-300 hover:bg-blue-50"
             >
               <div>

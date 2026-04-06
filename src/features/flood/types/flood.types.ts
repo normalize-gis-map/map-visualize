@@ -10,11 +10,6 @@ export type FloodFeatureProperties = {
   riskScore: number;
 };
 
-export type FloodPolygonFeature = GeoJSON.Feature<
-  GeoJSON.Polygon | GeoJSON.MultiPolygon,
-  FloodFeatureProperties
->;
-
 export type FloodGeoJson = GeoJSON.FeatureCollection<
   GeoJSON.Polygon | GeoJSON.MultiPolygon,
   FloodFeatureProperties

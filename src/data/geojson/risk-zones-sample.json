@@ -1,0 +1,45 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "risk-001",
+        "label": "High Risk Zone",
+        "level": "high"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.728, 10.797],
+            [106.742, 10.797],
+            [106.742, 10.807],
+            [106.728, 10.807],
+            [106.728, 10.797]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "risk-002",
+        "label": "Medium Risk Zone",
+        "level": "medium"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [106.744, 10.808],
+            [106.755, 10.808],
+            [106.755, 10.817],
+            [106.744, 10.817],
+            [106.744, 10.808]
+          ]
+        ]
+      }
+    }
+  ]
+}

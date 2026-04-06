@@ -1,18 +1,43 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import next from "eslint-config-next";
+import unusedImports from "eslint-plugin-unused-imports";
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
+/** @type {import("eslint").Linter.FlatConfig[]} */
+export default [
+  ...next(),
 
-export default eslintConfig;
+  {
+    plugins: {
+      "unused-imports": unusedImports,
+    },
+
+    rules: {
+      // 🔥 remove unused imports
+      "unused-imports/no-unused-imports": "error",
+
+      // warn unused vars
+      "unused-imports/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+
+      // import order
+      "import/order": [
+        "warn",
+        {
+          groups: ["builtin", "external", "internal"],
+          "newlines-between": "always",
+          alphabetize: {
+            order: "asc",
+            caseInsensitive: true,
+          },
+        },
+      ],
+
+      // relax TS rules
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+];

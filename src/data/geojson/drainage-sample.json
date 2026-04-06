@@ -1,0 +1,38 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "drain-001",
+        "name": "Drainage Canal A",
+        "status": "active"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [106.723, 10.806],
+          [106.729, 10.811],
+          [106.735, 10.816],
+          [106.742, 10.821]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "drain-002",
+        "name": "Drainage Channel B",
+        "status": "maintenance"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [106.738, 10.799],
+          [106.744, 10.804],
+          [106.749, 10.809]
+        ]
+      }
+    }
+  ]
+}

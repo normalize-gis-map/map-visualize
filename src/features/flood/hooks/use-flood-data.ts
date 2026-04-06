@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useFloodStore } from "@/src/features/flood/store/flood.store";
-import type { FloodGeoJson } from "@/src/features/flood/types/flood.types";
+import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 
 export function useFloodData() {
-  const { data, setData } = useFloodStore();
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<FloodGeoJson | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,14 +37,12 @@ export function useFloodData() {
       }
     }
 
-    if (!data) {
-      void run();
-    }
+    void run();
 
     return () => {
       active = false;
     };
-  }, [data, setData]);
+  }, []);
 
   return { data, loading, error };
 }

@@ -1,33 +1,35 @@
 import { create } from "zustand";
-import type { FloodGeoJson } from "@/src/features/flood/types/flood.types";
 
 export type MapMode = "2d" | "2.5d" | "3d";
-export type LayerKey = "flood" | "drainage" | "roads" | "riskZones";
+export type MapEngine = "maplibre" | "cesium";
+export type LayerKey =
+  | "flood"
+  | "buildings"
+  | "drainage"
+  | "roads"
+  | "riskZones";
 
 type FloodStore = {
-  data: FloodGeoJson | null;
   mapMode: MapMode;
-  selectedAreaId: string | null;
+  mapEngine: MapEngine;
   visibleLayers: Record<LayerKey, boolean>;
-  setData: (data: FloodGeoJson) => void;
   setMapMode: (mode: MapMode) => void;
-  setSelectedAreaId: (id: string | null) => void;
+  setMapEngine: (engine: MapEngine) => void;
   toggleLayer: (layer: LayerKey) => void;
 };
 
 export const useFloodStore = create<FloodStore>((set) => ({
-  data: null,
   mapMode: "2d",
-  selectedAreaId: null,
+  mapEngine: "maplibre",
   visibleLayers: {
-    flood: true,
+    flood: false,
+    buildings: false,
     drainage: false,
     roads: false,
     riskZones: false,
   },
-  setData: (data) => set({ data }),
   setMapMode: (mapMode) => set({ mapMode }),
-  setSelectedAreaId: (selectedAreaId) => set({ selectedAreaId }),
+  setMapEngine: (mapEngine) => set({ mapEngine }),
   toggleLayer: (layer) =>
     set((state) => ({
       visibleLayers: {

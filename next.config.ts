@@ -1,7 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  reactStrictMode: true,
+
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
+
+  images: {
+    unoptimized: true,
+  },
+
+  turbopack: {},
 };
 
 export default nextConfig;
