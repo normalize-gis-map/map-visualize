@@ -25,7 +25,9 @@ type OverpassResponse = {
 
 const CESIUM_ASSET_BASE_URL =
   "https://cesium.com/downloads/cesiumjs/releases/1.140/Build/Cesium/";
-const BUILDING_RADIUS_METERS = 3500;
+const BUILDING_RADIUS_METERS = 1800;
+const OVERPASS_ENDPOINT = "https://overpass.kumi.systems/api/interpreter";
+const OSM_RETRY_COOLDOWN_MS = 120000;
 
 function createViewer(container: HTMLDivElement) {
   (
@@ -74,10 +76,14 @@ async function fetchOsmBuildingWays(
   signal?: AbortSignal,
 ) {
   const query = `[out:json][timeout:25];way["building"](around:${BUILDING_RADIUS_METERS},${latitude},${longitude});out geom;`;
-  const response = await fetch(
-    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
-    { signal },
-  );
+  const response = await fetch(OVERPASS_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+    },
+    body: `data=${encodeURIComponent(query)}`,
+    signal,
+  });
 
   if (!response.ok) {
     throw new Error("Failed to fetch OSM building footprints");
@@ -138,6 +144,7 @@ export function CesiumMap({ selectedPlace, floodData }: CesiumMapProps) {
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const buildingEntitiesRef = useRef<string[]>([]);
   const lastBuildingFetchKeyRef = useRef<string>("");
+  const osmUnavailableUntilRef = useRef(0);
   const { visibleLayers, buildingOpacity } = useFloodStore();
 
   useEffect(() => {
@@ -207,9 +214,20 @@ export function CesiumMap({ selectedPlace, floodData }: CesiumMapProps) {
       abortController?.abort();
       abortController = new AbortController();
 
+      if (Date.now() < osmUnavailableUntilRef.current) {
+        if (!floodData) return;
+        buildingEntitiesRef.current = renderFallbackBuildings(
+          viewer,
+          floodData,
+          buildingOpacity,
+        );
+        return;
+      }
+
       void fetchOsmBuildingWays(latitude, longitude, abortController.signal)
         .then((ways) => {
           if (!active) return;
+          osmUnavailableUntilRef.current = 0;
 
           const ids: string[] = [];
 
@@ -257,6 +275,7 @@ export function CesiumMap({ selectedPlace, floodData }: CesiumMapProps) {
           buildingEntitiesRef.current = ids;
         })
         .catch(() => {
+          osmUnavailableUntilRef.current = Date.now() + OSM_RETRY_COOLDOWN_MS;
           if (!active || !floodData) return;
           buildingEntitiesRef.current = renderFallbackBuildings(
             viewer,
