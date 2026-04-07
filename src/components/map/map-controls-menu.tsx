@@ -25,11 +25,7 @@ export function MapControlsMenu() {
   };
 
   return (
-    <DropdownPanel
-      label="View"
-      icon={<Layers3 className="h-4 w-4" />}
-      hideLabelOnMobile
-    >
+    <DropdownPanel label="View" icon={<Layers3 className="h-4 w-4" />}>
       <div className="mb-3 rounded-2xl bg-slate-50 px-3 py-2">
         <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
           Engine
