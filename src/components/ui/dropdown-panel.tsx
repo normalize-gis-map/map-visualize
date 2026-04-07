@@ -8,6 +8,7 @@ type DropdownPanelProps = {
   icon?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  hideLabelOnMobile?: boolean;
 };
 
 export function DropdownPanel({
@@ -15,6 +16,7 @@ export function DropdownPanel({
   icon,
   children,
   className = "",
+  hideLabelOnMobile = false,
 }: DropdownPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -24,9 +26,12 @@ export function DropdownPanel({
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+        aria-label={label}
       >
         {icon}
-        {label}
+        <span className={hideLabelOnMobile ? "hidden sm:inline" : ""}>
+          {label}
+        </span>
         <ChevronDown
           className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
         />

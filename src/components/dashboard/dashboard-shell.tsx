@@ -44,7 +44,11 @@ export function DashboardShell() {
           />
         </div>
 
-        <div className="pointer-events-auto absolute right-3 bottom-3 z-20 md:right-4 md:bottom-4">
+        <div
+          className={`pointer-events-auto absolute bottom-2 left-1/2 z-20 w-[calc(100%-1rem)] -translate-x-1/2 md:right-4 md:bottom-4 md:left-auto md:w-auto md:translate-x-0 ${
+            catalogOpen ? "hidden md:block" : ""
+          }`}
+        >
           <AlertDrawer
             open={alertOpen}
             onToggle={() => setAlertOpen((prev) => !prev)}
