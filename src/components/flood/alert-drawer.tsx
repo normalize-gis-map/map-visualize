@@ -30,11 +30,11 @@ export function AlertDrawer({ open, onToggle, data }: AlertDrawerProps) {
     : 0;
 
   return (
-    <div className="w-[300px] max-w-[calc(100vw-2rem)] rounded-[28px] border border-slate-200 bg-white/92 shadow-2xl backdrop-blur">
+    <div className="w-[min(360px,calc(100vw-1rem))] rounded-[28px] border border-slate-200 bg-white/92 shadow-2xl backdrop-blur sm:w-[300px] sm:max-w-[calc(100vw-2rem)]">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between px-4 py-4 text-left"
+        className="flex w-full items-center justify-between px-3.5 py-3.5 text-left sm:px-4 sm:py-4"
       >
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
@@ -59,7 +59,7 @@ export function AlertDrawer({ open, onToggle, data }: AlertDrawerProps) {
       </button>
 
       {open && (
-        <div className="border-t border-slate-100 px-4 pt-3 pb-4">
+        <div className="max-h-[42vh] overflow-y-auto border-t border-slate-100 px-3.5 pt-3 pb-4 sm:max-h-none sm:px-4">
           <div className="grid grid-cols-1 gap-3">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
               <div className="mb-2 flex items-center gap-2">

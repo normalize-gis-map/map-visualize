@@ -62,6 +62,14 @@ const LAYER_ITEMS: Array<{
   },
 ];
 
+function getVisibleLayerItems(mapEngine: "maplibre" | "cesium") {
+  if (mapEngine === "cesium") {
+    return LAYER_ITEMS.filter((item) => item.key === "buildings");
+  }
+
+  return LAYER_ITEMS;
+}
+
 function ToggleSwitch({
   active,
   disabled,
@@ -212,7 +220,8 @@ function LayerItem({
 }
 
 function DesktopCollapsedRail({ onToggle }: { onToggle: () => void }) {
-  const { visibleLayers, toggleLayer } = useFloodStore();
+  const { mapEngine, visibleLayers, toggleLayer } = useFloodStore();
+  const items = getVisibleLayerItems(mapEngine);
 
   return (
     <div className="hidden md:block">
@@ -227,7 +236,7 @@ function DesktopCollapsedRail({ onToggle }: { onToggle: () => void }) {
         </button>
 
         <div className="space-y-2">
-          {LAYER_ITEMS.map((item) => {
+          {items.map((item) => {
             const active = visibleLayers[item.key];
 
             return (
@@ -257,8 +266,14 @@ function DesktopCollapsedRail({ onToggle }: { onToggle: () => void }) {
 }
 
 function DesktopPanel({ onToggle }: { onToggle: () => void }) {
-  const { visibleLayers, toggleLayer, buildingOpacity, setBuildingOpacity } =
-    useFloodStore();
+  const {
+    mapEngine,
+    visibleLayers,
+    toggleLayer,
+    buildingOpacity,
+    setBuildingOpacity,
+  } = useFloodStore();
+  const items = getVisibleLayerItems(mapEngine);
 
   return (
     <div className="hidden md:block">
@@ -292,7 +307,7 @@ function DesktopPanel({ onToggle }: { onToggle: () => void }) {
         </div>
 
         <div className="space-y-3">
-          {LAYER_ITEMS.map((item) => (
+          {items.map((item) => (
             <LayerItem
               key={item.key}
               item={item}
@@ -324,8 +339,14 @@ function MobileTrigger({ onToggle }: { onToggle: () => void }) {
 }
 
 function MobileSheet({ onToggle }: { onToggle: () => void }) {
-  const { visibleLayers, toggleLayer, buildingOpacity, setBuildingOpacity } =
-    useFloodStore();
+  const {
+    mapEngine,
+    visibleLayers,
+    toggleLayer,
+    buildingOpacity,
+    setBuildingOpacity,
+  } = useFloodStore();
+  const items = getVisibleLayerItems(mapEngine);
 
   return (
     <div className="md:hidden">
@@ -354,7 +375,7 @@ function MobileSheet({ onToggle }: { onToggle: () => void }) {
         </div>
 
         <div className="max-h-[65vh] space-y-3 overflow-y-auto pb-2">
-          {LAYER_ITEMS.map((item) => (
+          {items.map((item) => (
             <LayerItem
               key={item.key}
               item={item}

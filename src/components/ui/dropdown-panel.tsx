@@ -26,7 +26,7 @@ export function DropdownPanel({
         className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
       >
         {icon}
-        {label}
+        <span className="hidden sm:inline">{label}</span>
         <ChevronDown
           className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
         />
