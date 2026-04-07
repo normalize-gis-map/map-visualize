@@ -8,6 +8,8 @@ import {
 import type { AuthUser } from "@/features/auth/types/auth.types";
 
 const AUTH_SESSION_CHANGE_EVENT = "auth-session-change";
+let cachedUserRaw: string | null | undefined;
+let cachedUserParsed: AuthUser | null = null;
 
 function emitAuthSessionChange() {
   if (typeof window === "undefined") return;
@@ -38,11 +40,23 @@ export function getStoredAuthUser(): AuthUser | null {
   if (typeof window === "undefined") return null;
 
   const raw = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
-  if (!raw) return null;
+  if (raw === cachedUserRaw) {
+    return cachedUserParsed;
+  }
+
+  if (!raw) {
+    cachedUserRaw = raw;
+    cachedUserParsed = null;
+    return null;
+  }
 
   try {
-    return JSON.parse(raw) as AuthUser;
+    cachedUserRaw = raw;
+    cachedUserParsed = JSON.parse(raw) as AuthUser;
+    return cachedUserParsed;
   } catch {
+    cachedUserRaw = raw;
+    cachedUserParsed = null;
     return null;
   }
 }
