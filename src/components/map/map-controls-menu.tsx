@@ -6,7 +6,8 @@ import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { useFloodStore } from "@/features/flood/store/flood.store";
 
 export function MapControlsMenu() {
-  const { mapEngine, mapMode, setMapEngine, setMapMode } = useFloodStore();
+  const { mapEngine, mapMode, setMapEngine, setMapMode, mapInteractionTick } =
+    useFloodStore();
 
   const handleSelectEngine = (engine: "maplibre" | "cesium") => {
     setMapEngine(engine);
@@ -25,7 +26,11 @@ export function MapControlsMenu() {
   };
 
   return (
-    <DropdownPanel label="View" icon={<Layers3 className="h-4 w-4" />}>
+    <DropdownPanel
+      label="View"
+      icon={<Layers3 className="h-4 w-4" />}
+      closeSignal={mapInteractionTick}
+    >
       <div className="mb-3 rounded-2xl bg-slate-50 px-3 py-2">
         <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
           Engine

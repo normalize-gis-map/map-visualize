@@ -3,7 +3,7 @@
 import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import drainageData from "@/data/geojson/drainage-sample.json";
 import floodData from "@/data/geojson/flood-sample.json";
@@ -38,7 +38,8 @@ const MAP_STYLE_2D =
 const MAP_STYLE_25D = "https://tiles.openfreemap.org/styles/liberty";
 
 export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props) {
-  const { mapMode, visibleLayers, buildingOpacity } = useFloodStore();
+  const { mapMode, visibleLayers, buildingOpacity, notifyMapInteraction } =
+    useFloodStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
@@ -73,6 +74,37 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
 
+  useEffect(() => {
+    if (!mapInstance || !visibleLayers.drainage) return;
+
+    let frameId = 0;
+    let alive = true;
+    const start = performance.now();
+
+    const animate = (time: number) => {
+      if (!alive || !mapInstance.getLayer("drainage-line")) return;
+      const phase = ((time - start) / 1200) % 1;
+
+      mapInstance.setPaintProperty("drainage-line", "line-dasharray", [
+        0.2,
+        1.2,
+        1.1 + phase * 1.5,
+      ]);
+      mapInstance.triggerRepaint();
+      frameId = requestAnimationFrame(animate);
+    };
+
+    frameId = requestAnimationFrame(animate);
+
+    return () => {
+      alive = false;
+      cancelAnimationFrame(frameId);
+      if (mapInstance.getLayer("drainage-line")) {
+        mapInstance.setPaintProperty("drainage-line", "line-dasharray", [1, 0]);
+      }
+    };
+  }, [mapInstance, visibleLayers.drainage]);
+
   return (
     <div className="map-shell relative h-full w-full">
       <Map
@@ -91,9 +123,16 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
           "drainage-line",
           "risk-zones-fill",
         ]}
-        onClick={handleClick}
+        onClick={(event) => {
+          notifyMapInteraction();
+          handleClick(event);
+        }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
+        onMoveStart={notifyMapInteraction}
+        onDragStart={notifyMapInteraction}
+        onZoomStart={notifyMapInteraction}
+        onRotateStart={notifyMapInteraction}
         onLoad={(e) => setMapInstance(e.target)}
       >
         <NavigationControl position="bottom-right" />
@@ -131,14 +170,26 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
             type="geojson"
             data={drainageData as FeatureCollection}
           >
-            <Layer
-              id="drainage-line"
-              type="line"
-              paint={{
-                "line-color": "#0ea5e9",
-                "line-width": 3,
-              }}
-            />
+          <Layer
+            id="drainage-line"
+            type="line"
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={{
+              "line-color": "#0ea5e9",
+              "line-width": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                9,
+                1.6,
+                15,
+                4.5,
+              ],
+              "line-opacity": 0.8,
+              "line-blur": 0.25,
+              "line-dasharray": [1, 0],
+            }}
+          />
           </Source>
         )}
 
@@ -199,16 +250,16 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
                     "#ef4444",
                     "#60a5fa",
                   ],
-                  "fill-opacity": [
-                    "case",
-                    ["==", ["get", "id"], selectedId],
-                    0.75,
-                    ["==", ["get", "id"], hoveredId],
-                    0.65,
-                    0.5,
-                  ],
-                }}
-              />
+                "fill-opacity": [
+                  "case",
+                  ["==", ["get", "id"], selectedId],
+                  0.68,
+                  ["==", ["get", "id"], hoveredId],
+                  0.58,
+                  0.42,
+                ],
+              }}
+            />
             )}
 
             <Layer
@@ -230,6 +281,7 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
             subtitle={selectedFlood.properties.district}
             variant="flood"
             onClose={resetSelections}
+            anchor={selectedFlood.anchor}
             fields={[
               {
                 label: "Depth",
@@ -257,6 +309,7 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
             subtitle="3D extrusion"
             variant="building"
             onClose={resetSelections}
+            anchor={selectedBuilding.anchor}
             fields={[
               {
                 label: "Height",
@@ -281,6 +334,7 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
             subtitle="Water channel"
             variant="drainage"
             onClose={resetSelections}
+            anchor={selectedDrainage.anchor}
             fields={[
               {
                 label: "Status",
@@ -299,6 +353,7 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
             subtitle="Flood risk"
             variant="risk"
             onClose={resetSelections}
+            anchor={selectedRiskZone.anchor}
             fields={[
               {
                 label: "Level",

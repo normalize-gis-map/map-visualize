@@ -9,7 +9,7 @@ export function useMapCursor() {
 
   const handleMouseMove = (e: maplibregl.MapLayerMouseEvent) => {
     if (e.features && e.features.length > 0) {
-      setCursor("pointer");
+      setCursor("zoom-in");
       setHovered(e.features[0]);
     } else {
       setCursor("grab");

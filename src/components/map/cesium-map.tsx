@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { useFloodStore } from "@/features/flood/store/flood.store";
+import { FeaturePopupCard } from "@/components/map/feature-popup";
 
 type CesiumMapProps = {
   selectedPlace: PlaceItem | null;
@@ -59,6 +60,8 @@ type SelectedBuildingInfo = {
   height: string;
   kind: string;
   sourceId: string;
+  position: { x: number; y: number };
+  anchor: "top" | "bottom";
 };
 
 function getFeatureProperty(
@@ -85,7 +88,7 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
-  const { visibleLayers, buildingOpacity } = useFloodStore();
+  const { visibleLayers, buildingOpacity, notifyMapInteraction } = useFloodStore();
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
 
@@ -112,21 +115,47 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
         const picked = viewer.scene.pick(movement.position);
 
         if (picked && picked instanceof Cesium.Cesium3DTileFeature) {
+          const y = movement.position.y;
           setSelectedBuilding({
             name: getFeatureProperty(picked, ["name", "name:en"]),
             height: getFeatureProperty(picked, ["height", "building:levels"]),
             kind: getFeatureProperty(picked, ["building", "building:use"]),
             sourceId: getFeatureProperty(picked, ["id", "elementId"]),
+            position: { x: movement.position.x, y },
+            anchor: y < 200 ? "top" : "bottom",
           });
+          notifyMapInteraction();
+          viewer.scene.requestRender();
           return;
         }
 
         setSelectedBuilding(null);
+        notifyMapInteraction();
+        viewer.scene.requestRender();
       },
       Cesium.ScreenSpaceEventType.LEFT_CLICK,
     );
+    clickHandler.setInputAction(
+      (movement: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
+        const picked = viewer.scene.pick(movement.endPosition);
+        (viewer.container as HTMLElement).style.cursor =
+          picked && picked instanceof Cesium.Cesium3DTileFeature
+            ? "zoom-in"
+            : "grab";
+      },
+      Cesium.ScreenSpaceEventType.MOUSE_MOVE,
+    );
+
+    const handleMoveStart = () => {
+      setSelectedBuilding(null);
+      notifyMapInteraction();
+      viewer.scene.requestRender();
+    };
+    viewer.camera.moveStart.addEventListener(handleMoveStart);
 
     return () => {
+      (viewer.container as HTMLElement).style.cursor = "grab";
+      viewer.camera.moveStart.removeEventListener(handleMoveStart);
       clickHandler.destroy();
       if (osmBuildingsRef.current) {
         viewer.scene.primitives.remove(osmBuildingsRef.current);
@@ -135,7 +164,7 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
       viewer.destroy();
       viewerRef.current = null;
     };
-  }, []);
+  }, [notifyMapInteraction]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -162,6 +191,7 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
         viewer.scene.primitives.remove(osmBuildingsRef.current);
         osmBuildingsRef.current = null;
       }
+      viewer.scene.requestRender();
       return;
     }
 
@@ -179,6 +209,7 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
       tileset.style = new Cesium.Cesium3DTileStyle({
         color: toRgbaColor(buildingOpacity),
       });
+      viewer.scene.requestRender();
     };
 
     void attachBuildings();
@@ -193,24 +224,27 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
       <div ref={containerRef} className="h-full w-full" />
 
       {selectedBuilding && visibleLayers.buildings && (
-        <div className="pointer-events-none absolute top-4 right-4 z-20 w-[260px] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur">
-          <div className="text-sm font-semibold text-slate-900">
-            {selectedBuilding.name}
-          </div>
-          <div className="mt-2 space-y-1 text-xs text-slate-600">
-            <div>
-              <span className="font-medium text-slate-800">Type:</span>{" "}
-              {selectedBuilding.kind}
-            </div>
-            <div>
-              <span className="font-medium text-slate-800">Height/Levels:</span>{" "}
-              {selectedBuilding.height}
-            </div>
-            <div>
-              <span className="font-medium text-slate-800">OSM ID:</span>{" "}
-              {selectedBuilding.sourceId}
-            </div>
-          </div>
+        <div
+          className="absolute z-20"
+          style={{
+            left: Math.max(12, selectedBuilding.position.x - 150),
+            top:
+              selectedBuilding.anchor === "top"
+                ? selectedBuilding.position.y + 14
+                : selectedBuilding.position.y - 240,
+          }}
+        >
+          <FeaturePopupCard
+            title={selectedBuilding.name}
+            subtitle="3D extrusion"
+            variant="building"
+            onClose={() => setSelectedBuilding(null)}
+            fields={[
+              { label: "Type", value: selectedBuilding.kind },
+              { label: "Height/Levels", value: selectedBuilding.height, tone: "info" },
+              { label: "OSM ID", value: selectedBuilding.sourceId },
+            ]}
+          />
         </div>
       )}
     </div>

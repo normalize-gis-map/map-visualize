@@ -20,6 +20,8 @@ type FloodStore = {
   setMapEngine: (engine: MapEngine) => void;
   toggleLayer: (layer: LayerKey) => void;
   setBuildingOpacity: (value: number) => void;
+  mapInteractionTick: number;
+  notifyMapInteraction: () => void;
 };
 
 export const useFloodStore = create<FloodStore>((set) => ({
@@ -33,6 +35,7 @@ export const useFloodStore = create<FloodStore>((set) => ({
     riskZones: false,
   },
   buildingOpacity: 0.9,
+  mapInteractionTick: 0,
   setMapMode: (mapMode) => set({ mapMode }),
   setMapEngine: (mapEngine) => set({ mapEngine }),
   toggleLayer: (layer) =>
@@ -43,4 +46,6 @@ export const useFloodStore = create<FloodStore>((set) => ({
       },
     })),
   setBuildingOpacity: (buildingOpacity) => set({ buildingOpacity }),
+  notifyMapInteraction: () =>
+    set((state) => ({ mapInteractionTick: state.mapInteractionTick + 1 })),
 }));
