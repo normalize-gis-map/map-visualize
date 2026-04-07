@@ -3,7 +3,7 @@ import unusedImports from "eslint-plugin-unused-imports";
 
 /** @type {import("eslint").Linter.FlatConfig[]} */
 export default [
-  ...next(),
+  ...next,
 
   {
     plugins: {
@@ -35,9 +35,6 @@ export default [
           },
         },
       ],
-
-      // relax TS rules
-      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 ];
