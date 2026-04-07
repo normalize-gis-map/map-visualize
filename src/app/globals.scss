@@ -10,3 +10,22 @@ body,
 body {
   margin: 0;
 }
+
+.map-shell .maplibregl-ctrl-bottom-right {
+  bottom: 110px;
+  right: 16px;
+}
+
+.map-shell .maplibregl-ctrl-group {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.map-shell .maplibregl-ctrl-attrib {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 10px;
+}

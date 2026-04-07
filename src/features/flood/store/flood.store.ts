@@ -9,13 +9,17 @@ export type LayerKey =
   | "roads"
   | "riskZones";
 
+type VisibleLayers = Record<LayerKey, boolean>;
+
 type FloodStore = {
   mapMode: MapMode;
   mapEngine: MapEngine;
-  visibleLayers: Record<LayerKey, boolean>;
+  visibleLayers: VisibleLayers;
+  buildingOpacity: number;
   setMapMode: (mode: MapMode) => void;
   setMapEngine: (engine: MapEngine) => void;
   toggleLayer: (layer: LayerKey) => void;
+  setBuildingOpacity: (value: number) => void;
 };
 
 export const useFloodStore = create<FloodStore>((set) => ({
@@ -28,6 +32,7 @@ export const useFloodStore = create<FloodStore>((set) => ({
     roads: false,
     riskZones: false,
   },
+  buildingOpacity: 0.9,
   setMapMode: (mapMode) => set({ mapMode }),
   setMapEngine: (mapEngine) => set({ mapEngine }),
   toggleLayer: (layer) =>
@@ -37,4 +42,5 @@ export const useFloodStore = create<FloodStore>((set) => ({
         [layer]: !state.visibleLayers[layer],
       },
     })),
+  setBuildingOpacity: (buildingOpacity) => set({ buildingOpacity }),
 }));

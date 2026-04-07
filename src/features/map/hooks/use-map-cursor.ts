@@ -1,49 +1,26 @@
 "use client";
 
-import { useCallback, useState } from "react";
-
-import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
-
-type HoveredFeature = {
-  id: string;
-};
+import { useState } from "react";
+import type maplibregl from "maplibre-gl";
 
 export function useMapCursor() {
-  const [cursor, setCursor] = useState("");
-  const [hovered, setHovered] = useState<HoveredFeature | null>(null);
+  const [cursor, setCursor] = useState("grab");
+  const [hovered, setHovered] = useState<any>(null);
 
-  const handleMouseMove = useCallback((event: MapLayerMouseEvent) => {
-    const feature = event.features?.[0];
-
-    if (!feature?.properties) {
-      setHovered(null);
-      setCursor("");
-      return;
-    }
-
-    if (
-      feature.layer.id.includes("building") ||
-      feature.layer.id === "drainage-line" ||
-      feature.layer.id === "risk-zones-fill" ||
-      feature.layer.id === "risk-zones-outline"
-    ) {
-      setHovered(null);
+  const handleMouseMove = (e: maplibregl.MapLayerMouseEvent) => {
+    if (e.features && e.features.length > 0) {
       setCursor("pointer");
-      return;
+      setHovered(e.features[0]);
+    } else {
+      setCursor("grab");
+      setHovered(null);
     }
+  };
 
-    const id =
-      (feature.properties.id as string | undefined) ??
-      `${feature.properties.areaName}-${feature.properties.district}`;
-
-    setHovered({ id });
-    setCursor("pointer");
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
+  const handleMouseLeave = () => {
+    setCursor("grab");
     setHovered(null);
-    setCursor("");
-  }, []);
+  };
 
   return {
     cursor,
