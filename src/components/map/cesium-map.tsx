@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
 
 import type { PlaceItem } from "@/data/places";
@@ -27,13 +27,14 @@ function createViewer(container: HTMLDivElement) {
   Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
 
   return new Cesium.Viewer(container, {
+    baseLayer: Cesium.ImageryLayer.fromWorldImagery({}),
     terrain: Cesium.Terrain.fromWorldTerrain({
       requestVertexNormals: true,
       requestWaterMask: true,
     }),
     animation: false,
     timeline: false,
-    baseLayerPicker: true,
+    baseLayerPicker: false,
     sceneModePicker: false,
     geocoder: false,
     navigationHelpButton: false,
@@ -49,11 +50,40 @@ function toRgbaColor(opacity: number) {
   return `rgba(37,99,235,${alpha.toFixed(3)})`;
 }
 
+type SelectedBuildingInfo = {
+  name: string;
+  height: string;
+  kind: string;
+  sourceId: string;
+};
+
+function getFeatureProperty(
+  feature: Cesium.Cesium3DTileFeature,
+  keys: string[],
+): string {
+  for (const key of keys) {
+    if (feature.hasProperty(key)) {
+      const value = feature.getProperty(key);
+      if (
+        value !== undefined &&
+        value !== null &&
+        String(value).trim() !== ""
+      ) {
+        return String(value);
+      }
+    }
+  }
+
+  return "N/A";
+}
+
 export function CesiumMap({ selectedPlace }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
   const { visibleLayers, buildingOpacity } = useFloodStore();
+  const [selectedBuilding, setSelectedBuilding] =
+    useState<SelectedBuildingInfo | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || viewerRef.current) return;
@@ -70,7 +100,30 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
       duration: 1.5,
     });
 
+    const clickHandler = new Cesium.ScreenSpaceEventHandler(
+      viewer.scene.canvas,
+    );
+    clickHandler.setInputAction(
+      (movement: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+        const picked = viewer.scene.pick(movement.position);
+
+        if (picked && picked instanceof Cesium.Cesium3DTileFeature) {
+          setSelectedBuilding({
+            name: getFeatureProperty(picked, ["name", "name:en"]),
+            height: getFeatureProperty(picked, ["height", "building:levels"]),
+            kind: getFeatureProperty(picked, ["building", "building:use"]),
+            sourceId: getFeatureProperty(picked, ["id", "elementId"]),
+          });
+          return;
+        }
+
+        setSelectedBuilding(null);
+      },
+      Cesium.ScreenSpaceEventType.LEFT_CLICK,
+    );
+
     return () => {
+      clickHandler.destroy();
       if (osmBuildingsRef.current) {
         viewer.scene.primitives.remove(osmBuildingsRef.current);
         osmBuildingsRef.current = null;
@@ -131,5 +184,31 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
     };
   }, [buildingOpacity, visibleLayers.buildings]);
 
-  return <div ref={containerRef} className="h-full w-full bg-slate-900" />;
+  return (
+    <div className="relative h-full w-full bg-slate-900">
+      <div ref={containerRef} className="h-full w-full" />
+
+      {selectedBuilding && visibleLayers.buildings && (
+        <div className="pointer-events-none absolute top-4 right-4 z-20 w-[260px] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur">
+          <div className="text-sm font-semibold text-slate-900">
+            {selectedBuilding.name}
+          </div>
+          <div className="mt-2 space-y-1 text-xs text-slate-600">
+            <div>
+              <span className="font-medium text-slate-800">Type:</span>{" "}
+              {selectedBuilding.kind}
+            </div>
+            <div>
+              <span className="font-medium text-slate-800">Height/Levels:</span>{" "}
+              {selectedBuilding.height}
+            </div>
+            <div>
+              <span className="font-medium text-slate-800">OSM ID:</span>{" "}
+              {selectedBuilding.sourceId}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
