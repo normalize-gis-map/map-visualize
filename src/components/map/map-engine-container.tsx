@@ -24,7 +24,7 @@ export function MapEngineContainer({
   const { mapEngine } = useFloodStore();
 
   if (mapEngine === "cesium") {
-    return <CesiumMap selectedPlace={selectedPlace} />;
+    return <CesiumMap selectedPlace={selectedPlace} floodData={floodData} />;
   }
 
   return <MapLibreMap selectedPlace={selectedPlace} floodData={floodData} />;
