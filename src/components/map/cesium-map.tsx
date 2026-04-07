@@ -12,8 +12,20 @@ type CesiumMapProps = {
   floodData: FloodGeoJson | null;
 };
 
+type OverpassWay = {
+  type: "way";
+  id: number;
+  tags?: Record<string, string>;
+  geometry?: Array<{ lat: number; lon: number }>;
+};
+
+type OverpassResponse = {
+  elements: OverpassWay[];
+};
+
 const CESIUM_ASSET_BASE_URL =
   "https://cesium.com/downloads/cesiumjs/releases/1.140/Build/Cesium/";
+const BUILDING_RADIUS_METERS = 3500;
 
 function createViewer(container: HTMLDivElement) {
   (
@@ -40,6 +52,85 @@ function createViewer(container: HTMLDivElement) {
     selectionIndicator: false,
     scene3DOnly: true,
   });
+}
+
+function parseBuildingHeight(tags?: Record<string, string>) {
+  const explicitHeight = Number.parseFloat(tags?.height ?? "");
+  if (Number.isFinite(explicitHeight)) {
+    return Math.max(explicitHeight, 8);
+  }
+
+  const levels = Number.parseInt(tags?.["building:levels"] ?? "", 10);
+  if (Number.isFinite(levels)) {
+    return Math.max(levels * 3, 9);
+  }
+
+  return 12;
+}
+
+async function fetchOsmBuildingWays(
+  latitude: number,
+  longitude: number,
+  signal?: AbortSignal,
+) {
+  const query = `[out:json][timeout:25];way["building"](around:${BUILDING_RADIUS_METERS},${latitude},${longitude});out geom;`;
+  const response = await fetch(
+    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+    { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch OSM building footprints");
+  }
+
+  const json = (await response.json()) as OverpassResponse;
+  return json.elements.filter((element) => element.type === "way");
+}
+
+function renderFallbackBuildings(
+  viewer: Cesium.Viewer,
+  floodData: FloodGeoJson,
+  buildingOpacity: number,
+) {
+  const ids: string[] = [];
+
+  floodData.features.slice(0, 120).forEach((feature, index) => {
+    if (feature.geometry.type !== "Polygon") return;
+
+    const ring = feature.geometry.coordinates[0];
+    if (!ring?.length) return;
+
+    const [longitude, latitude] = ring.reduce(
+      (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
+      [0, 0],
+    );
+    const lng = longitude / ring.length;
+    const lat = latitude / ring.length;
+
+    const height = 20 + (feature.properties.riskScore ?? 0.5) * 45;
+    const width = 24 + (index % 5) * 8;
+    const depth = 20 + (index % 4) * 6;
+    const entityId = `cesium-building-${feature.properties.id}-${index}`;
+
+    viewer.entities.add({
+      id: entityId,
+      name: `Building ${index + 1}`,
+      position: Cesium.Cartesian3.fromDegrees(lng, lat, height / 2),
+      box: {
+        dimensions: new Cesium.Cartesian3(width, depth, height),
+        material:
+          Cesium.Color.fromCssColorString("#2563eb").withAlpha(buildingOpacity),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString("#1e3a8a").withAlpha(
+          Math.min(buildingOpacity + 0.15, 1),
+        ),
+      },
+    });
+
+    ids.push(entityId);
+  });
+
+  return ids;
 }
 
 export function CesiumMap({ selectedPlace, floodData }: CesiumMapProps) {
@@ -92,52 +183,71 @@ export function CesiumMap({ selectedPlace, floodData }: CesiumMapProps) {
     }
     buildingEntitiesRef.current = [];
 
-    if (!visibleLayers.buildings || !floodData) {
+    if (!visibleLayers.buildings) {
       return;
     }
+    const cameraPosition = viewer.camera.positionCartographic;
+    const latitude = Cesium.Math.toDegrees(cameraPosition.latitude);
+    const longitude = Cesium.Math.toDegrees(cameraPosition.longitude);
+    const abortController = new AbortController();
 
-    const maxBuildings = 120;
-    const buildingIds: string[] = [];
+    void fetchOsmBuildingWays(latitude, longitude, abortController.signal)
+      .then((ways) => {
+        const ids: string[] = [];
 
-    floodData.features.slice(0, maxBuildings).forEach((feature, index) => {
-      if (feature.geometry.type !== "Polygon") return;
+        ways.slice(0, 450).forEach((way) => {
+          const geometry = way.geometry;
+          if (!geometry || geometry.length < 3) return;
 
-      const ring = feature.geometry.coordinates[0];
-      if (!ring?.length) return;
+          const positions = geometry.map((point) =>
+            Cesium.Cartesian3.fromDegrees(point.lon, point.lat),
+          );
+          const first = geometry[0];
+          const last = geometry[geometry.length - 1];
+          if (
+            first &&
+            last &&
+            (first.lon !== last.lon || first.lat !== last.lat)
+          ) {
+            positions.push(Cesium.Cartesian3.fromDegrees(first.lon, first.lat));
+          }
 
-      const [longitude, latitude] = ring.reduce(
-        (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
-        [0, 0],
-      );
-      const lng = longitude / ring.length;
-      const lat = latitude / ring.length;
+          const height = parseBuildingHeight(way.tags);
+          const entityId = `osm-building-${way.id}`;
 
-      const height = 20 + (feature.properties.riskScore ?? 0.5) * 45;
-      const width = 24 + (index % 5) * 8;
-      const depth = 20 + (index % 4) * 6;
-      const entityId = `cesium-building-${feature.properties.id}-${index}`;
+          viewer.entities.add({
+            id: entityId,
+            polygon: {
+              hierarchy: positions,
+              extrudedHeight: height,
+              material:
+                Cesium.Color.fromCssColorString("#2563eb").withAlpha(
+                  buildingOpacity,
+                ),
+              outline: true,
+              outlineColor: Cesium.Color.fromCssColorString(
+                "#1e3a8a",
+              ).withAlpha(Math.min(buildingOpacity + 0.2, 1)),
+            },
+          });
 
-      viewer.entities.add({
-        id: entityId,
-        name: `Building ${index + 1}`,
-        position: Cesium.Cartesian3.fromDegrees(lng, lat, height / 2),
-        box: {
-          dimensions: new Cesium.Cartesian3(width, depth, height),
-          material:
-            Cesium.Color.fromCssColorString("#2563eb").withAlpha(
-              buildingOpacity,
-            ),
-          outline: true,
-          outlineColor: Cesium.Color.fromCssColorString("#1e3a8a").withAlpha(
-            Math.min(buildingOpacity + 0.15, 1),
-          ),
-        },
+          ids.push(entityId);
+        });
+
+        buildingEntitiesRef.current = ids;
+      })
+      .catch(() => {
+        if (!floodData) return;
+        buildingEntitiesRef.current = renderFallbackBuildings(
+          viewer,
+          floodData,
+          buildingOpacity,
+        );
       });
 
-      buildingIds.push(entityId);
-    });
-
-    buildingEntitiesRef.current = buildingIds;
+    return () => {
+      abortController.abort();
+    };
   }, [buildingOpacity, floodData, visibleLayers.buildings]);
 
   return <div ref={containerRef} className="h-full w-full bg-slate-900" />;
