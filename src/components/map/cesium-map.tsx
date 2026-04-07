@@ -137,6 +137,7 @@ export function CesiumMap({ selectedPlace, floodData }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const buildingEntitiesRef = useRef<string[]>([]);
+  const lastBuildingFetchKeyRef = useRef<string>("");
   const { visibleLayers, buildingOpacity } = useFloodStore();
 
   useEffect(() => {
@@ -178,75 +179,100 @@ export function CesiumMap({ selectedPlace, floodData }: CesiumMapProps) {
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    for (const entityId of buildingEntitiesRef.current) {
-      viewer.entities.removeById(entityId);
-    }
-    buildingEntitiesRef.current = [];
-
     if (!visibleLayers.buildings) {
+      for (const entityId of buildingEntitiesRef.current) {
+        viewer.entities.removeById(entityId);
+      }
+      buildingEntitiesRef.current = [];
+      lastBuildingFetchKeyRef.current = "";
       return;
     }
-    const cameraPosition = viewer.camera.positionCartographic;
-    const latitude = Cesium.Math.toDegrees(cameraPosition.latitude);
-    const longitude = Cesium.Math.toDegrees(cameraPosition.longitude);
-    const abortController = new AbortController();
+    let active = true;
+    let abortController: AbortController | null = null;
 
-    void fetchOsmBuildingWays(latitude, longitude, abortController.signal)
-      .then((ways) => {
-        const ids: string[] = [];
+    const renderBuildings = () => {
+      const cameraPosition = viewer.camera.positionCartographic;
+      const latitude = Cesium.Math.toDegrees(cameraPosition.latitude);
+      const longitude = Cesium.Math.toDegrees(cameraPosition.longitude);
+      const fetchKey = `${latitude.toFixed(3)}:${longitude.toFixed(3)}:${buildingOpacity.toFixed(2)}`;
 
-        ways.slice(0, 450).forEach((way) => {
-          const geometry = way.geometry;
-          if (!geometry || geometry.length < 3) return;
+      if (fetchKey === lastBuildingFetchKeyRef.current) return;
+      lastBuildingFetchKeyRef.current = fetchKey;
 
-          const positions = geometry.map((point) =>
-            Cesium.Cartesian3.fromDegrees(point.lon, point.lat),
-          );
-          const first = geometry[0];
-          const last = geometry[geometry.length - 1];
-          if (
-            first &&
-            last &&
-            (first.lon !== last.lon || first.lat !== last.lat)
-          ) {
-            positions.push(Cesium.Cartesian3.fromDegrees(first.lon, first.lat));
-          }
+      for (const entityId of buildingEntitiesRef.current) {
+        viewer.entities.removeById(entityId);
+      }
+      buildingEntitiesRef.current = [];
 
-          const height = parseBuildingHeight(way.tags);
-          const entityId = `osm-building-${way.id}`;
+      abortController?.abort();
+      abortController = new AbortController();
 
-          viewer.entities.add({
-            id: entityId,
-            polygon: {
-              hierarchy: positions,
-              extrudedHeight: height,
-              material:
-                Cesium.Color.fromCssColorString("#2563eb").withAlpha(
-                  buildingOpacity,
-                ),
-              outline: true,
-              outlineColor: Cesium.Color.fromCssColorString(
-                "#1e3a8a",
-              ).withAlpha(Math.min(buildingOpacity + 0.2, 1)),
-            },
+      void fetchOsmBuildingWays(latitude, longitude, abortController.signal)
+        .then((ways) => {
+          if (!active) return;
+
+          const ids: string[] = [];
+
+          ways.slice(0, 450).forEach((way) => {
+            const geometry = way.geometry;
+            if (!geometry || geometry.length < 3) return;
+
+            const positions = geometry.map((point) =>
+              Cesium.Cartesian3.fromDegrees(point.lon, point.lat),
+            );
+            const first = geometry[0];
+            const last = geometry[geometry.length - 1];
+            if (
+              first &&
+              last &&
+              (first.lon !== last.lon || first.lat !== last.lat)
+            ) {
+              positions.push(
+                Cesium.Cartesian3.fromDegrees(first.lon, first.lat),
+              );
+            }
+
+            const height = parseBuildingHeight(way.tags);
+            const entityId = `osm-building-${way.id}`;
+
+            viewer.entities.add({
+              id: entityId,
+              polygon: {
+                hierarchy: positions,
+                extrudedHeight: height,
+                material:
+                  Cesium.Color.fromCssColorString("#2563eb").withAlpha(
+                    buildingOpacity,
+                  ),
+                outline: true,
+                outlineColor: Cesium.Color.fromCssColorString(
+                  "#1e3a8a",
+                ).withAlpha(Math.min(buildingOpacity + 0.2, 1)),
+              },
+            });
+
+            ids.push(entityId);
           });
 
-          ids.push(entityId);
+          buildingEntitiesRef.current = ids;
+        })
+        .catch(() => {
+          if (!active || !floodData) return;
+          buildingEntitiesRef.current = renderFallbackBuildings(
+            viewer,
+            floodData,
+            buildingOpacity,
+          );
         });
+    };
 
-        buildingEntitiesRef.current = ids;
-      })
-      .catch(() => {
-        if (!floodData) return;
-        buildingEntitiesRef.current = renderFallbackBuildings(
-          viewer,
-          floodData,
-          buildingOpacity,
-        );
-      });
+    renderBuildings();
+    viewer.camera.moveEnd.addEventListener(renderBuildings);
 
     return () => {
-      abortController.abort();
+      active = false;
+      abortController?.abort();
+      viewer.camera.moveEnd.removeEventListener(renderBuildings);
     };
   }, [buildingOpacity, floodData, visibleLayers.buildings]);
 
