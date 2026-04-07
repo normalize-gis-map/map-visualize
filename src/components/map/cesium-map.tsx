@@ -102,7 +102,9 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
     const viewer = createViewer(containerRef.current);
     viewer.scene.globe.depthTestAgainstTerrain = false;
     viewer.scene.globe.showWaterEffect = true;
-    viewer.scene.requestRenderMode = true;
+    // Keep continuous render so imagery tiles can fully refine and avoid
+    // visible semi-transparent tile patches while idle.
+    viewer.scene.requestRenderMode = false;
 
     viewerRef.current = viewer;
 

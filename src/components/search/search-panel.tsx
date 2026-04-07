@@ -22,7 +22,7 @@ export function SearchPanel({
 
     return PLACES.filter((place) =>
       place.label.toLowerCase().includes(normalized),
-    ).slice(0, 6);
+    ).slice(0, 30);
   }, [query]);
 
   return (
