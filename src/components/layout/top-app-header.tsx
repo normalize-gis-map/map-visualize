@@ -1,9 +1,10 @@
 "use client";
 
-import { MapPinned, UserCircle2 } from "lucide-react";
+import { MapPinned } from "lucide-react";
 
 import { MapControlsMenu } from "@/components/map/map-controls-menu";
 import { SearchPanel } from "@/components/search/search-panel";
+import { UserMenu } from "@/components/layout/user-menu";
 import type { PlaceItem } from "@/data/places";
 
 type TopAppHeaderProps = {
@@ -29,14 +30,7 @@ export function TopAppHeader({ onSelectPlace }: TopAppHeaderProps) {
 
           <div className="flex shrink-0 items-center gap-2">
             <MapControlsMenu />
-
-            <button
-              type="button"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100"
-              aria-label="Account"
-            >
-              <UserCircle2 className="h-5 w-5" />
-            </button>
+            <UserMenu />
           </div>
         </div>
       </div>
