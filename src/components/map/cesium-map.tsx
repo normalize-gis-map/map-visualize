@@ -27,7 +27,11 @@ function createViewer(container: HTMLDivElement) {
   Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
 
   return new Cesium.Viewer(container, {
-    baseLayer: Cesium.ImageryLayer.fromWorldImagery({}),
+    baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+      Cesium.createWorldImageryAsync({
+        style: Cesium.IonWorldImageryStyle.AERIAL_WITH_LABELS,
+      }),
+    ),
     terrain: Cesium.Terrain.fromWorldTerrain({
       requestVertexNormals: true,
       requestWaterMask: true,
