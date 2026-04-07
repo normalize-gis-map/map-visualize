@@ -1,19 +1,23 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import type { AuthUser } from "@/features/auth/types/auth.types";
 import {
   clearAuthSession,
   getStoredAuthUser,
+  subscribeAuthSession,
 } from "@/features/auth/utils/auth-session";
 
 export function useAuthSession() {
-  const [user, setUser] = useState<AuthUser | null>(() => getStoredAuthUser());
+  const user = useSyncExternalStore<AuthUser | null>(
+    subscribeAuthSession,
+    getStoredAuthUser,
+    () => null,
+  );
 
   const logout = useCallback(() => {
     clearAuthSession();
-    setUser(null);
   }, []);
 
   return { user, logout };
