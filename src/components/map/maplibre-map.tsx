@@ -9,6 +9,7 @@ import drainageData from "@/data/geojson/drainage-sample.json";
 import floodData from "@/data/geojson/flood-sample.json";
 import riskZonesData from "@/data/geojson/risk-zones-sample.json";
 import type { PlaceItem } from "@/data/places";
+import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { useFloodStore } from "@/features/flood/store/flood.store";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
@@ -28,6 +29,7 @@ import { MapLegend } from "./map-legend";
 
 type Props = {
   selectedPlace: PlaceItem | null;
+  floodData: FloodGeoJson | null;
 };
 
 const MAP_STYLE_2D =
@@ -35,9 +37,12 @@ const MAP_STYLE_2D =
 
 const MAP_STYLE_25D = "https://tiles.openfreemap.org/styles/liberty";
 
-export function MapLibreMap({ selectedPlace }: Props) {
+export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props) {
   const { mapMode, visibleLayers, buildingOpacity } = useFloodStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
+  const activeFloodData =
+    (serverFloodData as FeatureCollection | null) ??
+    (floodData as FeatureCollection);
 
   const initialViewState = useMemo(
     () => ({
@@ -141,7 +146,7 @@ export function MapLibreMap({ selectedPlace }: Props) {
           <Source
             id="flood"
             type="geojson"
-            data={floodData as FeatureCollection}
+            data={activeFloodData}
           >
             {mapMode === "2.5d" ? (
               <Layer

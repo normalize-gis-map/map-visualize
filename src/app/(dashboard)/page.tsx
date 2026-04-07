@@ -28,7 +28,7 @@ export default function Page() {
             {error}
           </div>
         ) : (
-          <MapEngineContainer selectedPlace={selectedPlace} />
+          <MapEngineContainer selectedPlace={selectedPlace} floodData={data} />
         )}
       </div>
 
