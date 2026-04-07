@@ -153,7 +153,7 @@ export function FeaturePopup({
       onClose={onClose}
       offset={24}
       maxWidth="340px"
-      className="[&_.maplibregl-popup-content]:overflow-hidden [&_.maplibregl-popup-content]:rounded-3xl [&_.maplibregl-popup-content]:border [&_.maplibregl-popup-content]:border-slate-200/90 [&_.maplibregl-popup-content]:bg-white/95 [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:shadow-[0_16px_60px_-20px_rgba(15,23,42,0.42)] [&_.maplibregl-popup-content]:backdrop-blur [&_.maplibregl-popup-tip]:border-t-white/95"
+      className="[&_.maplibregl-popup-content]:pointer-events-auto [&_.maplibregl-popup-content]:cursor-default [&_.maplibregl-popup-content]:overflow-hidden [&_.maplibregl-popup-content]:rounded-3xl [&_.maplibregl-popup-content]:border [&_.maplibregl-popup-content]:border-slate-200/90 [&_.maplibregl-popup-content]:bg-white/95 [&_.maplibregl-popup-content]:p-0 [&_.maplibregl-popup-content]:shadow-[0_16px_60px_-20px_rgba(15,23,42,0.42)] [&_.maplibregl-popup-content]:backdrop-blur [&_.maplibregl-popup-tip]:border-t-white/95"
     >
       <FeaturePopupCard
         title={title}

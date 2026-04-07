@@ -7,6 +7,10 @@ import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { useFloodStore } from "@/features/flood/store/flood.store";
 import { FeaturePopupCard } from "@/components/map/feature-popup";
+import {
+  DEFAULT_MAP_CURSOR,
+  INSPECT_FEATURE_CURSOR,
+} from "@/lib/constants/cursor.constants";
 
 type CesiumMapProps = {
   selectedPlace: PlaceItem | null;
@@ -140,8 +144,8 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
         const picked = viewer.scene.pick(movement.endPosition);
         (viewer.container as HTMLElement).style.cursor =
           picked && picked instanceof Cesium.Cesium3DTileFeature
-            ? "zoom-in"
-            : "grab";
+            ? INSPECT_FEATURE_CURSOR
+            : DEFAULT_MAP_CURSOR;
       },
       Cesium.ScreenSpaceEventType.MOUSE_MOVE,
     );
@@ -154,7 +158,7 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
     viewer.camera.moveStart.addEventListener(handleMoveStart);
 
     return () => {
-      (viewer.container as HTMLElement).style.cursor = "grab";
+      (viewer.container as HTMLElement).style.cursor = DEFAULT_MAP_CURSOR;
       viewer.camera.moveStart.removeEventListener(handleMoveStart);
       clickHandler.destroy();
       if (osmBuildingsRef.current) {
