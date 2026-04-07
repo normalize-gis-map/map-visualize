@@ -1,15 +1,13 @@
 "use client";
 
-import { Loader2, Route } from "lucide-react";
+import { ArrowRight, Loader2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { PLACES, type PlaceItem } from "@/data/places";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import { getDrivingRoutes } from "@/services/routing/route.service";
 
 type RoutePlannerProps = {
-  closeSignal: number;
   onRoutesChange: (
     payload: {
       from: PlaceItem;
@@ -33,7 +31,7 @@ function formatDistance(meters: number) {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
-export function RoutePlanner({ closeSignal, onRoutesChange }: RoutePlannerProps) {
+export function RoutePlanner({ onRoutesChange }: RoutePlannerProps) {
   const [fromLabel, setFromLabel] = useState("");
   const [toLabel, setToLabel] = useState("");
   const [routes, setRoutes] = useState<RouteAlternative[]>([]);
@@ -50,11 +48,11 @@ export function RoutePlanner({ closeSignal, onRoutesChange }: RoutePlannerProps)
     [toLabel],
   );
 
-  const searchId = "hcm-place-options";
+  const searchId = "hcm-route-place-options";
 
   const handlePlan = async () => {
     if (!fromPlace || !toPlace) {
-      setError("Chọn đủ điểm đi và điểm đến từ danh sách gợi ý.");
+      setError("Chọn đúng From/To từ danh sách gợi ý.");
       return;
     }
     setLoading(true);
@@ -79,6 +77,15 @@ export function RoutePlanner({ closeSignal, onRoutesChange }: RoutePlannerProps)
     }
   };
 
+  const handleClear = () => {
+    setFromLabel("");
+    setToLabel("");
+    setRoutes([]);
+    setActiveRoute(0);
+    setError("");
+    onRoutesChange(null);
+  };
+
   const handleSelectRoute = (index: number) => {
     if (!fromPlace || !toPlace || !routes[index]) return;
     setActiveRoute(index);
@@ -91,73 +98,89 @@ export function RoutePlanner({ closeSignal, onRoutesChange }: RoutePlannerProps)
   };
 
   return (
-    <DropdownPanel
-      label="Route"
-      icon={<Route className="h-4 w-4" />}
-      closeSignal={closeSignal}
-      className="w-full sm:w-auto"
-    >
-      <div className="space-y-2">
-        <input
-          list={searchId}
-          value={fromLabel}
-          onChange={(event) => setFromLabel(event.target.value)}
-          placeholder="Điểm đi (VD: Quận 1)"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-        />
-        <input
-          list={searchId}
-          value={toLabel}
-          onChange={(event) => setToLabel(event.target.value)}
-          placeholder="Điểm đến (VD: Huyện Cần Giờ)"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-        />
-        <datalist id={searchId}>
-          {PLACES.map((place) => (
-            <option key={place.key} value={place.label} />
-          ))}
-        </datalist>
+    <div className="min-w-0 flex-1">
+      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase">
+            From
+          </span>
+          <input
+            list={searchId}
+            value={fromLabel}
+            onChange={(event) => setFromLabel(event.target.value)}
+            placeholder="Quận 1..."
+            className="w-full bg-transparent text-sm outline-none"
+          />
+        </label>
+
+        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase">
+            To
+          </span>
+          <input
+            list={searchId}
+            value={toLabel}
+            onChange={(event) => setToLabel(event.target.value)}
+            placeholder="Huyện Cần Giờ..."
+            className="w-full bg-transparent text-sm outline-none"
+          />
+        </label>
 
         <button
           type="button"
           onClick={handlePlan}
           disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-blue-300"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-blue-300"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Tìm đường
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+          Go
         </button>
 
-        {error ? <p className="text-xs text-red-600">{error}</p> : null}
-
-        {routes.length > 0 ? (
-          <div className="space-y-2 pt-1">
-            {routes.map((route, index) => {
-              const active = index === activeRoute;
-              return (
-                <button
-                  key={route.id}
-                  type="button"
-                  onClick={() => handleSelectRoute(index)}
-                  className={`w-full rounded-xl border px-3 py-2 text-left ${
-                    active
-                      ? "border-blue-300 bg-blue-50"
-                      : "border-slate-200 bg-slate-50 hover:bg-slate-100"
-                  }`}
-                >
-                  <div className="text-sm font-semibold text-slate-800">
-                    {active ? "Đường chính" : `Gợi ý ${index + 1}`}
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    {formatDuration(route.durationSeconds)} •{" "}
-                    {formatDistance(route.distanceMeters)}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
+        <button
+          type="button"
+          onClick={handleClear}
+          className="inline-flex h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <X className="h-4 w-4" />
+          Clear
+        </button>
       </div>
-    </DropdownPanel>
+
+      <datalist id={searchId}>
+        {PLACES.map((place) => (
+          <option key={place.key} value={place.label} />
+        ))}
+      </datalist>
+
+      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+
+      {routes.length > 0 ? (
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {routes.map((route, index) => {
+            const active = index === activeRoute;
+            return (
+              <button
+                key={route.id}
+                type="button"
+                onClick={() => handleSelectRoute(index)}
+                className={`rounded-xl border px-3 py-2 text-left ${
+                  active
+                    ? "border-blue-300 bg-blue-50"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                }`}
+              >
+                <div className="text-sm font-semibold text-slate-800">
+                  {active ? "Đường chính" : `Gợi ý ${index + 1}`}
+                </div>
+                <div className="text-xs text-slate-600">
+                  {formatDuration(route.durationSeconds)} •{" "}
+                  {formatDistance(route.distanceMeters)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }

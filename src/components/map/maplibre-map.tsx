@@ -118,28 +118,11 @@ export function MapLibreMap({
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
-    const activeRoute = routePayload.routes[routePayload.activeIndex];
-    if (!activeRoute?.geometry.coordinates.length) return;
-
-    let minLng = Number.POSITIVE_INFINITY;
-    let minLat = Number.POSITIVE_INFINITY;
-    let maxLng = Number.NEGATIVE_INFINITY;
-    let maxLat = Number.NEGATIVE_INFINITY;
-
-    for (const [lng, lat] of activeRoute.geometry.coordinates) {
-      minLng = Math.min(minLng, lng);
-      minLat = Math.min(minLat, lat);
-      maxLng = Math.max(maxLng, lng);
-      maxLat = Math.max(maxLat, lat);
-    }
-
-    mapInstance.fitBounds(
-      [
-        [minLng, minLat],
-        [maxLng, maxLat],
-      ],
-      { padding: 80, duration: 900 },
-    );
+    mapInstance.flyTo({
+      center: routePayload.from.center,
+      zoom: Math.max(mapInstance.getZoom(), 13),
+      duration: 900,
+    });
   }, [mapInstance, routePayload]);
 
   const routeCollection: FeatureCollection | null = routePayload

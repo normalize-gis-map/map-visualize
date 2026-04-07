@@ -1,13 +1,13 @@
 "use client";
 
 import { MapPinned } from "lucide-react";
+import { useState } from "react";
 
 import { MapControlsMenu } from "@/components/map/map-controls-menu";
 import { SearchPanel } from "@/components/search/search-panel";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { PlaceItem } from "@/data/places";
-import { useFloodStore } from "@/features/flood/store/flood.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type TopAppHeaderProps = {
@@ -23,7 +23,7 @@ type TopAppHeaderProps = {
 };
 
 export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
-  const { mapInteractionTick } = useFloodStore();
+  const [mode, setMode] = useState<"view" | "route">("view");
 
   return (
     <div className="pointer-events-auto absolute inset-x-0 top-0 z-30">
@@ -37,16 +37,37 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
             <MapPinned className="h-5 w-5" />
           </button>
 
+          <div className="inline-flex h-12 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setMode("view")}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                mode === "view" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              View
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("route")}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                mode === "route" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              Route
+            </button>
+          </div>
+
           <div className="min-w-0 flex-1">
-            <SearchPanel onSelectPlace={onSelectPlace} compact />
+            {mode === "view" ? (
+              <SearchPanel onSelectPlace={onSelectPlace} compact />
+            ) : (
+              <RoutePlanner onRoutesChange={onRoutesChange} />
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <RoutePlanner
-              closeSignal={mapInteractionTick}
-              onRoutesChange={onRoutesChange}
-            />
-            <MapControlsMenu />
+            {mode === "view" ? <MapControlsMenu /> : null}
             <UserMenu />
           </div>
         </div>
