@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import type { RouteAlternative } from "@/features/map/types/route.types";
 import { useFloodStore } from "@/features/flood/store/flood.store";
 import { MapLibreMap } from "./maplibre-map";
 
@@ -15,11 +16,18 @@ const CesiumMap = dynamic(
 type MapEngineContainerProps = {
   selectedPlace: PlaceItem | null;
   floodData: FloodGeoJson | null;
+  routePayload: {
+    from: PlaceItem;
+    to: PlaceItem;
+    routes: RouteAlternative[];
+    activeIndex: number;
+  } | null;
 };
 
 export function MapEngineContainer({
   selectedPlace,
   floodData,
+  routePayload,
 }: MapEngineContainerProps) {
   const { mapEngine } = useFloodStore();
 
@@ -27,5 +35,11 @@ export function MapEngineContainer({
     return <CesiumMap selectedPlace={selectedPlace} floodData={floodData} />;
   }
 
-  return <MapLibreMap selectedPlace={selectedPlace} floodData={floodData} />;
+  return (
+    <MapLibreMap
+      selectedPlace={selectedPlace}
+      floodData={floodData}
+      routePayload={routePayload}
+    />
+  );
 }

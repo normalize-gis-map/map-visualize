@@ -10,6 +10,7 @@ import floodData from "@/data/geojson/flood-sample.json";
 import riskZonesData from "@/data/geojson/risk-zones-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import type { RouteAlternative } from "@/features/map/types/route.types";
 import { useFloodStore } from "@/features/flood/store/flood.store";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
@@ -30,6 +31,12 @@ import { MapLegend } from "./map-legend";
 type Props = {
   selectedPlace: PlaceItem | null;
   floodData: FloodGeoJson | null;
+  routePayload: {
+    from: PlaceItem;
+    to: PlaceItem;
+    routes: RouteAlternative[];
+    activeIndex: number;
+  } | null;
 };
 
 const MAP_STYLE_2D =
@@ -37,7 +44,11 @@ const MAP_STYLE_2D =
 
 const MAP_STYLE_25D = "https://tiles.openfreemap.org/styles/liberty";
 
-export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props) {
+export function MapLibreMap({
+  selectedPlace,
+  floodData: serverFloodData,
+  routePayload,
+}: Props) {
   const { mapMode, visibleLayers, buildingOpacity, notifyMapInteraction } =
     useFloodStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
@@ -105,6 +116,46 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
     };
   }, [mapInstance, visibleLayers.drainage]);
 
+  useEffect(() => {
+    if (!mapInstance || !routePayload) return;
+    const activeRoute = routePayload.routes[routePayload.activeIndex];
+    if (!activeRoute?.geometry.coordinates.length) return;
+
+    let minLng = Number.POSITIVE_INFINITY;
+    let minLat = Number.POSITIVE_INFINITY;
+    let maxLng = Number.NEGATIVE_INFINITY;
+    let maxLat = Number.NEGATIVE_INFINITY;
+
+    for (const [lng, lat] of activeRoute.geometry.coordinates) {
+      minLng = Math.min(minLng, lng);
+      minLat = Math.min(minLat, lat);
+      maxLng = Math.max(maxLng, lng);
+      maxLat = Math.max(maxLat, lat);
+    }
+
+    mapInstance.fitBounds(
+      [
+        [minLng, minLat],
+        [maxLng, maxLat],
+      ],
+      { padding: 80, duration: 900 },
+    );
+  }, [mapInstance, routePayload]);
+
+  const routeCollection: FeatureCollection | null = routePayload
+    ? {
+        type: "FeatureCollection",
+        features: routePayload.routes.map((route, index) => ({
+          type: "Feature",
+          geometry: route.geometry,
+          properties: {
+            routeId: route.id,
+            isPrimary: index === routePayload.activeIndex ? 1 : 0,
+          },
+        })),
+      }
+    : null;
+
   return (
     <div className="map-shell relative h-full w-full">
       <Map
@@ -136,6 +187,36 @@ export function MapLibreMap({ selectedPlace, floodData: serverFloodData }: Props
         onLoad={(e) => setMapInstance(e.target)}
       >
         <NavigationControl position="bottom-right" />
+
+        {routeCollection ? (
+          <Source id="routes" type="geojson" data={routeCollection}>
+            <Layer
+              id="route-alternatives"
+              type="line"
+              paint={{
+                "line-color": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  "#1d4ed8",
+                  "#93c5fd",
+                ],
+                "line-width": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  6,
+                  4,
+                ],
+                "line-opacity": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  0.95,
+                  0.45,
+                ],
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+          </Source>
+        ) : null}
 
         {visibleLayers.riskZones && (
           <Source
