@@ -27,7 +27,10 @@ function createViewer(container: HTMLDivElement) {
   Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
 
   return new Cesium.Viewer(container, {
-    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+    terrain: Cesium.Terrain.fromWorldTerrain({
+      requestVertexNormals: true,
+      requestWaterMask: true,
+    }),
     animation: false,
     timeline: false,
     baseLayerPicker: true,
@@ -57,6 +60,7 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
 
     const viewer = createViewer(containerRef.current);
     viewer.scene.globe.depthTestAgainstTerrain = false;
+    viewer.scene.globe.showWaterEffect = true;
     viewer.scene.requestRenderMode = true;
 
     viewerRef.current = viewer;
