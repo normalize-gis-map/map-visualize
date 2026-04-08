@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowRight, Loader2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PLACES, type PlaceItem } from "@/data/places";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -16,6 +16,8 @@ type RoutePlannerProps = {
       activeIndex: number;
     } | null,
   ) => void;
+  initialToLabel?: string;
+  onBackToSearch?: () => void;
 };
 
 function formatDuration(seconds: number) {
@@ -31,7 +33,11 @@ function formatDistance(meters: number) {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
-export function RoutePlanner({ onRoutesChange }: RoutePlannerProps) {
+export function RoutePlanner({
+  onRoutesChange,
+  initialToLabel,
+  onBackToSearch,
+}: RoutePlannerProps) {
   const [fromLabel, setFromLabel] = useState("");
   const [toLabel, setToLabel] = useState("");
   const [routes, setRoutes] = useState<RouteAlternative[]>([]);
@@ -49,6 +55,12 @@ export function RoutePlanner({ onRoutesChange }: RoutePlannerProps) {
   );
 
   const searchId = "hcm-route-place-options";
+
+  useEffect(() => {
+    if (initialToLabel) {
+      setToLabel(initialToLabel);
+    }
+  }, [initialToLabel]);
 
   const handlePlan = async () => {
     if (!fromPlace || !toPlace) {
@@ -99,7 +111,17 @@ export function RoutePlanner({ onRoutesChange }: RoutePlannerProps) {
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm">
-      <div className="grid gap-2 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
+      <div className="grid gap-2 md:grid-cols-[auto_minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
+        {onBackToSearch ? (
+          <button
+            type="button"
+            onClick={onBackToSearch}
+            className="inline-flex h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 px-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Search
+          </button>
+        ) : null}
         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
           <span className="text-[11px] font-semibold text-slate-500 uppercase">
             From

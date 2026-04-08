@@ -1,6 +1,6 @@
 "use client";
 
-import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
+import Map, { Layer, Marker, NavigationControl, Source } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -139,9 +139,8 @@ export function MapLibreMap({
       if (!mapInstance.getLayer("route-motion")) return;
       routePhaseRef.current = (routePhaseRef.current + 0.08) % 1;
       mapInstance.setPaintProperty("route-motion", "line-dasharray", [
-        0.15,
-        1.1,
-        1 + routePhaseRef.current * 1.3,
+        0.2 + routePhaseRef.current * 0.5,
+        1.25,
       ]);
       mapInstance.triggerRepaint();
     }, 90);
@@ -149,7 +148,7 @@ export function MapLibreMap({
     return () => {
       globalThis.clearInterval(interval);
       if (mapInstance.getLayer("route-motion")) {
-        mapInstance.setPaintProperty("route-motion", "line-dasharray", [0.15, 1.1, 1]);
+        mapInstance.setPaintProperty("route-motion", "line-dasharray", [0.2, 1.25]);
       }
     };
   }, [mapInstance, activeRouteId]);
@@ -404,7 +403,7 @@ export function MapLibreMap({
                 "line-color": "#bfdbfe",
                 "line-width": 3,
                 "line-opacity": 0.9,
-                "line-dasharray": [0.1, 1.1, 1],
+                "line-dasharray": [0.2, 1.25],
               }}
               layout={{ "line-cap": "round", "line-join": "round" }}
             />
@@ -521,6 +520,37 @@ export function MapLibreMap({
             ]}
           />
         )}
+
+        {activeRoute ? (
+          <>
+            <Marker
+              longitude={activeRoute.geometry.coordinates[0][0]}
+              latitude={activeRoute.geometry.coordinates[0][1]}
+              anchor="bottom"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-xs font-bold text-white shadow-lg">
+                A
+              </div>
+            </Marker>
+            <Marker
+              longitude={
+                activeRoute.geometry.coordinates[
+                  activeRoute.geometry.coordinates.length - 1
+                ][0]
+              }
+              latitude={
+                activeRoute.geometry.coordinates[
+                  activeRoute.geometry.coordinates.length - 1
+                ][1]
+              }
+              anchor="bottom"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-xs font-bold text-white shadow-lg">
+                B
+              </div>
+            </Marker>
+          </>
+        ) : null}
       </Map>
 
       {activeRoute && routePayload ? (

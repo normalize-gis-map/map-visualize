@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPinned } from "lucide-react";
+import { Car, Coffee, Fuel, MapPinned, UtensilsCrossed } from "lucide-react";
 import { useState } from "react";
 
 import { MapControlsMenu } from "@/components/map/map-controls-menu";
@@ -26,8 +26,16 @@ type TopAppHeaderProps = {
 export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
   const { mapEngine, hasHydrated } = useFloodStore();
   const [mode, setMode] = useState<"view" | "route">("view");
+  const [selectedPreviewPlace, setSelectedPreviewPlace] = useState<PlaceItem | null>(
+    null,
+  );
   const safeMapEngine = hasHydrated ? mapEngine : "maplibre";
   const activeMode = safeMapEngine === "cesium" ? "view" : mode;
+
+  const handleSelectPlace = (place: PlaceItem) => {
+    setSelectedPreviewPlace(place);
+    onSelectPlace(place);
+  };
 
   return (
     <div className="pointer-events-auto absolute inset-x-0 top-0 z-30">
@@ -77,11 +85,54 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
 
           <div className="mt-3">
             {activeMode === "view" ? (
-              <SearchPanel onSelectPlace={onSelectPlace} compact />
+              <SearchPanel onSelectPlace={handleSelectPlace} compact />
             ) : (
-              <RoutePlanner onRoutesChange={onRoutesChange} />
+              <RoutePlanner
+                onRoutesChange={onRoutesChange}
+                initialToLabel={selectedPreviewPlace?.label}
+                onBackToSearch={() => setMode("view")}
+              />
             )}
           </div>
+
+          {activeMode === "view" && selectedPreviewPlace ? (
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold tracking-[0.13em] text-slate-500 uppercase">
+                    Search Result
+                  </div>
+                  <div className="text-base font-semibold text-slate-900">
+                    {selectedPreviewPlace.label}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMode("route")}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Đường đi
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { label: "Gas", icon: Fuel },
+                  { label: "Parking", icon: Car },
+                  { label: "Food", icon: UtensilsCrossed },
+                  { label: "Cafe", icon: Coffee },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                  >
+                    <item.icon className="h-4 w-4 text-slate-500" />
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
