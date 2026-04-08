@@ -114,11 +114,44 @@ export function MapLibreMap({
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
+    const activeRoute = routePayload.routes[routePayload.activeIndex];
+    const [start, next] = activeRoute.geometry.coordinates;
+    const bearing =
+      start && next
+        ? (Math.atan2(next[0] - start[0], next[1] - start[1]) * 180) / Math.PI
+        : 0;
+
     mapInstance.flyTo({
       center: routePayload.from.center,
       zoom: Math.max(mapInstance.getZoom(), 13),
+      pitch: mapMode === "2.5d" ? 62 : 0,
+      bearing: mapMode === "2.5d" ? bearing : 0,
       duration: 900,
     });
+  }, [mapInstance, routePayload, mapMode]);
+
+  useEffect(() => {
+    if (!mapInstance || !routePayload?.routes.length) return;
+    let frame = 0;
+    const start = performance.now();
+
+    const tick = (time: number) => {
+      if (!mapInstance.getLayer("route-motion")) return;
+      const phase = ((time - start) / 900) % 1;
+      mapInstance.setPaintProperty("route-motion", "line-dasharray", [
+        0.1,
+        1.1,
+        1 + phase * 1.2,
+      ]);
+      mapInstance.triggerRepaint();
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
   }, [mapInstance, routePayload]);
 
   const routeCollection: FeatureCollection | null = routePayload
@@ -304,7 +337,32 @@ export function MapLibreMap({
         )}
 
         {routeCollection ? (
-          <Source id="routes" type="geojson" data={routeCollection}>
+          <Source id="routes" type="geojson" data={routeCollection} lineMetrics>
+            <Layer
+              id="route-casing"
+              type="line"
+              paint={{
+                "line-color": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  "#0f172a",
+                  "#475569",
+                ],
+                "line-width": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  12,
+                  8,
+                ],
+                "line-opacity": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  0.32,
+                  0.12,
+                ],
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
             <Layer
               id="route-alternatives"
               type="line"
@@ -318,7 +376,7 @@ export function MapLibreMap({
                 "line-width": [
                   "case",
                   ["==", ["get", "isPrimary"], 1],
-                  8,
+                  9,
                   5,
                 ],
                 "line-opacity": [
@@ -327,6 +385,18 @@ export function MapLibreMap({
                   0.95,
                   0.45,
                 ],
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="route-motion"
+              type="line"
+              filter={["==", ["get", "isPrimary"], 1]}
+              paint={{
+                "line-color": "#bfdbfe",
+                "line-width": 3,
+                "line-opacity": 0.9,
+                "line-dasharray": [0.1, 1.1, 1],
               }}
               layout={{ "line-cap": "round", "line-join": "round" }}
             />
