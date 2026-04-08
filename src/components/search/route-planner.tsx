@@ -1,11 +1,14 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bike, Car, Footprints, Loader2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { PLACES, type PlaceItem } from "@/data/places";
-import type { RouteAlternative } from "@/features/map/types/route.types";
-import { getDrivingRoutes } from "@/services/routing/route.service";
+import type {
+  RouteAlternative,
+  TransportMode,
+} from "@/features/map/types/route.types";
+import { getRoutes } from "@/services/routing/route.service";
 
 type RoutePlannerProps = {
   onRoutesChange: (
@@ -42,6 +45,7 @@ export function RoutePlanner({
   const [toLabel, setToLabel] = useState("");
   const [routes, setRoutes] = useState<RouteAlternative[]>([]);
   const [activeRoute, setActiveRoute] = useState(0);
+  const [mode, setMode] = useState<TransportMode>("car");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -71,7 +75,7 @@ export function RoutePlanner({
     setError("");
 
     try {
-      const alternatives = await getDrivingRoutes(fromPlace, toPlace);
+      const alternatives = await getRoutes(fromPlace, toPlace, mode);
       setRoutes(alternatives);
       setActiveRoute(0);
       onRoutesChange({
@@ -111,6 +115,32 @@ export function RoutePlanner({
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm">
+      <div className="mb-2 grid grid-cols-3 gap-2">
+        {[
+          { id: "car", label: "Car", icon: Car },
+          { id: "bike", label: "Bike", icon: Bike },
+          { id: "walk", label: "Walk", icon: Footprints },
+        ].map((item) => {
+          const Icon = item.icon;
+          const active = mode === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setMode(item.id as TransportMode)}
+              className={`flex h-10 items-center justify-center gap-2 rounded-xl border text-sm font-medium ${
+                active
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid gap-2 md:grid-cols-[auto_minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
         {onBackToSearch ? (
           <button

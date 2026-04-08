@@ -87,9 +87,10 @@ export function MapLibreMap({
   const selectedId = selectedFlood?.id ?? "";
   const glyphFallbackAppliedRef = useRef(false);
   const [routePanelOpen, setRoutePanelOpen] = useState(true);
-  const [navMode, setNavMode] = useState<"car" | "bike" | "walk">("car");
   const [isNavigating, setIsNavigating] = useState(false);
   const [navProgress, setNavProgress] = useState(0);
+  const [navHeading, setNavHeading] = useState(0);
+  const navHeadingRef = useRef(0);
 
   useEffect(() => {
     if (!mapInstance || !visibleLayers.drainage) return;
@@ -190,6 +191,7 @@ export function MapLibreMap({
     : null;
 
   const activeRoute = routePayload?.routes[routePayload.activeIndex] ?? null;
+  const navMode = activeRoute?.mode ?? "car";
   const routeFromLabel = routePayload?.from.label ?? "Start";
   const routeToLabel = routePayload?.to.label ?? "Destination";
   const etaMinutes = activeRoute
@@ -215,18 +217,39 @@ export function MapLibreMap({
     ];
   }, [activeRoute, navProgress]);
 
+  const activeStepIndex = useMemo(() => {
+    if (!activeRoute?.steps?.length) return 0;
+    return Math.min(
+      activeRoute.steps.length - 1,
+      Math.floor(navProgress * activeRoute.steps.length),
+    );
+  }, [activeRoute, navProgress]);
+
   useEffect(() => {
     if (!mapInstance || !activeRoute || !isNavigating) return;
     let frameId = 0;
     let last = performance.now();
     const speed =
       navMode === "car" ? 0.00025 : navMode === "bike" ? 0.00018 : 0.0001;
+    const points = activeRoute.geometry.coordinates;
 
     const animate = (now: number) => {
       const dt = now - last;
       last = now;
-      setNavProgress((prev) => {
-        const next = Math.min(1, prev + dt * speed);
+      setNavProgress((previousProgress) => {
+        const next = Math.min(1, previousProgress + dt * speed);
+        if (points.length > 1) {
+          const scaled = next * (points.length - 1);
+          const index = Math.min(points.length - 2, Math.floor(scaled));
+          const [lngA, latA] = points[index];
+          const [lngB, latB] = points[index + 1];
+          const targetBearing = (Math.atan2(lngB - lngA, latB - latA) * 180) / Math.PI;
+          const delta =
+            ((((targetBearing - navHeadingRef.current) % 360) + 540) % 360) - 180;
+          navHeadingRef.current += delta * 0.16;
+          setNavHeading(navHeadingRef.current);
+        }
+
         if (next >= 1) {
           setIsNavigating(false);
         }
@@ -244,10 +267,11 @@ export function MapLibreMap({
     mapInstance.easeTo({
       center: navCoordinate,
       pitch: mapMode === "2.5d" ? 62 : 0,
+      bearing: mapMode === "2.5d" ? navHeading : mapInstance.getBearing(),
       duration: 280,
       easing: (t) => t,
     });
-  }, [mapInstance, navCoordinate, isNavigating, mapMode]);
+  }, [mapInstance, navCoordinate, isNavigating, mapMode, navHeading]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -617,7 +641,10 @@ export function MapLibreMap({
                 latitude={navCoordinate[1]}
                 anchor="center"
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg">
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg"
+                  style={{ transform: `rotate(${navHeading}deg)` }}
+                >
                   {navMode === "car" ? (
                     <Car className="h-4 w-4" />
                   ) : navMode === "bike" ? (
@@ -674,31 +701,15 @@ export function MapLibreMap({
                 </div>
               </div>
 
-              <div className="mb-3 flex gap-2">
-                {[
-                  { id: "car", label: "Car", icon: Car, disabled: false },
-                  { id: "bike", label: "Bike", icon: Bike, disabled: false },
-                  { id: "walk", label: "Walk", icon: Footprints, disabled: false },
-                ].map((mode) => {
-                  const Icon = mode.icon;
-                  const active = navMode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      disabled={mode.disabled}
-                      onClick={() => setNavMode(mode.id as "car" | "bike" | "walk")}
-                      className={`flex h-10 flex-1 items-center justify-center gap-1 rounded-xl border text-sm font-medium ${
-                        active
-                          ? "border-blue-300 bg-blue-50 text-blue-700"
-                          : "border-slate-200 text-slate-600"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {mode.label}
-                    </button>
-                  );
-                })}
+              <div className="mb-3 flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700">
+                {navMode === "car" ? (
+                  <Car className="h-4 w-4" />
+                ) : navMode === "bike" ? (
+                  <Bike className="h-4 w-4" />
+                ) : (
+                  <Footprints className="h-4 w-4" />
+                )}
+                Chế độ: {navMode === "car" ? "Ô tô" : navMode === "bike" ? "Xe đạp" : "Đi bộ"}
               </div>
 
               <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2">
@@ -709,6 +720,21 @@ export function MapLibreMap({
                   ETA {etaMinutes} phút • {distanceKm} km
                 </div>
               </div>
+
+              {activeRoute.steps.length ? (
+                <div className="mb-2 rounded-xl border border-slate-200 bg-white p-2">
+                  <p className="mb-1 text-[11px] font-semibold tracking-[0.13em] text-slate-500 uppercase">
+                    Turn by turn
+                  </p>
+                  <ul className="space-y-1">
+                    {activeRoute.steps.slice(activeStepIndex, activeStepIndex + 3).map((step) => (
+                      <li key={`${step.instruction}-${step.distanceMeters}`} className="text-xs text-slate-700">
+                        {step.instruction} • {(step.distanceMeters / 1000).toFixed(2)} km
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
 
               <div className="flex gap-2">
                 <button
@@ -736,6 +762,8 @@ export function MapLibreMap({
                   onClick={() => {
                     setIsNavigating(false);
                     setNavProgress(0);
+                    navHeadingRef.current = 0;
+                    setNavHeading(0);
                     if (mapInstance) {
                       const start = activeRoute.geometry.coordinates[0];
                       mapInstance.flyTo({
