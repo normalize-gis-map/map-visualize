@@ -8,6 +8,7 @@ import { SearchPanel } from "@/components/search/search-panel";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { PlaceItem } from "@/data/places";
+import { useFloodStore } from "@/features/flood/store/flood.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type TopAppHeaderProps = {
@@ -23,7 +24,9 @@ type TopAppHeaderProps = {
 };
 
 export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
+  const { mapEngine } = useFloodStore();
   const [mode, setMode] = useState<"view" | "route">("view");
+  const activeMode = mapEngine === "cesium" ? "view" : mode;
 
   return (
     <div className="pointer-events-auto absolute inset-x-0 top-0 z-30">
@@ -37,29 +40,35 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
             <MapPinned className="h-5 w-5" />
           </button>
 
-          <div className="inline-flex h-12 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1">
-            <button
-              type="button"
-              onClick={() => setMode("view")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                mode === "view" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              View
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("route")}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                mode === "route" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              Route
-            </button>
-          </div>
+          {mapEngine === "maplibre" ? (
+            <div className="inline-flex h-12 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setMode("view")}
+                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                  activeMode === "view"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                View
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("route")}
+                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                  activeMode === "route"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                Route
+              </button>
+            </div>
+          ) : null}
 
           <div className="min-w-0 flex-1">
-            {mode === "view" ? (
+            {activeMode === "view" ? (
               <SearchPanel onSelectPlace={onSelectPlace} compact />
             ) : (
               <RoutePlanner onRoutesChange={onRoutesChange} />
@@ -67,7 +76,7 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {mode === "view" ? <MapControlsMenu /> : null}
+            {activeMode === "view" ? <MapControlsMenu /> : null}
             <UserMenu />
           </div>
         </div>

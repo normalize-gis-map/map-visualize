@@ -186,8 +186,8 @@ export function MapLibreMap({
                 "line-width": [
                   "case",
                   ["==", ["get", "isPrimary"], 1],
-                  6,
-                  4,
+                  8,
+                  5,
                 ],
                 "line-opacity": [
                   "case",
@@ -197,6 +197,26 @@ export function MapLibreMap({
                 ],
               }}
               layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="route-direction-arrows"
+              type="symbol"
+              filter={["==", ["get", "isPrimary"], 1]}
+              layout={{
+                "symbol-placement": "line",
+                "symbol-spacing": 55,
+                "text-field": "▶",
+                "text-size": 12,
+                "text-keep-upright": false,
+                "text-allow-overlap": true,
+                "text-ignore-placement": true,
+              }}
+              paint={{
+                "text-color": "#1e40af",
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1,
+                "text-opacity": 0.95,
+              }}
             />
           </Source>
         ) : null}
