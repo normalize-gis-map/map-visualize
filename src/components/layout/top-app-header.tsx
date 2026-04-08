@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPinned } from "lucide-react";
+import { MapPinned, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 import { MapControlsMenu } from "@/components/map/map-controls-menu";
@@ -26,6 +26,7 @@ type TopAppHeaderProps = {
 export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
   const { mapEngine } = useFloodStore();
   const [mode, setMode] = useState<"view" | "route">("view");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const activeMode = mapEngine === "cesium" ? "view" : mode;
 
   return (
@@ -41,7 +42,7 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
           </button>
 
           {mapEngine === "maplibre" ? (
-            <div className="inline-flex h-12 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1">
+            <div className="hidden h-12 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 md:inline-flex">
               <button
                 type="button"
                 onClick={() => setMode("view")}
@@ -75,11 +76,56 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden shrink-0 items-center gap-2 md:flex">
             {activeMode === "view" ? <MapControlsMenu /> : null}
             <UserMenu />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 md:hidden"
+            aria-label="Toggle header menu"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
+
+        {mobileMenuOpen ? (
+          <div className="mt-3 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 md:hidden">
+            {mapEngine === "maplibre" ? (
+              <div className="inline-flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setMode("view")}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                    activeMode === "view"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500"
+                  }`}
+                >
+                  View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("route")}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                    activeMode === "route"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500"
+                  }`}
+                >
+                  Route
+                </button>
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-2">
+              {activeMode === "view" ? <MapControlsMenu /> : null}
+              <UserMenu />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
