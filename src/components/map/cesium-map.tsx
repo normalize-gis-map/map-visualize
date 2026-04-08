@@ -5,20 +5,19 @@ import * as Cesium from "cesium";
 
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
-import { useFloodStore } from "@/features/flood/store/flood.store";
+import { useMapStore } from "@/features/map/store/map.store";
 import { FeaturePopupCard } from "@/components/map/feature-popup";
 import {
   DEFAULT_MAP_CURSOR,
   INSPECT_FEATURE_CURSOR,
 } from "@/lib/constants/cursor.constants";
+import { CESIUM_ASSET_BASE_URL } from "@/lib/constants/map.constants";
 
 type CesiumMapProps = {
   selectedPlace: PlaceItem | null;
   floodData: FloodGeoJson | null;
 };
 
-const CESIUM_ASSET_BASE_URL =
-  "https://cesium.com/downloads/cesiumjs/releases/1.140/Build/Cesium/";
 const CESIUM_ION_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5NDQzZmY3YS0zMzM5LTQxNjQtODExYy1lMjdlNmZiMjBiZTEiLCJpZCI6NDE0ODM1LCJpYXQiOjE3NzU1NTU0MjB9.thF7Xpi0ljcc9CbgVkumz2OuxExJgvcRkQeUveEs0AE";
 
@@ -92,7 +91,7 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
-  const { visibleLayers, buildingOpacity, notifyMapInteraction } = useFloodStore();
+  const { visibleLayers, buildingOpacity, notifyMapInteraction } = useMapStore();
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
 

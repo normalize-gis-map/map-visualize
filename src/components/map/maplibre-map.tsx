@@ -11,7 +11,8 @@ import riskZonesData from "@/data/geojson/risk-zones-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import type { RouteAlternative } from "@/features/map/types/route.types";
-import { useFloodStore } from "@/features/flood/store/flood.store";
+import { useMapStore } from "@/features/map/store/map.store";
+import { MAP_STYLE_2D, MAP_STYLE_25D } from "@/lib/constants/map.constants";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
@@ -39,18 +40,13 @@ type Props = {
   } | null;
 };
 
-const MAP_STYLE_2D =
-  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
-
-const MAP_STYLE_25D = "https://tiles.openfreemap.org/styles/liberty";
-
 export function MapLibreMap({
   selectedPlace,
   floodData: serverFloodData,
   routePayload,
 }: Props) {
   const { mapMode, visibleLayers, buildingOpacity, notifyMapInteraction } =
-    useFloodStore();
+    useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
-import { useFloodStore } from "@/features/flood/store/flood.store";
+import { useFloodStore } from "@/features/map/store/map.store";
 
 export function UserMenu() {
   const router = useRouter();

@@ -2,7 +2,7 @@
 
 import { Layers3, Map, Orbit } from "lucide-react";
 
-import { useFloodStore } from "@/features/flood/store/flood.store";
+import { useFloodStore } from "@/features/map/store/map.store";
 
 export function MapControlsMenu() {
   const { mapEngine, mapMode, setMapEngine, setMapMode } = useFloodStore();

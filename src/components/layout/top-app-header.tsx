@@ -8,7 +8,7 @@ import { SearchPanel } from "@/components/search/search-panel";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { PlaceItem } from "@/data/places";
-import { useFloodStore } from "@/features/flood/store/flood.store";
+import { useFloodStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type TopAppHeaderProps = {

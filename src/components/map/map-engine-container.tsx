@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import type { RouteAlternative } from "@/features/map/types/route.types";
-import { useFloodStore } from "@/features/flood/store/flood.store";
+import { useFloodStore } from "@/features/map/store/map.store";
 import { MapLibreMap } from "./maplibre-map";
 
 const CesiumMap = dynamic(

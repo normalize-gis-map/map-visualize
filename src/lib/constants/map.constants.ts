@@ -5,6 +5,14 @@ export const DEFAULT_CENTER = {
 
 export const DEFAULT_ZOOM = 11;
 
+export const MAP_STYLE_2D =
+  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+
+export const MAP_STYLE_25D = "https://tiles.openfreemap.org/styles/liberty";
+
+export const CESIUM_ASSET_BASE_URL =
+  "https://cesium.com/downloads/cesiumjs/releases/1.140/Build/Cesium/";
+
 export const FLOOD_COLORS = {
   low: "#60a5fa",
   medium: "#f59e0b",

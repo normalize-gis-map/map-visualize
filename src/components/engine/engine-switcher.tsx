@@ -1,6 +1,6 @@
 "use client";
 
-import { useFloodStore } from "@/features/flood/store/flood.store";
+import { useFloodStore } from "@/features/map/store/map.store";
 
 type EngineSwitchProps = {
   compact?: boolean;
