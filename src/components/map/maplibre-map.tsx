@@ -671,7 +671,7 @@ export function MapLibreMap({
       </Map>
 
       {activeRoute && routePayload ? (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-20 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur">
+        <div className="pointer-events-none absolute top-3 left-1/2 z-20 hidden w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur md:block">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
@@ -696,13 +696,13 @@ export function MapLibreMap({
           <button
             type="button"
             onClick={() => setRoutePanelOpen((prev) => !prev)}
-            className="absolute bottom-4 left-1/2 z-30 flex h-11 w-11 -translate-x-1/2 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl"
+            className="absolute bottom-24 left-1/2 z-30 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl md:bottom-4"
           >
             <Menu className="h-5 w-5" />
           </button>
 
           {routePanelOpen ? (
-            <div className="absolute right-3 bottom-20 left-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
+            <div className="absolute right-2 bottom-20 left-2 z-30 max-h-[52vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur md:right-3 md:bottom-20 md:left-3 md:max-h-[46vh]">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase">
                   Route drawer
@@ -723,7 +723,7 @@ export function MapLibreMap({
                 Chế độ: {navMode === "car" ? "Ô tô" : navMode === "bike" ? "Xe đạp" : "Đi bộ"}
               </div>
 
-              <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2">
+              <div className="mb-2 rounded-2xl bg-slate-50 px-3 py-2">
                 <div className="text-sm font-semibold text-slate-800">
                   {routeFromLabel} → {routeToLabel}
                 </div>
@@ -733,13 +733,16 @@ export function MapLibreMap({
               </div>
 
               {activeRoute.steps.length ? (
-                <div className="mb-2 rounded-xl border border-slate-200 bg-white p-2">
+                <div className="mb-3 rounded-2xl border border-slate-200 bg-white p-3">
                   <p className="mb-1 text-[11px] font-semibold tracking-[0.13em] text-slate-500 uppercase">
                     Turn by turn
                   </p>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1.5">
                     {activeRoute.steps.slice(activeStepIndex, activeStepIndex + 3).map((step) => (
-                      <li key={`${step.instruction}-${step.distanceMeters}`} className="text-xs text-slate-700">
+                      <li
+                        key={`${step.instruction}-${step.distanceMeters}`}
+                        className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-700"
+                      >
                         {step.instruction}
                         {step.roadName ? ` (${step.roadName})` : ""} •{" "}
                         {(step.distanceMeters / 1000).toFixed(2)} km •{" "}
@@ -750,14 +753,14 @@ export function MapLibreMap({
                 </div>
               ) : null}
 
-              <div className="flex gap-2">
+              <div className="sticky bottom-0 flex gap-2 bg-white/95 pt-1">
                 <button
                   type="button"
                   onClick={() => {
                     if (navProgress >= 1) setNavProgress(0);
                     setIsNavigating((prev) => !prev);
                   }}
-                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white"
+                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-semibold text-white"
                 >
                   {isNavigating ? (
                     <>
@@ -788,7 +791,7 @@ export function MapLibreMap({
                       });
                     }
                   }}
-                  className="flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700"
+                  className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-3 text-sm font-medium text-slate-700"
                 >
                   <Navigation className="h-4 w-4" />
                   Reset

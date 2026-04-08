@@ -114,8 +114,8 @@ export function RoutePlanner({
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm">
-      <div className="mb-2 grid grid-cols-3 gap-2">
+    <div className="rounded-3xl border border-slate-200/90 bg-white/92 p-3 shadow-lg backdrop-blur md:p-4">
+      <div className="mb-3 grid grid-cols-3 gap-2">
         {[
           { id: "car", label: "Car", icon: Car },
           { id: "bike", label: "Bike", icon: Bike },
@@ -128,9 +128,9 @@ export function RoutePlanner({
               key={item.id}
               type="button"
               onClick={() => setMode(item.id as TransportMode)}
-              className={`flex h-10 items-center justify-center gap-2 rounded-xl border text-sm font-medium ${
+              className={`flex h-11 items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition ${
                 active
-                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  ? "border-blue-300 bg-blue-50 text-blue-700 shadow-sm"
                   : "border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
@@ -146,13 +146,13 @@ export function RoutePlanner({
           <button
             type="button"
             onClick={onBackToSearch}
-            className="inline-flex h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 px-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           >
             <ArrowLeft className="h-4 w-4" />
             Search
           </button>
         ) : null}
-        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 px-3 py-2">
           <span className="text-[11px] font-semibold text-slate-500 uppercase">
             From
           </span>
@@ -165,7 +165,7 @@ export function RoutePlanner({
           />
         </label>
 
-        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 px-3 py-2">
           <span className="text-[11px] font-semibold text-slate-500 uppercase">
             To
           </span>
@@ -182,7 +182,7 @@ export function RoutePlanner({
           type="button"
           onClick={handlePlan}
           disabled={loading}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-blue-300"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-blue-300"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
           Go
@@ -191,7 +191,7 @@ export function RoutePlanner({
         <button
           type="button"
           onClick={handleClear}
-          className="inline-flex h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="inline-flex h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           <X className="h-4 w-4" />
           Clear
@@ -207,7 +207,7 @@ export function RoutePlanner({
       {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
 
       {routes.length > 0 ? (
-        <div className="mt-2 grid gap-2 md:grid-cols-3">
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible">
           {routes.map((route, index) => {
             const active = index === activeRoute;
             return (
@@ -215,9 +215,9 @@ export function RoutePlanner({
                 key={route.id}
                 type="button"
                 onClick={() => handleSelectRoute(index)}
-                className={`rounded-xl border px-3 py-2 text-left ${
+                className={`min-w-[180px] rounded-2xl border px-3 py-2 text-left transition md:min-w-0 ${
                   active
-                    ? "border-blue-300 bg-blue-50"
+                    ? "border-blue-300 bg-blue-50 shadow-sm"
                     : "border-slate-200 bg-white hover:bg-slate-50"
                 }`}
               >
