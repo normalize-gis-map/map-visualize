@@ -147,9 +147,28 @@ export function MapLibreMap({
     if (!style?.glyphs || style.glyphs === MAP_GLYPHS_FALLBACK) return;
 
     glyphFallbackAppliedRef.current = true;
+    const patchedLayers = style.layers?.map((layer) => {
+      if (
+        layer.type !== "symbol" ||
+        !layer.layout ||
+        !("text-font" in layer.layout)
+      ) {
+        return layer;
+      }
+
+      return {
+        ...layer,
+        layout: {
+          ...layer.layout,
+          "text-font": ["Open Sans Regular"],
+        },
+      };
+    });
+
     mapInstance.setStyle(
       {
         ...style,
+        layers: patchedLayers,
         glyphs: MAP_GLYPHS_FALLBACK,
       },
       { diff: true },

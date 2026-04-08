@@ -10,7 +10,7 @@ export const MAP_STYLE_2D =
 
 export const MAP_STYLE_25D = "https://tiles.openfreemap.org/styles/liberty";
 export const MAP_GLYPHS_FALLBACK =
-  "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf";
+  "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf";
 
 export const CESIUM_ASSET_BASE_URL =
   "https://cesium.com/downloads/cesiumjs/releases/1.140/Build/Cesium/";
