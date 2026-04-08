@@ -24,9 +24,10 @@ type TopAppHeaderProps = {
 };
 
 export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
-  const { mapEngine } = useFloodStore();
+  const { mapEngine, hasHydrated } = useFloodStore();
   const [mode, setMode] = useState<"view" | "route">("view");
-  const activeMode = mapEngine === "cesium" ? "view" : mode;
+  const safeMapEngine = hasHydrated ? mapEngine : "maplibre";
+  const activeMode = safeMapEngine === "cesium" ? "view" : mode;
 
   return (
     <div className="pointer-events-auto absolute inset-x-0 top-0 z-30">
@@ -41,7 +42,7 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
               <MapPinned className="h-5 w-5" />
             </button>
 
-            {mapEngine === "maplibre" ? (
+            {safeMapEngine === "maplibre" ? (
               <div className="inline-flex h-11 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 md:h-12">
                 <button
                   type="button"

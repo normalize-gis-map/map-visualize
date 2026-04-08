@@ -29,9 +29,10 @@ export function MapEngineContainer({
   floodData,
   routePayload,
 }: MapEngineContainerProps) {
-  const { mapEngine } = useFloodStore();
+  const { mapEngine, hasHydrated } = useFloodStore();
+  const safeMapEngine = hasHydrated ? mapEngine : "maplibre";
 
-  if (mapEngine === "cesium") {
+  if (safeMapEngine === "cesium") {
     return <CesiumMap selectedPlace={selectedPlace} floodData={floodData} />;
   }
 
