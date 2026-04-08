@@ -28,7 +28,28 @@ export function useBuildingLayer(
       map.setLayoutProperty(id, "visibility", visibility);
 
       if (layer.type === "fill-extrusion") {
+        map.setPaintProperty(id, "fill-extrusion-color", "#94a3b8");
         map.setPaintProperty(id, "fill-extrusion-opacity", opacity);
+        map.setPaintProperty(id, "fill-extrusion-base", [
+          "coalesce",
+          ["get", "render_min_height"],
+          ["get", "min_height"],
+          0,
+        ]);
+        map.setPaintProperty(id, "fill-extrusion-height", [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          14.8,
+          0,
+          15.05,
+          [
+            "coalesce",
+            ["get", "render_height"],
+            ["get", "height"],
+            ["*", ["coalesce", ["get", "building:levels"], 1], 3],
+          ],
+        ]);
       }
     });
   }, [map, visible, opacity]);
