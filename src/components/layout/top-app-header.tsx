@@ -31,59 +31,55 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
   return (
     <div className="pointer-events-auto absolute inset-x-0 top-0 z-30">
       <div className="border-b border-slate-200/80 bg-white/92 px-3 py-3 shadow-lg backdrop-blur md:px-4">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
-          <button
-            type="button"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm"
-            aria-label="App logo"
-          >
-            <MapPinned className="h-5 w-5" />
-          </button>
+        <div className="mx-auto max-w-[1600px]">
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              type="button"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm"
+              aria-label="App logo"
+            >
+              <MapPinned className="h-5 w-5" />
+            </button>
 
-          {mapEngine === "maplibre" ? (
-            <div className="inline-flex h-11 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 md:h-12">
-              <button
-                type="button"
-                onClick={() => setMode("view")}
-                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                  activeMode === "view"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500"
-                }`}
-              >
-                View
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("route")}
-                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                  activeMode === "route"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500"
-                }`}
-              >
-                Route
-              </button>
+            {mapEngine === "maplibre" ? (
+              <div className="inline-flex h-11 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 md:h-12">
+                <button
+                  type="button"
+                  onClick={() => setMode("view")}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    activeMode === "view"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500"
+                  }`}
+                >
+                  View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("route")}
+                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                    activeMode === "route"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500"
+                  }`}
+                >
+                  Route
+                </button>
+              </div>
+            ) : null}
+
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {activeMode === "view" ? <MapControlsMenu /> : null}
+              <UserMenu />
             </div>
-          ) : null}
+          </div>
 
-          <div
-            className={`order-last basis-full ${
-              activeMode === "route"
-                ? ""
-                : "md:order-none md:basis-auto md:min-w-0 md:flex-1"
-            }`}
-          >
+          <div className="mt-3">
             {activeMode === "view" ? (
               <SearchPanel onSelectPlace={onSelectPlace} compact />
             ) : (
               <RoutePlanner onRoutesChange={onRoutesChange} />
             )}
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {activeMode === "view" ? <MapControlsMenu /> : null}
-            <UserMenu />
           </div>
         </div>
       </div>
