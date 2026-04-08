@@ -3,7 +3,7 @@
 import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import drainageData from "@/data/geojson/drainage-sample.json";
 import floodData from "@/data/geojson/flood-sample.json";
@@ -80,6 +80,8 @@ export function MapLibreMap({
 
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
+  const routePhaseRef = useRef(0);
+  const activeRouteId = routePayload?.routes[routePayload.activeIndex]?.id;
 
   useEffect(() => {
     if (!mapInstance || !visibleLayers.drainage) return;
@@ -131,28 +133,26 @@ export function MapLibreMap({
   }, [mapInstance, routePayload, mapMode]);
 
   useEffect(() => {
-    if (!mapInstance || !routePayload?.routes.length) return;
-    let frame = 0;
-    const start = performance.now();
+    if (!mapInstance || !activeRouteId) return;
 
-    const tick = (time: number) => {
+    const interval = globalThis.setInterval(() => {
       if (!mapInstance.getLayer("route-motion")) return;
-      const phase = ((time - start) / 900) % 1;
+      routePhaseRef.current = (routePhaseRef.current + 0.08) % 1;
       mapInstance.setPaintProperty("route-motion", "line-dasharray", [
-        0.1,
+        0.15,
         1.1,
-        1 + phase * 1.2,
+        1 + routePhaseRef.current * 1.3,
       ]);
       mapInstance.triggerRepaint();
-      frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
+    }, 90);
 
     return () => {
-      cancelAnimationFrame(frame);
+      globalThis.clearInterval(interval);
+      if (mapInstance.getLayer("route-motion")) {
+        mapInstance.setPaintProperty("route-motion", "line-dasharray", [0.15, 1.1, 1]);
+      }
     };
-  }, [mapInstance, routePayload]);
+  }, [mapInstance, activeRouteId]);
 
   const routeCollection: FeatureCollection | null = routePayload
     ? {
@@ -167,6 +167,14 @@ export function MapLibreMap({
         })),
       }
     : null;
+
+  const activeRoute = routePayload?.routes[routePayload.activeIndex] ?? null;
+  const etaMinutes = activeRoute
+    ? Math.max(1, Math.round(activeRoute.durationSeconds / 60))
+    : 0;
+  const distanceKm = activeRoute
+    ? (activeRoute.distanceMeters / 1000).toFixed(1)
+    : "0.0";
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -514,6 +522,27 @@ export function MapLibreMap({
           />
         )}
       </Map>
+
+      {activeRoute && routePayload ? (
+        <div className="pointer-events-none absolute top-3 left-1/2 z-20 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
+                Navigation
+              </div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {routePayload.from.label} → {routePayload.to.label}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-semibold text-blue-700">
+                {etaMinutes} min
+              </div>
+              <div className="text-xs text-slate-500">{distanceKm} km</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {visibleLayers.flood && <MapLegend />}
     </div>
