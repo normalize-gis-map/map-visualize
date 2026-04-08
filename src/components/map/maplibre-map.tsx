@@ -1,5 +1,6 @@
 "use client";
 
+import { Bike, Car, Footprints, Menu, Navigation, Pause, Play } from "lucide-react";
 import Map, { Layer, Marker, NavigationControl, Source } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
@@ -85,6 +86,10 @@ export function MapLibreMap({
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
   const glyphFallbackAppliedRef = useRef(false);
+  const [routePanelOpen, setRoutePanelOpen] = useState(true);
+  const [navMode, setNavMode] = useState<"car" | "bike" | "walk">("car");
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [navProgress, setNavProgress] = useState(0);
 
   useEffect(() => {
     if (!mapInstance || !visibleLayers.drainage) return;
@@ -166,12 +171,64 @@ export function MapLibreMap({
     : null;
 
   const activeRoute = routePayload?.routes[routePayload.activeIndex] ?? null;
+  const routeFromLabel = routePayload?.from.label ?? "Start";
+  const routeToLabel = routePayload?.to.label ?? "Destination";
   const etaMinutes = activeRoute
     ? Math.max(1, Math.round(activeRoute.durationSeconds / 60))
     : 0;
   const distanceKm = activeRoute
     ? (activeRoute.distanceMeters / 1000).toFixed(1)
     : "0.0";
+  const navCoordinate = useMemo(() => {
+    if (!activeRoute) return null;
+    const points = activeRoute.geometry.coordinates;
+    if (!points.length) return null;
+
+    const scaled = navProgress * (points.length - 1);
+    const index = Math.floor(scaled);
+    const nextIndex = Math.min(points.length - 1, index + 1);
+    const t = scaled - index;
+    const [lngA, latA] = points[index];
+    const [lngB, latB] = points[nextIndex];
+    return [lngA + (lngB - lngA) * t, latA + (latB - latA) * t] as [
+      number,
+      number,
+    ];
+  }, [activeRoute, navProgress]);
+
+  useEffect(() => {
+    if (!mapInstance || !activeRoute || !isNavigating) return;
+    let frameId = 0;
+    let last = performance.now();
+    const speed =
+      navMode === "car" ? 0.00025 : navMode === "bike" ? 0.00018 : 0.0001;
+
+    const animate = (now: number) => {
+      const dt = now - last;
+      last = now;
+      setNavProgress((prev) => {
+        const next = Math.min(1, prev + dt * speed);
+        if (next >= 1) {
+          setIsNavigating(false);
+        }
+        return next;
+      });
+      frameId = requestAnimationFrame(animate);
+    };
+
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [mapInstance, activeRoute, isNavigating, navMode]);
+
+  useEffect(() => {
+    if (!mapInstance || !isNavigating || !navCoordinate) return;
+    mapInstance.easeTo({
+      center: navCoordinate,
+      pitch: mapMode === "2.5d" ? 62 : 0,
+      duration: 280,
+      easing: (t) => t,
+    });
+  }, [mapInstance, navCoordinate, isNavigating, mapMode]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -535,6 +592,23 @@ export function MapLibreMap({
                 B
               </div>
             </Marker>
+            {navCoordinate ? (
+              <Marker
+                longitude={navCoordinate[0]}
+                latitude={navCoordinate[1]}
+                anchor="center"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg">
+                  {navMode === "car" ? (
+                    <Car className="h-4 w-4" />
+                  ) : navMode === "bike" ? (
+                    <Bike className="h-4 w-4" />
+                  ) : (
+                    <Footprints className="h-4 w-4" />
+                  )}
+                </div>
+              </Marker>
+            ) : null}
           </>
         ) : null}
       </Map>
@@ -558,6 +632,110 @@ export function MapLibreMap({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {activeRoute ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setRoutePanelOpen((prev) => !prev)}
+            className="absolute bottom-4 left-1/2 z-30 flex h-11 w-11 -translate-x-1/2 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+
+          {routePanelOpen ? (
+            <div className="absolute right-3 bottom-20 left-3 z-30 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase">
+                  Route drawer
+                </p>
+                <div className="text-xs text-slate-500">
+                  {Math.round(navProgress * 100)}%
+                </div>
+              </div>
+
+              <div className="mb-3 flex gap-2">
+                {[
+                  { id: "car", label: "Car", icon: Car, disabled: false },
+                  { id: "bike", label: "Bike", icon: Bike, disabled: false },
+                  { id: "walk", label: "Walk", icon: Footprints, disabled: false },
+                ].map((mode) => {
+                  const Icon = mode.icon;
+                  const active = navMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      disabled={mode.disabled}
+                      onClick={() => setNavMode(mode.id as "car" | "bike" | "walk")}
+                      className={`flex h-10 flex-1 items-center justify-center gap-1 rounded-xl border text-sm font-medium ${
+                        active
+                          ? "border-blue-300 bg-blue-50 text-blue-700"
+                          : "border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mb-2 rounded-xl bg-slate-50 px-3 py-2">
+                <div className="text-sm font-semibold text-slate-800">
+                  {routeFromLabel} → {routeToLabel}
+                </div>
+                <div className="text-xs text-slate-600">
+                  ETA {etaMinutes} phút • {distanceKm} km
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (navProgress >= 1) setNavProgress(0);
+                    setIsNavigating((prev) => !prev);
+                  }}
+                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white"
+                >
+                  {isNavigating ? (
+                    <>
+                      <Pause className="h-4 w-4" />
+                      Tạm dừng
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4" />
+                      Di chuyển
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNavigating(false);
+                    setNavProgress(0);
+                    if (mapInstance) {
+                      const start = activeRoute.geometry.coordinates[0];
+                      mapInstance.flyTo({
+                        center: [start[0], start[1]],
+                        zoom: Math.max(mapInstance.getZoom(), 13),
+                        pitch: mapMode === "2.5d" ? 62 : 0,
+                        duration: 700,
+                      });
+                    }
+                  }}
+                  className="flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700"
+                >
+                  <Navigation className="h-4 w-4" />
+                  Reset
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       {visibleLayers.flood && <MapLegend />}
