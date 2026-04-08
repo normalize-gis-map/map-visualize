@@ -67,7 +67,13 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
             </div>
           ) : null}
 
-          <div className="order-last basis-full md:order-none md:basis-auto md:min-w-0 md:flex-1">
+          <div
+            className={`order-last basis-full ${
+              activeMode === "route"
+                ? ""
+                : "md:order-none md:basis-auto md:min-w-0 md:flex-1"
+            }`}
+          >
             {activeMode === "view" ? (
               <SearchPanel onSelectPlace={onSelectPlace} compact />
             ) : (

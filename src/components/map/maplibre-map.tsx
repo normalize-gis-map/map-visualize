@@ -171,56 +171,6 @@ export function MapLibreMap({
       >
         <NavigationControl position="bottom-right" />
 
-        {routeCollection ? (
-          <Source id="routes" type="geojson" data={routeCollection}>
-            <Layer
-              id="route-alternatives"
-              type="line"
-              paint={{
-                "line-color": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  "#1d4ed8",
-                  "#93c5fd",
-                ],
-                "line-width": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  8,
-                  5,
-                ],
-                "line-opacity": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  0.95,
-                  0.45,
-                ],
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-direction-arrows"
-              type="symbol"
-              filter={["==", ["get", "isPrimary"], 1]}
-              layout={{
-                "symbol-placement": "line",
-                "symbol-spacing": 55,
-                "text-field": "▶",
-                "text-size": 12,
-                "text-keep-upright": false,
-                "text-allow-overlap": true,
-                "text-ignore-placement": true,
-              }}
-              paint={{
-                "text-color": "#1e40af",
-                "text-halo-color": "#ffffff",
-                "text-halo-width": 1,
-                "text-opacity": 0.95,
-              }}
-            />
-          </Source>
-        ) : null}
-
         {visibleLayers.riskZones && (
           <Source
             id="risk-zones"
@@ -356,6 +306,56 @@ export function MapLibreMap({
             />
           </Source>
         )}
+
+        {routeCollection ? (
+          <Source id="routes" type="geojson" data={routeCollection}>
+            <Layer
+              id="route-alternatives"
+              type="line"
+              paint={{
+                "line-color": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  "#1d4ed8",
+                  "#93c5fd",
+                ],
+                "line-width": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  8,
+                  5,
+                ],
+                "line-opacity": [
+                  "case",
+                  ["==", ["get", "isPrimary"], 1],
+                  0.95,
+                  0.45,
+                ],
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="route-direction-arrows"
+              type="symbol"
+              filter={["==", ["get", "isPrimary"], 1]}
+              layout={{
+                "symbol-placement": "line",
+                "symbol-spacing": 55,
+                "text-field": "▶",
+                "text-size": 12,
+                "text-keep-upright": false,
+                "text-allow-overlap": true,
+                "text-ignore-placement": true,
+              }}
+              paint={{
+                "text-color": "#1e40af",
+                "text-halo-color": "#ffffff",
+                "text-halo-width": 1,
+                "text-opacity": 0.95,
+              }}
+            />
+          </Source>
+        ) : null}
 
         {selectedFlood && (
           <FeaturePopup
