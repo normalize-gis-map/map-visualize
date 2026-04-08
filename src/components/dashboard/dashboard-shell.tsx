@@ -53,7 +53,7 @@ export function DashboardShell() {
           onRoutesChange={setRoutePayload}
         />
 
-        <div className="pointer-events-auto absolute top-[92px] left-3 z-20 md:top-[96px] md:left-4">
+        <div className="pointer-events-auto absolute top-[150px] left-3 z-20 md:top-[156px] md:left-4">
           <LayerCatalog
             open={catalogOpen}
             onToggle={() => setCatalogOpen((prev) => !prev)}
