@@ -2,12 +2,10 @@
 
 import { Layers3, Map, Orbit } from "lucide-react";
 
-import { DropdownPanel } from "@/components/ui/dropdown-panel";
 import { useFloodStore } from "@/features/flood/store/flood.store";
 
 export function MapControlsMenu() {
-  const { mapEngine, mapMode, setMapEngine, setMapMode, mapInteractionTick } =
-    useFloodStore();
+  const { mapEngine, mapMode, setMapEngine, setMapMode } = useFloodStore();
 
   const handleSelectEngine = (engine: "maplibre" | "cesium") => {
     setMapEngine(engine);
@@ -26,79 +24,65 @@ export function MapControlsMenu() {
   };
 
   return (
-    <DropdownPanel
-      label="View"
-      icon={<Layers3 className="h-4 w-4" />}
-      closeSignal={mapInteractionTick}
-    >
-      <div className="mb-3 rounded-2xl bg-slate-50 px-3 py-2">
-        <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
-          Engine
-        </div>
+    <div className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-sm">
+      <button
+        type="button"
+        onClick={() => handleSelectEngine("maplibre")}
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+          mapEngine === "maplibre"
+            ? "bg-slate-900 text-white"
+            : "text-slate-500 hover:bg-slate-100"
+        }`}
+        aria-label="Use map view"
+        title="Map view"
+      >
+        <Map className="h-4 w-4" />
+      </button>
 
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => handleSelectEngine("maplibre")}
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-medium transition ${
-              mapEngine === "maplibre"
-                ? "bg-slate-900 text-white"
-                : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-            }`}
-          >
-            <Map className="h-4 w-4" />
-            Map
-          </button>
+      <button
+        type="button"
+        onClick={() => handleSelectEngine("cesium")}
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+          mapEngine === "cesium"
+            ? "bg-slate-900 text-white"
+            : "text-slate-500 hover:bg-slate-100"
+        }`}
+        aria-label="Use 3D globe view"
+        title="3D view"
+      >
+        <Orbit className="h-4 w-4" />
+      </button>
 
-          <button
-            type="button"
-            onClick={() => handleSelectEngine("cesium")}
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-medium transition ${
-              mapEngine === "cesium"
-                ? "bg-slate-900 text-white"
-                : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-            }`}
-          >
-            <Orbit className="h-4 w-4" />
-            3D
-          </button>
-        </div>
-      </div>
+      <div className="mx-1 h-6 w-px bg-slate-200" />
 
-      <div className="rounded-2xl bg-slate-50 px-3 py-2">
-        <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
-          Mode
-        </div>
-
-        {mapEngine === "maplibre" ? (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {(["2d", "2.5d"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => handleSelectMode(mode)}
-                className={`rounded-2xl px-3 py-2.5 text-sm font-medium transition ${
-                  mapMode === mode
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                }`}
-              >
-                {mode.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-2">
+      {mapEngine === "maplibre" ? (
+        <div className="inline-flex items-center gap-1">
+          {(["2d", "2.5d"] as const).map((mode) => (
             <button
+              key={mode}
               type="button"
-              onClick={() => handleSelectMode("3d")}
-              className="w-full rounded-2xl bg-blue-600 px-3 py-2.5 text-sm font-medium text-white"
+              onClick={() => handleSelectMode(mode)}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                mapMode === mode
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-500 hover:bg-slate-100"
+              }`}
             >
-              3D
+              {mode.toUpperCase()}
             </button>
-          </div>
-        )}
-      </div>
-    </DropdownPanel>
+          ))}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => handleSelectMode("3d")}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white"
+          aria-label="3D mode active"
+          title="3D mode"
+        >
+          <Layers3 className="h-4 w-4" />
+        </button>
+      )}
+    </div>
   );
 }

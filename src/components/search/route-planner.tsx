@@ -98,8 +98,8 @@ export function RoutePlanner({ onRoutesChange }: RoutePlannerProps) {
   };
 
   return (
-    <div className="min-w-0 flex-1">
-      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+    <div className="rounded-2xl border border-slate-200 bg-white/90 p-2 shadow-sm">
+      <div className="grid gap-2 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
           <span className="text-[11px] font-semibold text-slate-500 uppercase">
             From
@@ -152,10 +152,10 @@ export function RoutePlanner({ onRoutesChange }: RoutePlannerProps) {
         ))}
       </datalist>
 
-      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
 
       {routes.length > 0 ? (
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
           {routes.map((route, index) => {
             const active = index === activeRoute;
             return (
