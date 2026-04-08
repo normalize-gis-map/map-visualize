@@ -12,7 +12,11 @@ import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import { useMapStore } from "@/features/map/store/map.store";
-import { MAP_STYLE_2D, MAP_STYLE_25D } from "@/lib/constants/map.constants";
+import {
+  MAP_GLYPHS_FALLBACK,
+  MAP_STYLE_2D,
+  MAP_STYLE_25D,
+} from "@/lib/constants/map.constants";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
@@ -80,8 +84,7 @@ export function MapLibreMap({
 
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
-  const routePhaseRef = useRef(0);
-  const activeRouteId = routePayload?.routes[routePayload.activeIndex]?.id;
+  const glyphFallbackAppliedRef = useRef(false);
 
   useEffect(() => {
     if (!mapInstance || !visibleLayers.drainage) return;
@@ -133,25 +136,20 @@ export function MapLibreMap({
   }, [mapInstance, routePayload, mapMode]);
 
   useEffect(() => {
-    if (!mapInstance || !activeRouteId) return;
+    if (!mapInstance || glyphFallbackAppliedRef.current) return;
 
-    const interval = globalThis.setInterval(() => {
-      if (!mapInstance.getLayer("route-motion")) return;
-      routePhaseRef.current = (routePhaseRef.current + 0.08) % 1;
-      mapInstance.setPaintProperty("route-motion", "line-dasharray", [
-        0.2 + routePhaseRef.current * 0.5,
-        1.25,
-      ]);
-      mapInstance.triggerRepaint();
-    }, 90);
+    const style = mapInstance.getStyle();
+    if (!style?.glyphs || style.glyphs === MAP_GLYPHS_FALLBACK) return;
 
-    return () => {
-      globalThis.clearInterval(interval);
-      if (mapInstance.getLayer("route-motion")) {
-        mapInstance.setPaintProperty("route-motion", "line-dasharray", [0.2, 1.25]);
-      }
-    };
-  }, [mapInstance, activeRouteId]);
+    glyphFallbackAppliedRef.current = true;
+    mapInstance.setStyle(
+      {
+        ...style,
+        glyphs: MAP_GLYPHS_FALLBACK,
+      },
+      { diff: true },
+    );
+  }, [mapInstance, mapMode]);
 
   const routeCollection: FeatureCollection | null = routePayload
     ? {
@@ -392,18 +390,6 @@ export function MapLibreMap({
                   0.95,
                   0.45,
                 ],
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-motion"
-              type="line"
-              filter={["==", ["get", "isPrimary"], 1]}
-              paint={{
-                "line-color": "#bfdbfe",
-                "line-width": 3,
-                "line-opacity": 0.9,
-                "line-dasharray": [0.2, 1.25],
               }}
               layout={{ "line-cap": "round", "line-join": "round" }}
             />
