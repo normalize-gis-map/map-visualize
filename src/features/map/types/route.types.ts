@@ -2,6 +2,7 @@ export type TransportMode = "car" | "bike" | "walk";
 
 export type RouteStep = {
   instruction: string;
+  roadName?: string;
   distanceMeters: number;
   durationSeconds: number;
   maneuver: {

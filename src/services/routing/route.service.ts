@@ -35,16 +35,26 @@ function getOsrmProfile(mode: TransportMode) {
 }
 
 function toInstruction(step: RouteStep) {
+  const modifierMap: Record<string, string> = {
+    left: "trái",
+    right: "phải",
+    slight_left: "hơi chếch trái",
+    slight_right: "hơi chếch phải",
+    sharp_left: "gấp trái",
+    sharp_right: "gấp phải",
+    straight: "thẳng",
+  };
   const modifier = step.maneuver.modifier
-    ? ` ${step.maneuver.modifier}`
+    ? (modifierMap[step.maneuver.modifier] ?? step.maneuver.modifier)
     : "";
+  const road = step.roadName ? ` vào ${step.roadName}` : "";
 
   if (step.maneuver.type === "depart") return "Bắt đầu hành trình";
   if (step.maneuver.type === "arrive") return "Bạn đã đến nơi";
-  if (step.maneuver.type === "turn") return `Rẽ${modifier}`;
-  if (step.maneuver.type === "continue") return "Đi thẳng";
+  if (step.maneuver.type === "turn") return `Rẽ ${modifier}${road}`.trim();
+  if (step.maneuver.type === "continue") return `Đi thẳng${road}`;
   if (step.maneuver.type === "roundabout") return "Đi vào vòng xoay";
-  return "Tiếp tục di chuyển";
+  return `Tiếp tục di chuyển${road}`;
 }
 
 export async function getRoutes(
@@ -84,6 +94,7 @@ export async function getRoutes(
         .map((step) => {
           const mapped: RouteStep = {
             instruction: "",
+            roadName: step.name || undefined,
             distanceMeters: step.distance,
             durationSeconds: step.duration,
             maneuver: {

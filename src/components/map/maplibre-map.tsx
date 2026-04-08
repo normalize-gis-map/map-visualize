@@ -85,7 +85,7 @@ export function MapLibreMap({
 
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
-  const glyphFallbackAppliedRef = useRef(false);
+  const patchedGlyphUrlRef = useRef<string | null>(null);
   const [routePanelOpen, setRoutePanelOpen] = useState(true);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navProgress, setNavProgress] = useState(0);
@@ -142,38 +142,47 @@ export function MapLibreMap({
   }, [mapInstance, routePayload, mapMode]);
 
   useEffect(() => {
-    if (!mapInstance || glyphFallbackAppliedRef.current) return;
+    if (!mapInstance) return;
 
-    const style = mapInstance.getStyle();
-    if (!style?.glyphs || style.glyphs === MAP_GLYPHS_FALLBACK) return;
+    const patchStyleGlyphs = () => {
+      const style = mapInstance.getStyle();
+      if (!style?.glyphs || style.glyphs === MAP_GLYPHS_FALLBACK) return;
+      if (patchedGlyphUrlRef.current === style.glyphs) return;
 
-    glyphFallbackAppliedRef.current = true;
-    const patchedLayers = style.layers?.map((layer) => {
-      if (
-        layer.type !== "symbol" ||
-        !layer.layout ||
-        !("text-font" in layer.layout)
-      ) {
-        return layer;
-      }
+      patchedGlyphUrlRef.current = style.glyphs;
+      const patchedLayers = style.layers?.map((layer) => {
+        if (
+          layer.type !== "symbol" ||
+          !layer.layout ||
+          !("text-font" in layer.layout)
+        ) {
+          return layer;
+        }
 
-      return {
-        ...layer,
-        layout: {
-          ...layer.layout,
-          "text-font": ["Open Sans Regular"],
+        return {
+          ...layer,
+          layout: {
+            ...layer.layout,
+            "text-font": ["Open Sans Regular"],
+          },
+        };
+      });
+
+      mapInstance.setStyle(
+        {
+          ...style,
+          layers: patchedLayers,
+          glyphs: MAP_GLYPHS_FALLBACK,
         },
-      };
-    });
+        { diff: true },
+      );
+    };
 
-    mapInstance.setStyle(
-      {
-        ...style,
-        layers: patchedLayers,
-        glyphs: MAP_GLYPHS_FALLBACK,
-      },
-      { diff: true },
-    );
+    patchStyleGlyphs();
+    mapInstance.on("styledata", patchStyleGlyphs);
+    return () => {
+      mapInstance.off("styledata", patchStyleGlyphs);
+    };
   }, [mapInstance, mapMode]);
 
   const routeCollection: FeatureCollection | null = routePayload
@@ -230,25 +239,27 @@ export function MapLibreMap({
     let frameId = 0;
     let last = performance.now();
     const speed =
-      navMode === "car" ? 0.00025 : navMode === "bike" ? 0.00018 : 0.0001;
+      navMode === "car" ? 0.00008 : navMode === "bike" ? 0.00006 : 0.00004;
     const points = activeRoute.geometry.coordinates;
+    if (!Array.isArray(points) || points.length < 2) return;
 
     const animate = (now: number) => {
       const dt = now - last;
       last = now;
       setNavProgress((previousProgress) => {
         const next = Math.min(1, previousProgress + dt * speed);
-        if (points.length > 1) {
-          const scaled = next * (points.length - 1);
-          const index = Math.min(points.length - 2, Math.floor(scaled));
-          const [lngA, latA] = points[index];
-          const [lngB, latB] = points[index + 1];
-          const targetBearing = (Math.atan2(lngB - lngA, latB - latA) * 180) / Math.PI;
-          const delta =
-            ((((targetBearing - navHeadingRef.current) % 360) + 540) % 360) - 180;
-          navHeadingRef.current += delta * 0.16;
-          setNavHeading(navHeadingRef.current);
-        }
+        const scaled = next * (points.length - 1);
+        const index = Math.min(points.length - 2, Math.floor(scaled));
+        const currentPoint = points[index];
+        const nextPoint = points[index + 1];
+        if (!currentPoint || !nextPoint) return next;
+        const [lngA, latA] = currentPoint;
+        const [lngB, latB] = nextPoint;
+        const targetBearing = (Math.atan2(lngB - lngA, latB - latA) * 180) / Math.PI;
+        const delta =
+          ((((targetBearing - navHeadingRef.current) % 360) + 540) % 360) - 180;
+        navHeadingRef.current += delta * 0.16;
+        setNavHeading(navHeadingRef.current);
 
         if (next >= 1) {
           setIsNavigating(false);
@@ -729,7 +740,10 @@ export function MapLibreMap({
                   <ul className="space-y-1">
                     {activeRoute.steps.slice(activeStepIndex, activeStepIndex + 3).map((step) => (
                       <li key={`${step.instruction}-${step.distanceMeters}`} className="text-xs text-slate-700">
-                        {step.instruction} • {(step.distanceMeters / 1000).toFixed(2)} km
+                        {step.instruction}
+                        {step.roadName ? ` (${step.roadName})` : ""} •{" "}
+                        {(step.distanceMeters / 1000).toFixed(2)} km •{" "}
+                        {Math.max(1, Math.round(step.durationSeconds / 60))} phút
                       </li>
                     ))}
                   </ul>
