@@ -21,7 +21,7 @@ export function useNavigationPlayback({
   const [heading, setHeading] = useState(0);
   const headingRef = useRef(0);
 
-  const coordinates = geometry?.coordinates ?? [];
+  const coordinates = useMemo(() => geometry?.coordinates ?? [], [geometry]);
 
   useEffect(() => {
     if (!isPlaying || coordinates.length < 2) return;

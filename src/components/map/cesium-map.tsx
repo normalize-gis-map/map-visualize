@@ -300,6 +300,27 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       traffic1.position = new Cesium.ConstantPositionProperty(positions[1]);
       traffic2.position = new Cesium.ConstantPositionProperty(positions[2]);
       traffic3.position = new Cesium.ConstantPositionProperty(positions[3]);
+
+      const focus = sampleRouteAtProgress(coordinates, progress);
+      const ahead = sampleRouteAtProgress(
+        coordinates,
+        Math.min(1, progress + 0.015),
+      );
+      if (focus && ahead && !viewerDestroyedRef.current) {
+        const heading = Math.atan2(ahead.lng - focus.lng, ahead.lat - focus.lat);
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(
+            focus.lng,
+            focus.lat,
+            180,
+          ),
+          orientation: {
+            heading,
+            pitch: Cesium.Math.toRadians(-24),
+            roll: 0,
+          },
+        });
+      }
       viewer.scene.requestRender();
     };
 
