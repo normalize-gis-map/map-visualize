@@ -98,6 +98,7 @@ export function MapLibreMap({
   const [navHeading, setNavHeading] = useState(0);
   const navHeadingRef = useRef(0);
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
+  const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
 
   useEffect(() => {
     if (!mapInstance || !visibleLayers.drainage) return;
@@ -688,7 +689,14 @@ export function MapLibreMap({
                   className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg"
                   style={{ transform: `rotate(${navHeading}deg)` }}
                 >
-                  {navMode === "car" ? (
+                  {mapLibreCar3D && navMode === "car" ? (
+                    <div className="relative h-5 w-5">
+                      <div className="absolute inset-x-0 bottom-0 h-3 rounded-[3px] bg-blue-100 shadow-[0_2px_4px_rgba(0,0,0,0.35)]" />
+                      <div className="absolute inset-x-1 top-0 h-2 rounded-[2px] bg-white/90" />
+                      <div className="absolute bottom-0.5 left-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />
+                      <div className="absolute right-0.5 bottom-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />
+                    </div>
+                  ) : navMode === "car" ? (
                     <Car className="h-4 w-4" />
                   ) : navMode === "bike" ? (
                     <Bike className="h-4 w-4" />
@@ -790,13 +798,26 @@ export function MapLibreMap({
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setMapEngine("cesium")}
-                className="mb-3 flex h-10 w-full items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700"
-              >
-                Chuyển sang 3D mesh (Cesium)
-              </button>
+              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setMapLibreCar3D((prev) => !prev)}
+                  className={`flex h-10 items-center justify-center rounded-2xl border text-sm font-semibold ${
+                    mapLibreCar3D
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 text-slate-600"
+                  }`}
+                >
+                  {mapLibreCar3D ? "Tắt xe 3D MapLibre" : "Bật xe 3D MapLibre"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMapEngine("cesium")}
+                  className="flex h-10 items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700"
+                >
+                  Chuyển sang 3D mesh (Cesium)
+                </button>
+              </div>
 
               <div className="mb-2 rounded-2xl bg-slate-50 px-3 py-2">
                 <div className="text-sm font-semibold text-slate-800">

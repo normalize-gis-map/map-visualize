@@ -275,10 +275,12 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       viewer.scene.requestRender();
     };
 
-    viewer.clock.onTick.addEventListener(tick);
-    viewer.clock.shouldAnimate = true;
+    viewer.clock?.onTick.addEventListener(tick);
+    if (viewer.clock) {
+      viewer.clock.shouldAnimate = true;
+    }
     routeTickCleanupRef.current = () => {
-      viewer.clock.onTick.removeEventListener(tick);
+      viewer.clock?.onTick.removeEventListener(tick);
     };
 
     viewer.flyTo([routeLine, mainCar], {
