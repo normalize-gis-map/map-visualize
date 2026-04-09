@@ -24,6 +24,7 @@ type TrafficSample = {
   lat: number;
   bearing: number;
   direction: "forward" | "backward";
+  vehicleType: "car" | "bike";
 };
 
 export function useNavigationPlayback({
@@ -93,33 +94,37 @@ export function useNavigationPlayback({
     const forward: TrafficSample[] = [];
     const backward: TrafficSample[] = [];
 
-    for (const item of buildTrafficProgress(progress, 6)) {
+    buildTrafficProgress(progress, 6).forEach((item, index) => {
       const sample = sampleRouteAtProgress(coordinates, item.progress);
-      if (!sample) continue;
-      const shifted = offsetRouteSample(sample, forwardLaneOffset);
+      if (!sample) return;
+      const laneDrift = Math.sin((progress * 14 + index) * 1.5) * 0.35;
+      const shifted = offsetRouteSample(sample, forwardLaneOffset + laneDrift);
       forward.push({
         id: `${item.id}-forward`,
         direction: "forward",
+        vehicleType: index % 3 === 0 ? "car" : "bike",
         ...shifted,
         bearing: normalizeBearing(shifted.bearing),
       });
-    }
+    });
 
-    for (const item of buildTrafficProgress(1 - progress, 5)) {
+    buildTrafficProgress(1 - progress, 5).forEach((item, index) => {
       const sample = sampleRouteAtProgress(coordinates, item.progress);
-      if (!sample) continue;
+      if (!sample) return;
       const reversed = {
         ...sample,
         bearing: normalizeBearing(sample.bearing + 180),
       };
-      const shifted = offsetRouteSample(reversed, backwardLaneOffset);
+      const laneDrift = Math.cos((progress * 11 + index) * 1.4) * 0.28;
+      const shifted = offsetRouteSample(reversed, backwardLaneOffset + laneDrift);
       backward.push({
         id: `${item.id}-backward`,
         direction: "backward",
+        vehicleType: index % 4 === 0 ? "car" : "bike",
         ...shifted,
         bearing: normalizeBearing(shifted.bearing),
       });
-    }
+    });
 
     return [...forward, ...backward];
   }, [coordinates, progress]);

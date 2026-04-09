@@ -62,6 +62,7 @@ export function MapLibreMap({
   } =
     useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
+  const [mapZoom, setMapZoom] = useState(11.2);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -206,10 +207,12 @@ export function MapLibreMap({
   const distanceKm = activeRoute
     ? (activeRoute.distanceMeters / 1000).toFixed(1)
     : "0.0";
-  const trafficCars = useMemo(
-    () => (viewMode === "drive3d" ? trafficSamples : []),
-    [trafficSamples, viewMode],
-  );
+  const trafficCars = useMemo(() => {
+    if (viewMode !== "drive3d") return [];
+
+    const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
+    return trafficSamples.slice(0, maxVehicles);
+  }, [mapZoom, trafficSamples, viewMode]);
 
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
@@ -254,7 +257,11 @@ export function MapLibreMap({
         onDragStart={() => {
           if (!programmaticMoveRef.current) notifyMapInteraction();
         }}
-        onLoad={(e) => setMapInstance(e.target)}
+        onMove={(event) => setMapZoom(event.viewState.zoom)}
+        onLoad={(e) => {
+          setMapInstance(e.target);
+          setMapZoom(e.target.getZoom());
+        }}
       >
         <NavigationControl position="bottom-right" />
 

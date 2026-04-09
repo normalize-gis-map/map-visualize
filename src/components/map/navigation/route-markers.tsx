@@ -8,6 +8,7 @@ type TrafficSample = {
   lat: number;
   bearing: number;
   direction: "forward" | "backward";
+  vehicleType: "car" | "bike";
 };
 
 type Props = {
@@ -76,11 +77,19 @@ export function RouteMarkers({
             className="relative flex h-7 w-7 items-center justify-center rounded-[7px] border border-white/70 bg-slate-900/85 text-[10px] text-white shadow-lg"
             style={{ transform: `rotate(${car.bearing}deg)` }}
           >
-            <div
-              className={`h-4 w-4 rounded-[4px] ${
-                car.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
-              }`}
-            />
+            {car.vehicleType === "bike" ? (
+              <div className="relative h-4 w-4">
+                <div className="absolute top-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-slate-100" />
+                <div className="absolute bottom-0 left-0.5 h-1.5 w-1.5 rounded-full border border-slate-900 bg-white" />
+                <div className="absolute right-0.5 bottom-0 h-1.5 w-1.5 rounded-full border border-slate-900 bg-white" />
+              </div>
+            ) : (
+              <div
+                className={`h-4 w-4 rounded-[4px] ${
+                  car.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
+                }`}
+              />
+            )}
             <div className="absolute top-0.5 left-1/2 h-0.5 w-2 -translate-x-1/2 rounded-full bg-white/85" />
             <div
               className={`absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
