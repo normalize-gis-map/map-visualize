@@ -33,7 +33,13 @@ export function MapEngineContainer({
   const safeMapEngine = hasHydrated ? mapEngine : "maplibre";
 
   if (safeMapEngine === "cesium") {
-    return <CesiumMap selectedPlace={selectedPlace} floodData={floodData} />;
+    return (
+      <CesiumMap
+        selectedPlace={selectedPlace}
+        floodData={floodData}
+        routePayload={routePayload}
+      />
+    );
   }
 
   return (

@@ -5,6 +5,7 @@ import * as Cesium from "cesium";
 
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import type { RouteAlternative } from "@/features/map/types/route.types";
 import { useMapStore } from "@/features/map/store/map.store";
 import { FeaturePopupCard } from "@/components/map/feature-popup";
 import {
@@ -16,6 +17,12 @@ import { CESIUM_ASSET_BASE_URL } from "@/lib/constants/map.constants";
 type CesiumMapProps = {
   selectedPlace: PlaceItem | null;
   floodData: FloodGeoJson | null;
+  routePayload: {
+    from: PlaceItem;
+    to: PlaceItem;
+    routes: RouteAlternative[];
+    activeIndex: number;
+  } | null;
 };
 
 const CESIUM_ION_TOKEN =
@@ -87,10 +94,14 @@ function getFeatureProperty(
   return "N/A";
 }
 
-export function CesiumMap({ selectedPlace }: CesiumMapProps) {
+const CAR_MODEL_URL =
+  "https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb";
+
+export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
+  const routeTickCleanupRef = useRef<(() => void) | null>(null);
   const { visibleLayers, buildingOpacity, notifyMapInteraction } = useMapStore();
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
@@ -184,6 +195,102 @@ export function CesiumMap({ selectedPlace }: CesiumMapProps) {
       duration: 1.5,
     });
   }, [selectedPlace]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    viewer.entities.removeById("route-main");
+    viewer.entities.removeById("route-car");
+    viewer.entities.removeById("route-traffic-1");
+    viewer.entities.removeById("route-traffic-2");
+    viewer.entities.removeById("route-traffic-3");
+    routeTickCleanupRef.current?.();
+    routeTickCleanupRef.current = null;
+
+    if (!routePayload) return;
+    const activeRoute = routePayload.routes[routePayload.activeIndex];
+    const coordinates = activeRoute.geometry.coordinates;
+    if (!coordinates.length) return;
+
+    const cartesianPath = coordinates.map((coord) =>
+      Cesium.Cartesian3.fromDegrees(coord[0], coord[1], 3),
+    );
+    const routeLine = viewer.entities.add({
+      id: "route-main",
+      polyline: {
+        positions: cartesianPath,
+        width: 5,
+        material: Cesium.Color.fromCssColorString("#2563eb").withAlpha(0.9),
+        clampToGround: true,
+      },
+    });
+
+    const sampleAt = (progress: number) => {
+      const scaled = progress * (coordinates.length - 1);
+      const index = Math.min(
+        coordinates.length - 2,
+        Math.max(0, Math.floor(scaled)),
+      );
+      const t = scaled - index;
+      const pointA = coordinates[index];
+      const pointB = coordinates[index + 1];
+      if (!pointA || !pointB) return Cesium.Cartesian3.fromDegrees(0, 0, 3);
+
+      const lng = pointA[0] + (pointB[0] - pointA[0]) * t;
+      const lat = pointA[1] + (pointB[1] - pointA[1]) * t;
+      return Cesium.Cartesian3.fromDegrees(lng, lat, 3);
+    };
+
+    const createCarEntity = (id: string, progress: number, scale = 12) =>
+      viewer.entities.add({
+        id,
+        position: sampleAt(progress),
+        model: {
+          uri: CAR_MODEL_URL,
+          minimumPixelSize: 26,
+          maximumScale: scale,
+          scale: 1.6,
+        },
+      });
+
+    const mainCar = createCarEntity("route-car", 0.001, 15);
+    const traffic1 = createCarEntity("route-traffic-1", 0.16);
+    const traffic2 = createCarEntity("route-traffic-2", 0.31);
+    const traffic3 = createCarEntity("route-traffic-3", 0.49);
+
+    let progress = 0;
+    const tick = () => {
+      progress = (progress + 0.0008) % 1;
+      const positions = [
+        sampleAt(progress),
+        sampleAt((progress + 0.18) % 1),
+        sampleAt((progress + 0.35) % 1),
+        sampleAt((progress + 0.52) % 1),
+      ];
+      mainCar.position = new Cesium.ConstantPositionProperty(positions[0]);
+      traffic1.position = new Cesium.ConstantPositionProperty(positions[1]);
+      traffic2.position = new Cesium.ConstantPositionProperty(positions[2]);
+      traffic3.position = new Cesium.ConstantPositionProperty(positions[3]);
+      viewer.scene.requestRender();
+    };
+
+    viewer.clock.onTick.addEventListener(tick);
+    viewer.clock.shouldAnimate = true;
+    routeTickCleanupRef.current = () => {
+      viewer.clock.onTick.removeEventListener(tick);
+    };
+
+    viewer.flyTo([routeLine, mainCar], {
+      duration: 1.4,
+      offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-28), 1800),
+    });
+
+    return () => {
+      routeTickCleanupRef.current?.();
+      routeTickCleanupRef.current = null;
+    };
+  }, [routePayload]);
 
   useEffect(() => {
     const viewer = viewerRef.current;

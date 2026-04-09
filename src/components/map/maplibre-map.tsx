@@ -50,7 +50,13 @@ export function MapLibreMap({
   floodData: serverFloodData,
   routePayload,
 }: Props) {
-  const { mapMode, visibleLayers, buildingOpacity, notifyMapInteraction } =
+  const {
+    mapMode,
+    visibleLayers,
+    buildingOpacity,
+    notifyMapInteraction,
+    setMapEngine,
+  } =
     useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const activeFloodData =
@@ -86,7 +92,7 @@ export function MapLibreMap({
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
   const patchedGlyphUrlRef = useRef<string | null>(null);
-  const [routePanelOpen, setRoutePanelOpen] = useState(true);
+  const [routePanelOpen, setRoutePanelOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navProgress, setNavProgress] = useState(0);
   const [navHeading, setNavHeading] = useState(0);
@@ -759,7 +765,7 @@ export function MapLibreMap({
                 Chế độ: {navMode === "car" ? "Ô tô" : navMode === "bike" ? "Xe đạp" : "Đi bộ"}
               </div>
 
-              <div className="mb-3 grid grid-cols-2 gap-2">
+              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setViewMode("map")}
@@ -783,6 +789,14 @@ export function MapLibreMap({
                   Góc nhìn lái xe 3D
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setMapEngine("cesium")}
+                className="mb-3 flex h-10 w-full items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700"
+              >
+                Chuyển sang 3D mesh (Cesium)
+              </button>
 
               <div className="mb-2 rounded-2xl bg-slate-50 px-3 py-2">
                 <div className="text-sm font-semibold text-slate-800">
