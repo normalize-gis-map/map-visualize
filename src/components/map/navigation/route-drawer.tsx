@@ -178,15 +178,25 @@ export function RouteDrawer({
                 Turn by turn
               </p>
               <ul className="space-y-1.5">
-                {steps.slice(activeStepIndex, activeStepIndex + 3).map((step) => (
-                  <li
-                    key={`${step.instruction}-${step.distanceMeters}`}
-                    className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-700"
-                  >
-                    {step.instruction}
-                    {step.roadName ? ` (${step.roadName})` : ""} • {(step.distanceMeters / 1000).toFixed(2)} km • {Math.max(1, Math.round(step.durationSeconds / 60))} phút
-                  </li>
-                ))}
+                {steps.slice(activeStepIndex, activeStepIndex + 3).map((step, idx) => {
+                  const isActive = idx === 0;
+                  return (
+                    <li
+                      key={`${step.instruction}-${step.distanceMeters}`}
+                      className={`rounded-xl px-2.5 py-2 text-xs ${
+                        isActive
+                          ? "border border-blue-200 bg-blue-50 text-blue-800"
+                          : "bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[10px] font-semibold text-slate-500">
+                        {activeStepIndex + idx + 1}
+                      </span>
+                      {step.instruction}
+                      {step.roadName ? ` (${step.roadName})` : ""} • {(step.distanceMeters / 1000).toFixed(2)} km • {Math.max(1, Math.round(step.durationSeconds / 60))} phút
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : null}

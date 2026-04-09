@@ -454,6 +454,41 @@ export function MapLibreMap({
               layout={{ "line-cap": "round", "line-join": "round" }}
             />
             <Layer
+              id="route-glow"
+              type="line"
+              filter={["==", ["get", "isPrimary"], 1]}
+              paint={{
+                "line-color": "#60a5fa",
+                "line-width": 20,
+                "line-opacity": 0.12,
+                "line-blur": 1.1,
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
+              id="route-progress-highlight"
+              type="line"
+              filter={["==", ["get", "isPrimary"], 1]}
+              paint={{
+                "line-gradient": [
+                  "interpolate",
+                  ["linear"],
+                  ["line-progress"],
+                  0,
+                  "#38bdf8",
+                  navProgress,
+                  "#38bdf8",
+                  navProgress,
+                  "rgba(29,78,216,0.12)",
+                  1,
+                  "rgba(29,78,216,0.12)",
+                ],
+                "line-width": 10,
+                "line-opacity": 1,
+              }}
+              layout={{ "line-cap": "round", "line-join": "round" }}
+            />
+            <Layer
               id="route-direction-arrows"
               type="symbol"
               filter={["==", ["get", "isPrimary"], 1]}
