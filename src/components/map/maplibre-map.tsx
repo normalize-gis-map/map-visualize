@@ -91,6 +91,7 @@ export function MapLibreMap({
   const [navProgress, setNavProgress] = useState(0);
   const [navHeading, setNavHeading] = useState(0);
   const navHeadingRef = useRef(0);
+  const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
 
   useEffect(() => {
     if (!mapInstance || !visibleLayers.drainage) return;
@@ -226,6 +227,30 @@ export function MapLibreMap({
     ];
   }, [activeRoute, navProgress]);
 
+  const trafficCars = useMemo(() => {
+    if (!activeRoute || viewMode !== "drive3d") return [];
+    const points = activeRoute.geometry.coordinates;
+    if (points.length < 2) return [];
+
+    const sampleAt = (progress: number) => {
+      const scaled = progress * (points.length - 1);
+      const index = Math.min(points.length - 2, Math.max(0, Math.floor(scaled)));
+      const nextIndex = Math.min(points.length - 1, index + 1);
+      const t = scaled - index;
+      const [lngA, latA] = points[index];
+      const [lngB, latB] = points[nextIndex];
+      const lng = lngA + (lngB - lngA) * t;
+      const lat = latA + (latB - latA) * t;
+      const bearing = (Math.atan2(lngB - lngA, latB - latA) * 180) / Math.PI;
+      return { lng, lat, bearing };
+    };
+
+    return [0.08, 0.21, 0.36, 0.57].map((offset, idx) => {
+      const p = (navProgress + offset) % 1;
+      return { id: `traffic-${idx}`, ...sampleAt(p) };
+    });
+  }, [activeRoute, navProgress, viewMode]);
+
   const activeStepIndex = useMemo(() => {
     if (!activeRoute?.steps?.length) return 0;
     return Math.min(
@@ -277,12 +302,13 @@ export function MapLibreMap({
     if (!mapInstance || !isNavigating || !navCoordinate) return;
     mapInstance.easeTo({
       center: navCoordinate,
-      pitch: mapMode === "2.5d" ? 62 : 0,
+      pitch: mapMode === "2.5d" ? (viewMode === "drive3d" ? 78 : 62) : 0,
       bearing: mapMode === "2.5d" ? navHeading : mapInstance.getBearing(),
-      duration: 280,
+      zoom: viewMode === "drive3d" ? Math.max(mapInstance.getZoom(), 14.5) : undefined,
+      duration: viewMode === "drive3d" ? 240 : 280,
       easing: (t) => t,
     });
-  }, [mapInstance, navCoordinate, isNavigating, mapMode, navHeading]);
+  }, [mapInstance, navCoordinate, isNavigating, mapMode, navHeading, viewMode]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -666,6 +692,16 @@ export function MapLibreMap({
                 </div>
               </Marker>
             ) : null}
+            {trafficCars.map((car) => (
+              <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/70 bg-slate-800/85 text-[10px] text-white shadow-lg"
+                  style={{ transform: `rotate(${car.bearing}deg)` }}
+                >
+                  🚗
+                </div>
+              </Marker>
+            ))}
           </>
         ) : null}
       </Map>
@@ -721,6 +757,31 @@ export function MapLibreMap({
                   <Footprints className="h-4 w-4" />
                 )}
                 Chế độ: {navMode === "car" ? "Ô tô" : navMode === "bike" ? "Xe đạp" : "Đi bộ"}
+              </div>
+
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("map")}
+                  className={`h-10 rounded-2xl border text-sm font-semibold ${
+                    viewMode === "map"
+                      ? "border-blue-300 bg-blue-50 text-blue-700"
+                      : "border-slate-200 text-slate-600"
+                  }`}
+                >
+                  Bản đồ thường
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("drive3d")}
+                  className={`h-10 rounded-2xl border text-sm font-semibold ${
+                    viewMode === "drive3d"
+                      ? "border-blue-300 bg-blue-50 text-blue-700"
+                      : "border-slate-200 text-slate-600"
+                  }`}
+                >
+                  Góc nhìn lái xe 3D
+                </button>
               </div>
 
               <div className="mb-2 rounded-2xl bg-slate-50 px-3 py-2">
