@@ -98,6 +98,7 @@ export function MapLibreMap({
   const [routePanelOpen, setRoutePanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
+  const programmaticMoveRef = useRef(false);
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
@@ -208,6 +209,10 @@ export function MapLibreMap({
 
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
+    programmaticMoveRef.current = true;
+    mapInstance.once("moveend", () => {
+      programmaticMoveRef.current = false;
+    });
     mapInstance.easeTo({
       center: navCoordinate,
       pitch: mapMode === "2.5d" ? (viewMode === "drive3d" ? 78 : 62) : 0,
@@ -242,10 +247,18 @@ export function MapLibreMap({
         }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        onMoveStart={notifyMapInteraction}
-        onDragStart={notifyMapInteraction}
-        onZoomStart={notifyMapInteraction}
-        onRotateStart={notifyMapInteraction}
+        onMoveStart={() => {
+          if (!programmaticMoveRef.current) notifyMapInteraction();
+        }}
+        onDragStart={() => {
+          if (!programmaticMoveRef.current) notifyMapInteraction();
+        }}
+        onZoomStart={() => {
+          if (!programmaticMoveRef.current) notifyMapInteraction();
+        }}
+        onRotateStart={() => {
+          if (!programmaticMoveRef.current) notifyMapInteraction();
+        }}
         onLoad={(e) => setMapInstance(e.target)}
       >
         <NavigationControl position="bottom-right" />
