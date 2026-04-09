@@ -247,16 +247,7 @@ export function MapLibreMap({
         }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        onMoveStart={() => {
-          if (!programmaticMoveRef.current) notifyMapInteraction();
-        }}
         onDragStart={() => {
-          if (!programmaticMoveRef.current) notifyMapInteraction();
-        }}
-        onZoomStart={() => {
-          if (!programmaticMoveRef.current) notifyMapInteraction();
-        }}
-        onRotateStart={() => {
           if (!programmaticMoveRef.current) notifyMapInteraction();
         }}
         onLoad={(e) => setMapInstance(e.target)}
