@@ -3,7 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { RouteStep, TransportMode } from "@/features/map/types/route.types";
 
-import { buildTrafficProgress, sampleRouteAtProgress } from "./route-sampling";
+import {
+  buildTrafficProgress,
+  normalizeBearing,
+  offsetRouteSample,
+  sampleRouteAtProgress,
+} from "./route-sampling";
 
 type UseNavigationPlaybackInput = {
   geometry: LineString | null;
@@ -12,6 +17,14 @@ type UseNavigationPlaybackInput = {
 };
 
 const SPEED_MULTIPLIERS = [0.5, 1, 2] as const;
+
+type TrafficSample = {
+  id: string;
+  lng: number;
+  lat: number;
+  bearing: number;
+  direction: "forward" | "backward";
+};
 
 export function useNavigationPlayback({
   geometry,
@@ -72,14 +85,43 @@ export function useNavigationPlayback({
     return Math.min(steps.length - 1, Math.floor(progress * steps.length));
   }, [progress, steps.length]);
 
-  const trafficSamples = useMemo(() => {
+  const trafficSamples = useMemo<TrafficSample[]>(() => {
     if (!coordinates.length) return [];
-    return buildTrafficProgress(progress)
-      .map((item) => {
-        const sample = sampleRouteAtProgress(coordinates, item.progress);
-        return sample ? { id: item.id, ...sample } : null;
-      })
-      .filter((item): item is { id: string; lng: number; lat: number; bearing: number } => Boolean(item));
+
+    const forwardLaneOffset = 2.4;
+    const backwardLaneOffset = -2.4;
+    const forward: TrafficSample[] = [];
+    const backward: TrafficSample[] = [];
+
+    for (const item of buildTrafficProgress(progress, 6)) {
+      const sample = sampleRouteAtProgress(coordinates, item.progress);
+      if (!sample) continue;
+      const shifted = offsetRouteSample(sample, forwardLaneOffset);
+      forward.push({
+        id: `${item.id}-forward`,
+        direction: "forward",
+        ...shifted,
+        bearing: normalizeBearing(shifted.bearing),
+      });
+    }
+
+    for (const item of buildTrafficProgress(1 - progress, 5)) {
+      const sample = sampleRouteAtProgress(coordinates, item.progress);
+      if (!sample) continue;
+      const reversed = {
+        ...sample,
+        bearing: normalizeBearing(sample.bearing + 180),
+      };
+      const shifted = offsetRouteSample(reversed, backwardLaneOffset);
+      backward.push({
+        id: `${item.id}-backward`,
+        direction: "backward",
+        ...shifted,
+        bearing: normalizeBearing(shifted.bearing),
+      });
+    }
+
+    return [...forward, ...backward];
   }, [coordinates, progress]);
 
   const seek = (nextProgress: number) => {

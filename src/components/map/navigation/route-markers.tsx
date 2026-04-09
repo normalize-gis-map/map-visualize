@@ -1,5 +1,5 @@
-import { Bike, Car, Footprints } from "lucide-react";
 import type { Position } from "geojson";
+import { Bike, Car, Footprints } from "lucide-react";
 import { Marker } from "react-map-gl/maplibre";
 
 type TrafficSample = {
@@ -7,6 +7,7 @@ type TrafficSample = {
   lng: number;
   lat: number;
   bearing: number;
+  direction: "forward" | "backward";
 };
 
 type Props = {
@@ -72,14 +73,18 @@ export function RouteMarkers({
       {trafficCars.map((car) => (
         <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
           <div
-            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-white/70 bg-slate-800/85 text-[10px] text-white shadow-lg"
+            className="relative flex h-7 w-7 items-center justify-center rounded-[7px] border border-white/70 bg-slate-900/85 text-[10px] text-white shadow-lg"
             style={{ transform: `rotate(${car.bearing}deg)` }}
           >
             <div
               className={`h-4 w-4 rounded-[4px] ${
-                Number(car.id.split("-").pop()) % 2 === 0
-                  ? "bg-sky-300"
-                  : "bg-rose-300"
+                car.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
+              }`}
+            />
+            <div className="absolute top-0.5 left-1/2 h-0.5 w-2 -translate-x-1/2 rounded-full bg-white/85" />
+            <div
+              className={`absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
+                car.direction === "forward" ? "bg-rose-400" : "bg-emerald-300"
               }`}
             />
           </div>

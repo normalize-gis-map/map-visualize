@@ -6,6 +6,15 @@ export type RouteSample = {
   bearing: number;
 };
 
+function metersToLatitudeDegrees(meters: number) {
+  return meters / 111320;
+}
+
+function metersToLongitudeDegrees(meters: number, latitude: number) {
+  const safeCos = Math.max(0.15, Math.cos((latitude * Math.PI) / 180));
+  return meters / (111320 * safeCos);
+}
+
 export function sampleRouteAtProgress(
   coordinates: Position[],
   progress: number,
@@ -24,13 +33,33 @@ export function sampleRouteAtProgress(
 
   const lng = pointA[0] + (pointB[0] - pointA[0]) * t;
   const lat = pointA[1] + (pointB[1] - pointA[1]) * t;
-  const bearing = (Math.atan2(pointB[0] - pointA[0], pointB[1] - pointA[1]) * 180) / Math.PI;
+  const bearing =
+    (Math.atan2(pointB[0] - pointA[0], pointB[1] - pointA[1]) * 180) / Math.PI;
 
   return { lng, lat, bearing };
 }
 
-export function buildTrafficProgress(baseProgress: number, count = 7) {
-  const offsets = [0.05, 0.12, 0.21, 0.33, 0.46, 0.57, 0.68].slice(0, count);
+export function offsetRouteSample(sample: RouteSample, lateralMeters: number): RouteSample {
+  const headingRad = (sample.bearing * Math.PI) / 180;
+  const rightX = Math.cos(headingRad);
+  const rightY = -Math.sin(headingRad);
+
+  const deltaLng = metersToLongitudeDegrees(rightX * lateralMeters, sample.lat);
+  const deltaLat = metersToLatitudeDegrees(rightY * lateralMeters);
+
+  return {
+    ...sample,
+    lng: sample.lng + deltaLng,
+    lat: sample.lat + deltaLat,
+  };
+}
+
+export function normalizeBearing(bearing: number) {
+  return ((bearing % 360) + 360) % 360;
+}
+
+export function buildTrafficProgress(baseProgress: number, count = 8) {
+  const offsets = [0.04, 0.11, 0.19, 0.27, 0.35, 0.46, 0.58, 0.69].slice(0, count);
   return offsets.map((offset, index) => ({
     id: `traffic-${index}`,
     progress: (baseProgress + offset) % 1,
