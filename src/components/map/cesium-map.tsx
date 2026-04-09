@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
 import { Globe, Map, Satellite } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
+import { FeaturePopupCard } from "@/components/map/feature-popup";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import { useCesiumChaseCamera } from "@/features/map/hooks/use-cesium-chase-camera";
 import { sampleRouteAtProgress } from "@/features/map/navigation/route-sampling";
-import type { RouteAlternative } from "@/features/map/types/route.types";
 import { useMapStore } from "@/features/map/store/map.store";
-import { FeaturePopupCard } from "@/components/map/feature-popup";
+import type { RouteAlternative } from "@/features/map/types/route.types";
 import {
   DEFAULT_MAP_CURSOR,
   INSPECT_FEATURE_CURSOR,
@@ -111,6 +112,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
   const [basemap, setBasemap] = useState<CesiumBasemap>("satelliteLabel");
+  const { updateChaseCamera, resetChaseCamera } = useCesiumChaseCamera();
 
   const resolveImageryStyle = (mode: CesiumBasemap) => {
     if (mode === "road") return Cesium.IonWorldImageryStyle.ROAD;
@@ -245,6 +247,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     viewer.entities.removeById("route-traffic-3");
     routeTickCleanupRef.current?.();
     routeTickCleanupRef.current = null;
+    resetChaseCamera();
 
     if (!routePayload) return;
     const activeRoute = routePayload.routes[routePayload.activeIndex];
@@ -301,24 +304,12 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       traffic2.position = new Cesium.ConstantPositionProperty(positions[2]);
       traffic3.position = new Cesium.ConstantPositionProperty(positions[3]);
 
-      const focus = sampleRouteAtProgress(coordinates, progress);
-      const ahead = sampleRouteAtProgress(
-        coordinates,
-        Math.min(1, progress + 0.015),
-      );
-      if (focus && ahead && !viewerDestroyedRef.current) {
-        const heading = Math.atan2(ahead.lng - focus.lng, ahead.lat - focus.lat);
-        viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(
-            focus.lng,
-            focus.lat,
-            180,
-          ),
-          orientation: {
-            heading,
-            pitch: Cesium.Math.toRadians(-24),
-            roll: 0,
-          },
+      if (!viewerDestroyedRef.current) {
+        updateChaseCamera(viewer, coordinates, progress, {
+          altitude: 180,
+          pitchDegrees: -24,
+          lookAheadProgress: 0.015,
+          damping: 0.2,
         });
       }
       viewer.scene.requestRender();
@@ -343,7 +334,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       routeTickCleanupRef.current?.();
       routeTickCleanupRef.current = null;
     };
-  }, [routePayload]);
+  }, [resetChaseCamera, routePayload, updateChaseCamera]);
 
   useEffect(() => {
     const viewer = viewerRef.current;

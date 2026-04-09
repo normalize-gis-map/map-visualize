@@ -1,29 +1,29 @@
 "use client";
 
-import { Menu } from "lucide-react";
-import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
-import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
+import { Menu } from "lucide-react";
+import maplibregl from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
 
 import drainageData from "@/data/geojson/drainage-sample.json";
 import floodData from "@/data/geojson/flood-sample.json";
 import riskZonesData from "@/data/geojson/risk-zones-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
-import type { RouteAlternative } from "@/features/map/types/route.types";
-import { useMapStore } from "@/features/map/store/map.store";
-import {
-  MAP_GLYPHS_FALLBACK,
-  MAP_STYLE_2D,
-  MAP_STYLE_25D,
-} from "@/lib/constants/map.constants";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
 import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
+import { useMapStore } from "@/features/map/store/map.store";
+import type { RouteAlternative } from "@/features/map/types/route.types";
+import {
+  MAP_GLYPHS_FALLBACK,
+  MAP_STYLE_2D,
+  MAP_STYLE_25D,
+} from "@/lib/constants/map.constants";
 import {
   formatMeters,
   formatScore,
@@ -98,6 +98,7 @@ export function MapLibreMap({
   const [routePanelOpen, setRoutePanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
+  const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);
   const programmaticMoveRef = useRef(false);
 
   useEffect(() => {
@@ -188,7 +189,10 @@ export function MapLibreMap({
     togglePlayback,
     pause,
     reset,
-    setProgress,
+    seek,
+    speedMultiplier,
+    availableSpeedMultipliers,
+    setSpeedMultiplier,
   } = useNavigationPlayback({
     geometry: activeRoute?.geometry ?? null,
     steps: activeRoute?.steps ?? [],
@@ -612,6 +616,9 @@ export function MapLibreMap({
             steps={activeRoute.steps}
             activeStepIndex={activeStepIndex}
             isNavigating={isNavigating}
+            speedMultiplier={speedMultiplier}
+            availableSpeedMultipliers={availableSpeedMultipliers}
+            drawerMinimalMode={drawerMinimalMode}
             onToggleViewMode={setViewMode}
             onToggleMapLibreCar3D={() => {
               setMapLibreCar3D((prev) => !prev);
@@ -619,9 +626,12 @@ export function MapLibreMap({
             }}
             onSwitchToCesium={() => setMapEngine("cesium")}
             onTogglePlayback={() => {
-              if (navProgress >= 1) setProgress(0);
+              if (navProgress >= 1) seek(0);
               togglePlayback();
             }}
+            onSeek={seek}
+            onSetSpeed={setSpeedMultiplier}
+            onToggleMinimalMode={() => setDrawerMinimalMode((prev) => !prev)}
             onReset={() => {
               pause();
               reset();

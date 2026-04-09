@@ -11,6 +11,8 @@ type UseNavigationPlaybackInput = {
   mode: TransportMode;
 };
 
+const SPEED_MULTIPLIERS = [0.5, 1, 2] as const;
+
 export function useNavigationPlayback({
   geometry,
   steps,
@@ -19,6 +21,8 @@ export function useNavigationPlayback({
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [heading, setHeading] = useState(0);
+  const [speedMultiplier, setSpeedMultiplier] =
+    useState<(typeof SPEED_MULTIPLIERS)[number]>(1);
   const headingRef = useRef(0);
 
   const coordinates = useMemo(() => geometry?.coordinates ?? [], [geometry]);
@@ -28,14 +32,14 @@ export function useNavigationPlayback({
 
     let frameId = 0;
     let last = performance.now();
-    const speed = mode === "car" ? 0.00008 : mode === "bike" ? 0.00006 : 0.00004;
+    const baseSpeed = mode === "car" ? 0.00008 : mode === "bike" ? 0.00006 : 0.00004;
 
     const animate = (now: number) => {
       const dt = now - last;
       last = now;
 
       setProgress((prev) => {
-        const next = Math.min(1, prev + dt * speed);
+        const next = Math.min(1, prev + dt * baseSpeed * speedMultiplier);
         const sample = sampleRouteAtProgress(coordinates, next);
 
         if (sample) {
@@ -56,7 +60,7 @@ export function useNavigationPlayback({
 
     frameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameId);
-  }, [coordinates, isPlaying, mode]);
+  }, [coordinates, isPlaying, mode, speedMultiplier]);
 
   const navSample = useMemo(
     () => sampleRouteAtProgress(coordinates, progress),
@@ -70,11 +74,26 @@ export function useNavigationPlayback({
 
   const trafficSamples = useMemo(() => {
     if (!coordinates.length) return [];
-    return buildTrafficProgress(progress).map((item) => {
-      const sample = sampleRouteAtProgress(coordinates, item.progress);
-      return sample ? { id: item.id, ...sample } : null;
-    }).filter((item): item is { id: string; lng: number; lat: number; bearing: number } => Boolean(item));
+    return buildTrafficProgress(progress)
+      .map((item) => {
+        const sample = sampleRouteAtProgress(coordinates, item.progress);
+        return sample ? { id: item.id, ...sample } : null;
+      })
+      .filter((item): item is { id: string; lng: number; lat: number; bearing: number } => Boolean(item));
   }, [coordinates, progress]);
+
+  const seek = (nextProgress: number) => {
+    const clamped = Math.min(1, Math.max(0, Number.isFinite(nextProgress) ? nextProgress : 0));
+    const sample = sampleRouteAtProgress(coordinates, clamped);
+    if (sample) {
+      headingRef.current = sample.bearing;
+      setHeading(sample.bearing);
+    }
+    setProgress(clamped);
+    if (clamped >= 1) {
+      setIsPlaying(false);
+    }
+  };
 
   const reset = () => {
     setIsPlaying(false);
@@ -87,12 +106,15 @@ export function useNavigationPlayback({
     isPlaying,
     progress,
     heading,
+    speedMultiplier,
+    availableSpeedMultipliers: SPEED_MULTIPLIERS,
     navCoordinate: navSample ? ([navSample.lng, navSample.lat] as [number, number]) : null,
     trafficSamples,
     activeStepIndex,
     togglePlayback: () => setIsPlaying((prev) => !prev),
     pause: () => setIsPlaying(false),
     reset,
-    setProgress,
+    seek,
+    setSpeedMultiplier,
   };
 }
