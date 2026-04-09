@@ -207,7 +207,9 @@ export function MapLibreMap({
   const distanceKm = activeRoute
     ? (activeRoute.distanceMeters / 1000).toFixed(1)
     : "0.0";
-  const remainingProgressEnd = Math.min(1, navProgress + 0.018);
+  const safeProgress = Math.min(0.998, Math.max(0, navProgress));
+  const progressFadeStart = Math.min(0.999, safeProgress + 0.0005);
+  const remainingProgressEnd = Math.min(0.9995, progressFadeStart + 0.018);
   const trafficCars = useMemo(() => {
     if (viewMode !== "drive3d") return [];
 
@@ -504,9 +506,9 @@ export function MapLibreMap({
                   ["line-progress"],
                   0,
                   "rgba(56,189,248,0)",
-                  navProgress,
+                  safeProgress,
                   "rgba(56,189,248,0)",
-                  navProgress,
+                  progressFadeStart,
                   "#38bdf8",
                   remainingProgressEnd,
                   "#38bdf8",
