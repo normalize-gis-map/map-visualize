@@ -817,14 +817,14 @@ export function MapLibreMap({
                       : "border-slate-200 text-slate-600"
                   }`}
                 >
-                  {mapLibreCar3D ? "Tắt xe 3D MapLibre" : "Bật xe 3D MapLibre"}
+                  {mapLibreCar3D ? "Phase 1: Tắt demo MapLibre" : "Phase 1: Demo MapLibre"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setMapEngine("cesium")}
                   className="flex h-10 items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700"
                 >
-                  Chuyển sang 3D mesh (Cesium)
+                  Phase 2: Cesium cinematic
                 </button>
               </div>
 

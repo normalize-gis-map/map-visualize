@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
+import { Globe, Map, Satellite } from "lucide-react";
 
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
@@ -24,6 +25,8 @@ type CesiumMapProps = {
     activeIndex: number;
   } | null;
 };
+
+type CesiumBasemap = "satelliteLabel" | "satellite" | "road";
 
 const CESIUM_ION_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5NDQzZmY3YS0zMzM5LTQxNjQtODExYy1lMjdlNmZiMjBiZTEiLCJpZCI6NDE0ODM1LCJpYXQiOjE3NzU1NTU0MjB9.thF7Xpi0ljcc9CbgVkumz2OuxExJgvcRkQeUveEs0AE";
@@ -106,6 +109,13 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   const { visibleLayers, buildingOpacity, notifyMapInteraction } = useMapStore();
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
+  const [basemap, setBasemap] = useState<CesiumBasemap>("satelliteLabel");
+
+  const resolveImageryStyle = (mode: CesiumBasemap) => {
+    if (mode === "road") return Cesium.IonWorldImageryStyle.ROAD;
+    if (mode === "satellite") return Cesium.IonWorldImageryStyle.AERIAL;
+    return Cesium.IonWorldImageryStyle.AERIAL_WITH_LABELS;
+  };
 
   useEffect(() => {
     if (!containerRef.current || viewerRef.current) return;
@@ -200,6 +210,28 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       duration: 1.5,
     });
   }, [selectedPlace]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    let alive = true;
+
+    const updateBaseLayer = async () => {
+      const provider = await Cesium.createWorldImageryAsync({
+        style: resolveImageryStyle(basemap),
+      });
+      if (!alive) return;
+      viewer.imageryLayers.removeAll();
+      viewer.imageryLayers.addImageryProvider(provider);
+      viewer.scene.requestRender();
+    };
+
+    void updateBaseLayer();
+
+    return () => {
+      alive = false;
+    };
+  }, [basemap]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -343,6 +375,45 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   return (
     <div className="relative h-full w-full bg-slate-900">
       <div ref={containerRef} className="h-full w-full" />
+
+      <div className="absolute top-3 right-3 z-20 flex gap-2 rounded-2xl border border-white/20 bg-slate-900/70 p-1.5 backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setBasemap("satelliteLabel")}
+          className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+            basemap === "satelliteLabel"
+              ? "bg-white text-slate-900"
+              : "text-white/80"
+          }`}
+          title="Satellite + labels"
+        >
+          <Globe className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setBasemap("satellite")}
+          className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+            basemap === "satellite"
+              ? "bg-white text-slate-900"
+              : "text-white/80"
+          }`}
+          title="Satellite"
+        >
+          <Satellite className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setBasemap("road")}
+          className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+            basemap === "road"
+              ? "bg-white text-slate-900"
+              : "text-white/80"
+          }`}
+          title="Road map"
+        >
+          <Map className="h-4 w-4" />
+        </button>
+      </div>
 
       {selectedBuilding && visibleLayers.buildings && (
         <div
