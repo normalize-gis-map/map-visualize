@@ -252,7 +252,7 @@ export function MapLibreMap({
       return { lng, lat, bearing };
     };
 
-    return [0.08, 0.21, 0.36, 0.57].map((offset, idx) => {
+    return [0.05, 0.12, 0.21, 0.33, 0.46, 0.57, 0.68].map((offset, idx) => {
       const p = (navProgress + offset) % 1;
       return { id: `traffic-${idx}`, ...sampleAt(p) };
     });
@@ -709,10 +709,16 @@ export function MapLibreMap({
             {trafficCars.map((car) => (
               <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
                 <div
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/70 bg-slate-800/85 text-[10px] text-white shadow-lg"
+                  className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-white/70 bg-slate-800/85 text-[10px] text-white shadow-lg"
                   style={{ transform: `rotate(${car.bearing}deg)` }}
                 >
-                  🚗
+                  <div
+                    className={`h-4 w-4 rounded-[4px] ${
+                      Number(car.id.split("-").pop()) % 2 === 0
+                        ? "bg-sky-300"
+                        : "bg-rose-300"
+                    }`}
+                  />
                 </div>
               </Marker>
             ))}
@@ -801,7 +807,10 @@ export function MapLibreMap({
               <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => setMapLibreCar3D((prev) => !prev)}
+                  onClick={() => {
+                    setMapLibreCar3D((prev) => !prev);
+                    setViewMode("drive3d");
+                  }}
                   className={`flex h-10 items-center justify-center rounded-2xl border text-sm font-semibold ${
                     mapLibreCar3D
                       ? "border-emerald-300 bg-emerald-50 text-emerald-700"

@@ -102,6 +102,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
   const routeTickCleanupRef = useRef<(() => void) | null>(null);
+  const viewerDestroyedRef = useRef(false);
   const { visibleLayers, buildingOpacity, notifyMapInteraction } = useMapStore();
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
@@ -110,6 +111,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     if (!containerRef.current || viewerRef.current) return;
 
     const viewer = createViewer(containerRef.current);
+    viewerDestroyedRef.current = false;
     viewer.scene.globe.depthTestAgainstTerrain = false;
     viewer.scene.globe.showWaterEffect = true;
     // Keep continuous render so imagery tiles can fully refine and avoid
@@ -173,10 +175,13 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       (viewer.container as HTMLElement).style.cursor = DEFAULT_MAP_CURSOR;
       viewer.camera.moveStart.removeEventListener(handleMoveStart);
       clickHandler.destroy();
+      routeTickCleanupRef.current?.();
+      routeTickCleanupRef.current = null;
       if (osmBuildingsRef.current) {
         viewer.scene.primitives.remove(osmBuildingsRef.current);
         osmBuildingsRef.current = null;
       }
+      viewerDestroyedRef.current = true;
       viewer.destroy();
       viewerRef.current = null;
     };
@@ -275,12 +280,14 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       viewer.scene.requestRender();
     };
 
-    viewer.clock?.onTick.addEventListener(tick);
-    if (viewer.clock) {
-      viewer.clock.shouldAnimate = true;
+    const clock = viewer.clock;
+    clock?.onTick.addEventListener(tick);
+    if (clock) {
+      clock.shouldAnimate = true;
     }
     routeTickCleanupRef.current = () => {
-      viewer.clock?.onTick.removeEventListener(tick);
+      if (viewerDestroyedRef.current) return;
+      clock?.onTick.removeEventListener(tick);
     };
 
     viewer.flyTo([routeLine, mainCar], {
