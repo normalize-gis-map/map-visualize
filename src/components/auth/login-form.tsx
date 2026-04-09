@@ -44,12 +44,15 @@ export function LoginForm() {
   return (
     <form
       action={onSubmit}
-      className="space-y-4 rounded-3xl bg-white p-7 shadow-xl"
+      className="space-y-5 rounded-3xl border border-white/20 bg-white/95 p-7 shadow-[0_30px_80px_-25px_rgba(15,23,42,0.55)] backdrop-blur"
     >
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Sign in</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Login to access flood dashboard and 3D monitoring tools.
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-blue-600 uppercase">
+          Secure Access
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold text-slate-900">Sign in</h1>
+        <p className="mt-1.5 text-sm text-slate-500">
+          Access the map command center and monitoring tools.
         </p>
       </div>
 
@@ -63,7 +66,7 @@ export function LoginForm() {
             type="email"
             autoComplete="email"
             required
-            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm ring-sky-200 outline-none focus:ring-2"
+            className="w-full rounded-xl border border-slate-300/90 bg-white px-3 py-2.5 text-sm ring-blue-200 outline-none focus:border-blue-500 focus:ring-2"
             placeholder="you@company.com"
           />
         </label>
@@ -77,7 +80,7 @@ export function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm ring-sky-200 outline-none focus:ring-2"
+            className="w-full rounded-xl border border-slate-300/90 bg-white px-3 py-2.5 text-sm ring-blue-200 outline-none focus:border-blue-500 focus:ring-2"
             placeholder="••••••••"
           />
         </label>
@@ -92,7 +95,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:from-blue-800 hover:to-blue-700 disabled:opacity-60"
       >
         {loading ? "Signing in..." : "Sign in"}
       </button>

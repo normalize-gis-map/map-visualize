@@ -22,7 +22,7 @@ export function SearchPanel({
 
     return PLACES.filter((place) =>
       place.label.toLowerCase().includes(normalized),
-    ).slice(0, 6);
+    ).slice(0, 30);
   }, [query]);
 
   return (
@@ -60,7 +60,16 @@ export function SearchPanel({
                 type="button"
                 onClick={() => {
                   setQuery(place.label);
-                  onSelectPlace(place);
+                  onSelectPlace({
+                    ...place,
+                    center: [...place.center] as [number, number],
+                    bounds: place.bounds
+                      ? [
+                          [...place.bounds[0]] as [number, number],
+                          [...place.bounds[1]] as [number, number],
+                        ]
+                      : undefined,
+                  });
                 }}
                 className="flex w-full items-center justify-between rounded-2xl border border-slate-200 px-3 py-2.5 text-left transition hover:border-blue-300 hover:bg-blue-50"
               >

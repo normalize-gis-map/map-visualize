@@ -8,11 +8,20 @@ import { TopAppHeader } from "@/components/layout/top-app-header";
 import { MapEngineContainer } from "@/components/map/map-engine-container";
 import type { PlaceItem } from "@/data/places";
 import { useFloodData } from "@/features/flood/hooks/use-flood-data";
+import type { RouteAlternative } from "@/features/map/types/route.types";
+
+type RoutePayload = {
+  from: PlaceItem;
+  to: PlaceItem;
+  routes: RouteAlternative[];
+  activeIndex: number;
+};
 
 export function DashboardShell() {
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<PlaceItem | null>(null);
+  const [routePayload, setRoutePayload] = useState<RoutePayload | null>(null);
 
   const { data, loading, error } = useFloodData();
 
@@ -30,14 +39,21 @@ export function DashboardShell() {
             {error}
           </div>
         ) : (
-          <MapEngineContainer selectedPlace={selectedPlace} floodData={data} />
+          <MapEngineContainer
+            selectedPlace={selectedPlace}
+            floodData={data}
+            routePayload={routePayload}
+          />
         )}
       </div>
 
       <div className="pointer-events-none absolute inset-0">
-        <TopAppHeader onSelectPlace={setSelectedPlace} />
+        <TopAppHeader
+          onSelectPlace={setSelectedPlace}
+          onRoutesChange={setRoutePayload}
+        />
 
-        <div className="pointer-events-auto absolute top-[92px] left-3 z-20 md:top-[96px] md:left-4">
+        <div className="pointer-events-auto absolute top-[150px] left-3 z-20 md:top-[156px] md:left-4">
           <LayerCatalog
             open={catalogOpen}
             onToggle={() => setCatalogOpen((prev) => !prev)}

@@ -2,14 +2,16 @@
 
 import { LogOut, UserCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
+import { useFloodStore } from "@/features/map/store/map.store";
 
 export function UserMenu() {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [menuState, setMenuState] = useState({ open: false, tick: 0 });
   const { user, logout } = useAuthSession();
+  const { mapInteractionTick } = useFloodStore();
 
   const displayName = user?.name ?? "Operator";
   const displayEmail = user?.email ?? "No email";
@@ -21,13 +23,23 @@ export function UserMenu() {
     router.refresh();
   }
 
+  const open = useMemo(
+    () => menuState.open && menuState.tick === mapInteractionTick,
+    [menuState.open, menuState.tick, mapInteractionTick],
+  );
+
   return (
     <div className="relative">
       <button
         type="button"
         className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100"
         aria-label="Account"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() =>
+          setMenuState((prev) => ({
+            open: !(prev.open && prev.tick === mapInteractionTick),
+            tick: mapInteractionTick,
+          }))
+        }
       >
         <UserCircle2 className="h-5 w-5" />
       </button>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type maplibregl from "maplibre-gl";
+import type { PopupAnchor } from "@/components/map/feature-popup";
 
 import {
   normalizeProperties,
@@ -11,6 +12,7 @@ import {
 export type SelectedFeature = {
   id: string;
   lngLat: maplibregl.LngLat;
+  anchor: PopupAnchor;
   properties: NormalizedProperties;
 };
 
@@ -55,6 +57,7 @@ export function useSelectedFeatures(map: maplibregl.Map | null) {
     const selected: SelectedFeature = {
       id: feature.id?.toString() ?? "",
       lngLat: e.lngLat,
+      anchor: e.point.y < 180 ? "top" : "bottom",
       properties: normalizeProperties(
         (feature.properties ?? {}) as Record<string, unknown>,
       ),

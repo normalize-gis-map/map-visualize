@@ -15,7 +15,7 @@ import {
 import {
   useFloodStore,
   type LayerKey,
-} from "@/features/flood/store/flood.store";
+} from "@/features/map/store/map.store";
 
 type LayerCatalogProps = {
   open: boolean;
