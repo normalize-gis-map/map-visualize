@@ -6,6 +6,7 @@ import { Globe, Map, Satellite } from "lucide-react";
 
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import { sampleRouteAtProgress } from "@/features/map/navigation/route-sampling";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import { useMapStore } from "@/features/map/store/map.store";
 import { FeaturePopupCard } from "@/components/map/feature-popup";
@@ -264,19 +265,9 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     });
 
     const sampleAt = (progress: number) => {
-      const scaled = progress * (coordinates.length - 1);
-      const index = Math.min(
-        coordinates.length - 2,
-        Math.max(0, Math.floor(scaled)),
-      );
-      const t = scaled - index;
-      const pointA = coordinates[index];
-      const pointB = coordinates[index + 1];
-      if (!pointA || !pointB) return Cesium.Cartesian3.fromDegrees(0, 0, 3);
-
-      const lng = pointA[0] + (pointB[0] - pointA[0]) * t;
-      const lat = pointA[1] + (pointB[1] - pointA[1]) * t;
-      return Cesium.Cartesian3.fromDegrees(lng, lat, 3);
+      const sample = sampleRouteAtProgress(coordinates, progress);
+      if (!sample) return Cesium.Cartesian3.fromDegrees(0, 0, 3);
+      return Cesium.Cartesian3.fromDegrees(sample.lng, sample.lat, 3);
     };
 
     const createCarEntity = (id: string, progress: number, scale = 12) =>

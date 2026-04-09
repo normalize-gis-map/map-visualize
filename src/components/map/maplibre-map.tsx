@@ -23,6 +23,7 @@ import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
+import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
 import {
   formatMeters,
   formatScore,
@@ -93,43 +94,8 @@ export function MapLibreMap({
   const selectedId = selectedFlood?.id ?? "";
   const patchedGlyphUrlRef = useRef<string | null>(null);
   const [routePanelOpen, setRoutePanelOpen] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [navProgress, setNavProgress] = useState(0);
-  const [navHeading, setNavHeading] = useState(0);
-  const navHeadingRef = useRef(0);
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
-
-  useEffect(() => {
-    if (!mapInstance || !visibleLayers.drainage) return;
-
-    let frameId = 0;
-    let alive = true;
-    const start = performance.now();
-
-    const animate = (time: number) => {
-      if (!alive || !mapInstance.getLayer("drainage-line")) return;
-      const phase = ((time - start) / 1200) % 1;
-
-      mapInstance.setPaintProperty("drainage-line", "line-dasharray", [
-        0.2,
-        1.2,
-        1.1 + phase * 1.5,
-      ]);
-      mapInstance.triggerRepaint();
-      frameId = requestAnimationFrame(animate);
-    };
-
-    frameId = requestAnimationFrame(animate);
-
-    return () => {
-      alive = false;
-      cancelAnimationFrame(frameId);
-      if (mapInstance.getLayer("drainage-line")) {
-        mapInstance.setPaintProperty("drainage-line", "line-dasharray", [1, 0]);
-      }
-    };
-  }, [mapInstance, visibleLayers.drainage]);
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
@@ -209,6 +175,22 @@ export function MapLibreMap({
 
   const activeRoute = routePayload?.routes[routePayload.activeIndex] ?? null;
   const navMode = activeRoute?.mode ?? "car";
+  const {
+    isPlaying: isNavigating,
+    progress: navProgress,
+    heading: navHeading,
+    navCoordinate,
+    trafficSamples,
+    activeStepIndex,
+    togglePlayback,
+    pause,
+    reset,
+    setProgress,
+  } = useNavigationPlayback({
+    geometry: activeRoute?.geometry ?? null,
+    steps: activeRoute?.steps ?? [],
+    mode: navMode,
+  });
   const routeFromLabel = routePayload?.from.label ?? "Start";
   const routeToLabel = routePayload?.to.label ?? "Destination";
   const etaMinutes = activeRoute
@@ -217,93 +199,10 @@ export function MapLibreMap({
   const distanceKm = activeRoute
     ? (activeRoute.distanceMeters / 1000).toFixed(1)
     : "0.0";
-  const navCoordinate = useMemo(() => {
-    if (!activeRoute) return null;
-    const points = activeRoute.geometry.coordinates;
-    if (!points.length) return null;
-
-    const scaled = navProgress * (points.length - 1);
-    const index = Math.floor(scaled);
-    const nextIndex = Math.min(points.length - 1, index + 1);
-    const t = scaled - index;
-    const [lngA, latA] = points[index];
-    const [lngB, latB] = points[nextIndex];
-    return [lngA + (lngB - lngA) * t, latA + (latB - latA) * t] as [
-      number,
-      number,
-    ];
-  }, [activeRoute, navProgress]);
-
-  const trafficCars = useMemo(() => {
-    if (!activeRoute || viewMode !== "drive3d") return [];
-    const points = activeRoute.geometry.coordinates;
-    if (points.length < 2) return [];
-
-    const sampleAt = (progress: number) => {
-      const scaled = progress * (points.length - 1);
-      const index = Math.min(points.length - 2, Math.max(0, Math.floor(scaled)));
-      const nextIndex = Math.min(points.length - 1, index + 1);
-      const t = scaled - index;
-      const [lngA, latA] = points[index];
-      const [lngB, latB] = points[nextIndex];
-      const lng = lngA + (lngB - lngA) * t;
-      const lat = latA + (latB - latA) * t;
-      const bearing = (Math.atan2(lngB - lngA, latB - latA) * 180) / Math.PI;
-      return { lng, lat, bearing };
-    };
-
-    return [0.05, 0.12, 0.21, 0.33, 0.46, 0.57, 0.68].map((offset, idx) => {
-      const p = (navProgress + offset) % 1;
-      return { id: `traffic-${idx}`, ...sampleAt(p) };
-    });
-  }, [activeRoute, navProgress, viewMode]);
-
-  const activeStepIndex = useMemo(() => {
-    if (!activeRoute?.steps?.length) return 0;
-    return Math.min(
-      activeRoute.steps.length - 1,
-      Math.floor(navProgress * activeRoute.steps.length),
-    );
-  }, [activeRoute, navProgress]);
-
-  useEffect(() => {
-    if (!mapInstance || !activeRoute || !isNavigating) return;
-    let frameId = 0;
-    let last = performance.now();
-    const speed =
-      navMode === "car" ? 0.00008 : navMode === "bike" ? 0.00006 : 0.00004;
-    const points = activeRoute.geometry.coordinates;
-    if (!Array.isArray(points) || points.length < 2) return;
-
-    const animate = (now: number) => {
-      const dt = now - last;
-      last = now;
-      setNavProgress((previousProgress) => {
-        const next = Math.min(1, previousProgress + dt * speed);
-        const scaled = next * (points.length - 1);
-        const index = Math.min(points.length - 2, Math.floor(scaled));
-        const currentPoint = points[index];
-        const nextPoint = points[index + 1];
-        if (!currentPoint || !nextPoint) return next;
-        const [lngA, latA] = currentPoint;
-        const [lngB, latB] = nextPoint;
-        const targetBearing = (Math.atan2(lngB - lngA, latB - latA) * 180) / Math.PI;
-        const delta =
-          ((((targetBearing - navHeadingRef.current) % 360) + 540) % 360) - 180;
-        navHeadingRef.current += delta * 0.16;
-        setNavHeading(navHeadingRef.current);
-
-        if (next >= 1) {
-          setIsNavigating(false);
-        }
-        return next;
-      });
-      frameId = requestAnimationFrame(animate);
-    };
-
-    frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
-  }, [mapInstance, activeRoute, isNavigating, navMode]);
+  const trafficCars = useMemo(
+    () => (viewMode === "drive3d" ? trafficSamples : []),
+    [trafficSamples, viewMode],
+  );
 
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
@@ -862,8 +761,8 @@ export function MapLibreMap({
                 <button
                   type="button"
                   onClick={() => {
-                    if (navProgress >= 1) setNavProgress(0);
-                    setIsNavigating((prev) => !prev);
+                    if (navProgress >= 1) setProgress(0);
+                    togglePlayback();
                   }}
                   className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-semibold text-white"
                 >
@@ -882,10 +781,8 @@ export function MapLibreMap({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsNavigating(false);
-                    setNavProgress(0);
-                    navHeadingRef.current = 0;
-                    setNavHeading(0);
+                    pause();
+                    reset();
                     if (mapInstance) {
                       const start = activeRoute.geometry.coordinates[0];
                       mapInstance.flyTo({
