@@ -207,12 +207,40 @@ export function MapLibreMap({
   const distanceKm = activeRoute
     ? (activeRoute.distanceMeters / 1000).toFixed(1)
     : "0.0";
+  const remainingProgressEnd = Math.min(1, navProgress + 0.018);
   const trafficCars = useMemo(() => {
     if (viewMode !== "drive3d") return [];
 
     const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
     return trafficSamples.slice(0, maxVehicles);
   }, [mapZoom, trafficSamples, viewMode]);
+  const miniRouteCollection: FeatureCollection | null = activeRoute
+    ? {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: activeRoute.geometry,
+            properties: {},
+          },
+        ],
+      }
+    : null;
+  const miniNavCollection: FeatureCollection | null = navCoordinate
+    ? {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: navCoordinate,
+            },
+            properties: {},
+          },
+        ],
+      }
+    : null;
 
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
@@ -422,8 +450,8 @@ export function MapLibreMap({
                 "line-opacity": [
                   "case",
                   ["==", ["get", "isPrimary"], 1],
-                  0.32,
-                  0.12,
+                  viewMode === "drive3d" ? 0.08 : 0.32,
+                  viewMode === "drive3d" ? 0 : 0.12,
                 ],
               }}
               layout={{ "line-cap": "round", "line-join": "round" }}
@@ -447,8 +475,8 @@ export function MapLibreMap({
                 "line-opacity": [
                   "case",
                   ["==", ["get", "isPrimary"], 1],
-                  0.95,
-                  0.45,
+                  viewMode === "drive3d" ? 0 : 0.95,
+                  viewMode === "drive3d" ? 0 : 0.45,
                 ],
               }}
               layout={{ "line-cap": "round", "line-join": "round" }}
@@ -475,13 +503,15 @@ export function MapLibreMap({
                   ["linear"],
                   ["line-progress"],
                   0,
-                  "#38bdf8",
+                  "rgba(56,189,248,0)",
+                  navProgress,
+                  "rgba(56,189,248,0)",
                   navProgress,
                   "#38bdf8",
-                  navProgress,
-                  "rgba(29,78,216,0.12)",
+                  remainingProgressEnd,
+                  "#38bdf8",
                   1,
-                  "rgba(29,78,216,0.12)",
+                  "rgba(125,211,252,0.75)",
                 ],
                 "line-width": 10,
                 "line-opacity": 1,
@@ -505,7 +535,7 @@ export function MapLibreMap({
                 "text-color": "#1e40af",
                 "text-halo-color": "#ffffff",
                 "text-halo-width": 1,
-                "text-opacity": 0.95,
+                "text-opacity": viewMode === "drive3d" ? 0 : 0.95,
               }}
             />
           </Source>
@@ -692,6 +722,59 @@ export function MapLibreMap({
       ) : null}
 
       {visibleLayers.flood && <MapLegend />}
+
+      {viewMode === "drive3d" && activeRoute && miniRouteCollection ? (
+        <div className="absolute right-3 bottom-3 z-30 hidden h-36 w-28 overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-2xl backdrop-blur md:block">
+          <Map
+            initialViewState={{
+              longitude: routePayload?.from.center[0] ?? 106.73,
+              latitude: routePayload?.from.center[1] ?? 10.82,
+              zoom: 13,
+              pitch: 0,
+              bearing: 0,
+            }}
+            mapStyle={MAP_STYLE_2D}
+            interactive={false}
+            dragPan={false}
+            doubleClickZoom={false}
+            scrollZoom={false}
+            touchZoomRotate={false}
+            longitude={navCoordinate?.[0] ?? routePayload?.from.center[0] ?? 106.73}
+            latitude={navCoordinate?.[1] ?? routePayload?.from.center[1] ?? 10.82}
+            zoom={navCoordinate ? Math.max(12.5, mapZoom - 1.6) : 13}
+            pitch={0}
+            bearing={0}
+            style={{ width: "100%", height: "100%" }}
+          >
+            <Source id="mini-route" type="geojson" data={miniRouteCollection}>
+              <Layer
+                id="mini-route-line"
+                type="line"
+                paint={{
+                  "line-color": "#2563eb",
+                  "line-width": 3.2,
+                  "line-opacity": 0.9,
+                }}
+                layout={{ "line-cap": "round", "line-join": "round" }}
+              />
+            </Source>
+            {miniNavCollection ? (
+              <Source id="mini-nav" type="geojson" data={miniNavCollection}>
+                <Layer
+                  id="mini-nav-dot"
+                  type="circle"
+                  paint={{
+                    "circle-radius": 4.8,
+                    "circle-color": "#f43f5e",
+                    "circle-stroke-width": 1.4,
+                    "circle-stroke-color": "#ffffff",
+                  }}
+                />
+              </Source>
+            ) : null}
+          </Map>
+        </div>
+      ) : null}
     </div>
   );
 }
