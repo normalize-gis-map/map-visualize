@@ -1,7 +1,7 @@
 "use client";
 
-import { Bike, Car, Footprints, Menu, Navigation, Pause, Play } from "lucide-react";
-import Map, { Layer, Marker, NavigationControl, Source } from "react-map-gl/maplibre";
+import { Menu } from "lucide-react";
+import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection } from "geojson";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -34,6 +34,8 @@ import {
 
 import { FeaturePopup } from "./feature-popup";
 import { MapLegend } from "./map-legend";
+import { RouteDrawer } from "./navigation/route-drawer";
+import { RouteMarkers } from "./navigation/route-markers";
 
 type Props = {
   selectedPlace: PlaceItem | null;
@@ -551,77 +553,14 @@ export function MapLibreMap({
         )}
 
         {activeRoute ? (
-          <>
-            <Marker
-              longitude={activeRoute.geometry.coordinates[0][0]}
-              latitude={activeRoute.geometry.coordinates[0][1]}
-              anchor="bottom"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-xs font-bold text-white shadow-lg">
-                A
-              </div>
-            </Marker>
-            <Marker
-              longitude={
-                activeRoute.geometry.coordinates[
-                  activeRoute.geometry.coordinates.length - 1
-                ][0]
-              }
-              latitude={
-                activeRoute.geometry.coordinates[
-                  activeRoute.geometry.coordinates.length - 1
-                ][1]
-              }
-              anchor="bottom"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-xs font-bold text-white shadow-lg">
-                B
-              </div>
-            </Marker>
-            {navCoordinate ? (
-              <Marker
-                longitude={navCoordinate[0]}
-                latitude={navCoordinate[1]}
-                anchor="center"
-              >
-                <div
-                  className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg"
-                  style={{ transform: `rotate(${navHeading}deg)` }}
-                >
-                  {mapLibreCar3D && navMode === "car" ? (
-                    <div className="relative h-5 w-5">
-                      <div className="absolute inset-x-0 bottom-0 h-3 rounded-[3px] bg-blue-100 shadow-[0_2px_4px_rgba(0,0,0,0.35)]" />
-                      <div className="absolute inset-x-1 top-0 h-2 rounded-[2px] bg-white/90" />
-                      <div className="absolute bottom-0.5 left-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />
-                      <div className="absolute right-0.5 bottom-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />
-                    </div>
-                  ) : navMode === "car" ? (
-                    <Car className="h-4 w-4" />
-                  ) : navMode === "bike" ? (
-                    <Bike className="h-4 w-4" />
-                  ) : (
-                    <Footprints className="h-4 w-4" />
-                  )}
-                </div>
-              </Marker>
-            ) : null}
-            {trafficCars.map((car) => (
-              <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
-                <div
-                  className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-white/70 bg-slate-800/85 text-[10px] text-white shadow-lg"
-                  style={{ transform: `rotate(${car.bearing}deg)` }}
-                >
-                  <div
-                    className={`h-4 w-4 rounded-[4px] ${
-                      Number(car.id.split("-").pop()) % 2 === 0
-                        ? "bg-sky-300"
-                        : "bg-rose-300"
-                    }`}
-                  />
-                </div>
-              </Marker>
-            ))}
-          </>
+          <RouteMarkers
+            coordinates={activeRoute.geometry.coordinates}
+            navCoordinate={navCoordinate}
+            navHeading={navHeading}
+            navMode={navMode}
+            mapLibreCar3D={mapLibreCar3D}
+            trafficCars={trafficCars}
+          />
         ) : null}
       </Map>
 
@@ -656,151 +595,43 @@ export function MapLibreMap({
             <Menu className="h-5 w-5" />
           </button>
 
-          {routePanelOpen ? (
-            <div className="absolute right-2 bottom-20 left-2 z-30 max-h-[52vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur md:right-3 md:bottom-20 md:left-3 md:max-h-[46vh]">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase">
-                  Route drawer
-                </p>
-                <div className="text-xs text-slate-500">
-                  {Math.round(navProgress * 100)}%
-                </div>
-              </div>
-
-              <div className="mb-3 flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700">
-                {navMode === "car" ? (
-                  <Car className="h-4 w-4" />
-                ) : navMode === "bike" ? (
-                  <Bike className="h-4 w-4" />
-                ) : (
-                  <Footprints className="h-4 w-4" />
-                )}
-                Chế độ: {navMode === "car" ? "Ô tô" : navMode === "bike" ? "Xe đạp" : "Đi bộ"}
-              </div>
-
-              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("map")}
-                  className={`h-10 rounded-2xl border text-sm font-semibold ${
-                    viewMode === "map"
-                      ? "border-blue-300 bg-blue-50 text-blue-700"
-                      : "border-slate-200 text-slate-600"
-                  }`}
-                >
-                  Bản đồ thường
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("drive3d")}
-                  className={`h-10 rounded-2xl border text-sm font-semibold ${
-                    viewMode === "drive3d"
-                      ? "border-blue-300 bg-blue-50 text-blue-700"
-                      : "border-slate-200 text-slate-600"
-                  }`}
-                >
-                  Góc nhìn lái xe 3D
-                </button>
-              </div>
-
-              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMapLibreCar3D((prev) => !prev);
-                    setViewMode("drive3d");
-                  }}
-                  className={`flex h-10 items-center justify-center rounded-2xl border text-sm font-semibold ${
-                    mapLibreCar3D
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                      : "border-slate-200 text-slate-600"
-                  }`}
-                >
-                  {mapLibreCar3D ? "Phase 1: Tắt demo MapLibre" : "Phase 1: Demo MapLibre"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMapEngine("cesium")}
-                  className="flex h-10 items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700"
-                >
-                  Phase 2: Cesium cinematic
-                </button>
-              </div>
-
-              <div className="mb-2 rounded-2xl bg-slate-50 px-3 py-2">
-                <div className="text-sm font-semibold text-slate-800">
-                  {routeFromLabel} → {routeToLabel}
-                </div>
-                <div className="text-xs text-slate-600">
-                  ETA {etaMinutes} phút • {distanceKm} km
-                </div>
-              </div>
-
-              {activeRoute.steps.length ? (
-                <div className="mb-3 rounded-2xl border border-slate-200 bg-white p-3">
-                  <p className="mb-1 text-[11px] font-semibold tracking-[0.13em] text-slate-500 uppercase">
-                    Turn by turn
-                  </p>
-                  <ul className="space-y-1.5">
-                    {activeRoute.steps.slice(activeStepIndex, activeStepIndex + 3).map((step) => (
-                      <li
-                        key={`${step.instruction}-${step.distanceMeters}`}
-                        className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-700"
-                      >
-                        {step.instruction}
-                        {step.roadName ? ` (${step.roadName})` : ""} •{" "}
-                        {(step.distanceMeters / 1000).toFixed(2)} km •{" "}
-                        {Math.max(1, Math.round(step.durationSeconds / 60))} phút
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              <div className="sticky bottom-0 flex gap-2 bg-white/95 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (navProgress >= 1) setProgress(0);
-                    togglePlayback();
-                  }}
-                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-semibold text-white"
-                >
-                  {isNavigating ? (
-                    <>
-                      <Pause className="h-4 w-4" />
-                      Tạm dừng
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4" />
-                      Di chuyển
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    pause();
-                    reset();
-                    if (mapInstance) {
-                      const start = activeRoute.geometry.coordinates[0];
-                      mapInstance.flyTo({
-                        center: [start[0], start[1]],
-                        zoom: Math.max(mapInstance.getZoom(), 13),
-                        pitch: mapMode === "2.5d" ? 62 : 0,
-                        duration: 700,
-                      });
-                    }
-                  }}
-                  className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-3 text-sm font-medium text-slate-700"
-                >
-                  <Navigation className="h-4 w-4" />
-                  Reset
-                </button>
-              </div>
-            </div>
-          ) : null}
+          <RouteDrawer
+            routePanelOpen={routePanelOpen}
+            navProgress={navProgress}
+            navMode={navMode}
+            viewMode={viewMode}
+            mapLibreCar3D={mapLibreCar3D}
+            routeFromLabel={routeFromLabel}
+            routeToLabel={routeToLabel}
+            etaMinutes={etaMinutes}
+            distanceKm={distanceKm}
+            steps={activeRoute.steps}
+            activeStepIndex={activeStepIndex}
+            isNavigating={isNavigating}
+            onToggleViewMode={setViewMode}
+            onToggleMapLibreCar3D={() => {
+              setMapLibreCar3D((prev) => !prev);
+              setViewMode("drive3d");
+            }}
+            onSwitchToCesium={() => setMapEngine("cesium")}
+            onTogglePlayback={() => {
+              if (navProgress >= 1) setProgress(0);
+              togglePlayback();
+            }}
+            onReset={() => {
+              pause();
+              reset();
+              if (mapInstance) {
+                const start = activeRoute.geometry.coordinates[0];
+                mapInstance.flyTo({
+                  center: [start[0], start[1]],
+                  zoom: Math.max(mapInstance.getZoom(), 13),
+                  pitch: mapMode === "2.5d" ? 62 : 0,
+                  duration: 700,
+                });
+              }
+            }}
+          />
         </>
       ) : null}
 
