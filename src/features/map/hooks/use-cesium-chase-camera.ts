@@ -37,6 +37,10 @@ export function useCesiumChaseCamera() {
         coordinates,
         Math.min(1, progress + dynamicLookAhead),
       );
+      const farAhead = sampleRouteAtProgress(
+        coordinates,
+        Math.min(1, progress + dynamicLookAhead * 1.9),
+      );
 
       if (!focus || !ahead) return;
 
@@ -49,20 +53,35 @@ export function useCesiumChaseCamera() {
       smoothFocusRef.current = smoothedFocus;
 
       const targetHeading = Math.atan2(ahead.lng - focus.lng, ahead.lat - focus.lat);
+      const farHeading = farAhead
+        ? Math.atan2(farAhead.lng - ahead.lng, farAhead.lat - ahead.lat)
+        : targetHeading;
+      const headingDelta = Cesium.Math.negativePiToPi(farHeading - targetHeading);
+      const turnStrength = Math.min(1, Math.abs(headingDelta) / 0.85);
       const currentHeading = smoothHeadingRef.current ?? targetHeading;
       const wrappedDelta = Cesium.Math.negativePiToPi(targetHeading - currentHeading);
-      const nextHeading = currentHeading + wrappedDelta * damping;
+      const adaptiveDamping = damping + turnStrength * 0.09;
+      const nextHeading = currentHeading + wrappedDelta * adaptiveDamping;
       smoothHeadingRef.current = nextHeading;
+
+      const adaptiveAltitude =
+        (options?.altitude ?? 180) +
+        (options?.speedFactor ?? 0) * 45 -
+        turnStrength * 55;
+      const adaptivePitch =
+        (options?.pitchDegrees ?? -24) -
+        (options?.speedFactor ?? 0) * 3.5 +
+        turnStrength * 8;
 
       viewer.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(
           smoothedFocus.lng,
           smoothedFocus.lat,
-          (options?.altitude ?? 180) + (options?.speedFactor ?? 0) * 45,
+          Math.max(85, adaptiveAltitude),
         ),
         orientation: {
           heading: nextHeading,
-          pitch: Cesium.Math.toRadians((options?.pitchDegrees ?? -24) - (options?.speedFactor ?? 0) * 3.5),
+          pitch: Cesium.Math.toRadians(Math.min(-10, adaptivePitch)),
           roll: 0,
         },
       });
