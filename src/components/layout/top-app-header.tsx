@@ -1,6 +1,14 @@
 "use client";
 
-import { Car, Coffee, Fuel, MapPinned, UtensilsCrossed } from "lucide-react";
+import {
+  Car,
+  Coffee,
+  Fuel,
+  MapPinned,
+  Search,
+  UtensilsCrossed,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 
 import { MapControlsMenu } from "@/components/map/map-controls-menu";
@@ -8,7 +16,6 @@ import { SearchPanel } from "@/components/search/search-panel";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { PlaceItem } from "@/data/places";
-import { useFloodStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type TopAppHeaderProps = {
@@ -24,16 +31,16 @@ type TopAppHeaderProps = {
 };
 
 export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
-  const { mapEngine, hasHydrated } = useFloodStore();
   const [mode, setMode] = useState<"view" | "route">("view");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedPreviewPlace, setSelectedPreviewPlace] = useState<PlaceItem | null>(
     null,
   );
-  const safeMapEngine = hasHydrated ? mapEngine : "maplibre";
-  const activeMode = safeMapEngine === "cesium" ? "view" : mode;
+  const activeMode = mode;
 
   const handleSelectPlace = (place: PlaceItem) => {
     setSelectedPreviewPlace(place);
+    setSearchOpen(false);
     onSelectPlace(place);
   };
 
@@ -50,32 +57,30 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
               <MapPinned className="h-5 w-5" />
             </button>
 
-            {safeMapEngine === "maplibre" ? (
-              <div className="inline-flex h-11 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 md:h-12">
-                <button
-                  type="button"
-                  onClick={() => setMode("view")}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    activeMode === "view"
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500"
-                  }`}
-                >
-                  View
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("route")}
-                  className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    activeMode === "route"
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500"
-                  }`}
-                >
-                  Route
-                </button>
-              </div>
-            ) : null}
+            <div className="inline-flex h-11 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 md:h-12">
+              <button
+                type="button"
+                onClick={() => setMode("view")}
+                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                  activeMode === "view"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                View
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("route")}
+                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                  activeMode === "route"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                Route
+              </button>
+            </div>
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {activeMode === "view" ? <MapControlsMenu /> : null}
@@ -83,17 +88,15 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
             </div>
           </div>
 
-          <div className="mt-3">
-            {activeMode === "view" ? (
-              <SearchPanel onSelectPlace={handleSelectPlace} compact />
-            ) : (
+          {activeMode === "route" ? (
+            <div className="mt-3">
               <RoutePlanner
                 onRoutesChange={onRoutesChange}
                 initialToLabel={selectedPreviewPlace?.label}
                 onBackToSearch={() => setMode("view")}
               />
-            )}
-          </div>
+            </div>
+          ) : null}
 
           {activeMode === "view" && selectedPreviewPlace ? (
             <div className="mt-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg">
@@ -135,6 +138,37 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
           ) : null}
         </div>
       </div>
+
+      {activeMode === "view" ? (
+        <div className="fixed bottom-4 left-4 z-40">
+          {searchOpen ? (
+            <div className="w-[min(92vw,380px)] rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
+                  Search
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(false)}
+                  className="rounded-lg border border-slate-200 p-1 text-slate-500"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <SearchPanel onSelectPlace={handleSelectPlace} compact />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/95 text-slate-700 shadow-2xl backdrop-blur"
+              aria-label="Open search"
+            >
+              <Search className="h-6 w-6" />
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

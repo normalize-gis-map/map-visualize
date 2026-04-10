@@ -5,6 +5,7 @@ import { Globe, Map, Satellite } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { FeaturePopupCard } from "@/components/map/feature-popup";
+import { ControlBoard } from "@/components/map/navigation/control-board";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { useCesiumChaseCamera } from "@/features/map/hooks/use-cesium-chase-camera";
@@ -329,6 +330,10 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       viewer.entities.add({
         id,
         position: sampleAt(progress),
+        orientation: Cesium.Transforms.headingPitchRollQuaternion(
+          sampleAt(progress),
+          new Cesium.HeadingPitchRoll(0, 0, 0),
+        ),
         model: {
           uri: CAR_MODEL_URL,
           minimumPixelSize: 26,
@@ -343,6 +348,12 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     const traffic3 = createCarEntity("route-traffic-3", 0.49);
 
     const tick = () => {
+      const roadSamples = [
+        sampleRouteAtProgress(coordinates, navProgressRef.current),
+        sampleRouteAtProgress(coordinates, (navProgressRef.current + 0.18) % 1),
+        sampleRouteAtProgress(coordinates, (navProgressRef.current + 0.35) % 1),
+        sampleRouteAtProgress(coordinates, (navProgressRef.current + 0.52) % 1),
+      ];
       const positions = [
         sampleAt(navProgressRef.current),
         sampleAt((navProgressRef.current + 0.18) % 1),
@@ -353,6 +364,27 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       traffic1.position = new Cesium.ConstantPositionProperty(positions[1]);
       traffic2.position = new Cesium.ConstantPositionProperty(positions[2]);
       traffic3.position = new Cesium.ConstantPositionProperty(positions[3]);
+      const toOrientation = (position: Cesium.Cartesian3, bearing?: number) =>
+        Cesium.Transforms.headingPitchRollQuaternion(
+          position,
+          new Cesium.HeadingPitchRoll(
+            Cesium.Math.toRadians((bearing ?? 0) - 90),
+            0,
+            0,
+          ),
+        );
+      mainCar.orientation = new Cesium.ConstantProperty(
+        toOrientation(positions[0], roadSamples[0]?.bearing),
+      );
+      traffic1.orientation = new Cesium.ConstantProperty(
+        toOrientation(positions[1], roadSamples[1]?.bearing),
+      );
+      traffic2.orientation = new Cesium.ConstantProperty(
+        toOrientation(positions[2], roadSamples[2]?.bearing),
+      );
+      traffic3.orientation = new Cesium.ConstantProperty(
+        toOrientation(positions[3], roadSamples[3]?.bearing),
+      );
 
       if (!viewerDestroyedRef.current && isNavigatingRef.current) {
         updateChaseCamera(viewer, coordinates, navProgressRef.current, {
@@ -468,56 +500,23 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       </div>
 
       {activeRoute ? (
-        <div className="absolute right-3 bottom-3 z-30 w-[min(92vw,420px)] rounded-2xl border border-white/20 bg-slate-900/80 p-3 text-white backdrop-blur">
-          <div className="mb-2 flex items-center justify-between text-xs">
-            <span>{Math.round(navProgress * 100)}%</span>
-            <div className="flex gap-1">
-              {availableSpeedMultipliers.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setSpeedMultiplier(item)}
-                  className={`rounded-md px-2 py-1 ${
-                    speedMultiplier === item ? "bg-cyan-300 text-slate-900" : "bg-white/15"
-                  }`}
-                >
-                  {item}x
-                </button>
-              ))}
-            </div>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={navProgress}
-            onChange={(event) => seek(Number(event.target.value))}
-            className="w-full accent-cyan-300"
-          />
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (navProgress >= 1) seek(0);
-                togglePlayback();
-              }}
-              className="flex-1 rounded-lg bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-900"
-            >
-              {isNavigating ? "Pause" : "Play"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                pause();
-                reset();
-              }}
-              className="rounded-lg border border-white/30 px-3 py-2 text-sm"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
+        <ControlBoard
+          progress={navProgress}
+          isPlaying={isNavigating}
+          speedMultiplier={speedMultiplier}
+          availableSpeedMultipliers={availableSpeedMultipliers}
+          onSeek={seek}
+          onSetSpeed={setSpeedMultiplier}
+          onTogglePlayback={() => {
+            if (navProgress >= 1) seek(0);
+            togglePlayback();
+          }}
+          onReset={() => {
+            pause();
+            reset();
+          }}
+          className="absolute right-3 bottom-3 z-30 w-[min(92vw,420px)] rounded-2xl border border-white/20 bg-slate-900/80 p-3 text-white backdrop-blur"
+        />
       ) : null}
 
       {selectedBuilding && visibleLayers.buildings && (

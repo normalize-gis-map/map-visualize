@@ -1,6 +1,7 @@
 import { Menu } from "lucide-react";
 
 import { MapLegend } from "@/components/map/map-legend";
+import { ControlBoard } from "@/components/map/navigation/control-board";
 import { NavigationMiniMapInset } from "@/components/map/navigation/navigation-mini-map-inset";
 import { RouteDrawer } from "@/components/map/navigation/route-drawer";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -94,6 +95,17 @@ export function NavigationHud({
 
       {activeRoute ? (
         <>
+          <ControlBoard
+            progress={navProgress}
+            isPlaying={isNavigating}
+            speedMultiplier={speedMultiplier}
+            availableSpeedMultipliers={availableSpeedMultipliers}
+            onSeek={onSeek}
+            onSetSpeed={onSetSpeed}
+            onTogglePlayback={onTogglePlayback}
+            onReset={onReset}
+            className="absolute right-3 bottom-3 z-30 hidden w-[min(92vw,360px)] rounded-2xl border border-white/70 bg-white/95 p-3 text-slate-900 shadow-2xl backdrop-blur md:block"
+          />
           <button
             type="button"
             onClick={() => setRoutePanelOpen(!routePanelOpen)}
