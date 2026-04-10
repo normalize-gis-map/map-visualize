@@ -17,6 +17,19 @@ export function RouteVisualLayers({
   remainingProgressEnd,
 }: Props) {
   if (!routeCollection) return null;
+  const p0 = Number.isFinite(safeProgress) ? Math.max(0, Math.min(safeProgress, 0.998)) : 0;
+  const p1 = Math.max(
+    p0 + 0.0001,
+    Number.isFinite(progressFadeStart)
+      ? Math.max(0, Math.min(progressFadeStart, 0.999))
+      : p0 + 0.0005,
+  );
+  const p2 = Math.max(
+    p1 + 0.0001,
+    Number.isFinite(remainingProgressEnd)
+      ? Math.max(0, Math.min(remainingProgressEnd, 0.9995))
+      : p1 + 0.018,
+  );
 
   return (
     <Source id="routes" type="geojson" data={routeCollection} lineMetrics>
@@ -73,17 +86,28 @@ export function RouteVisualLayers({
             ["line-progress"],
             0,
             "rgba(56,189,248,0)",
-            safeProgress,
+            p0,
             "rgba(56,189,248,0)",
-            progressFadeStart,
+            p1,
             "#38bdf8",
-            remainingProgressEnd,
+            p2,
             "#38bdf8",
             1,
             "rgba(125,211,252,0.75)",
           ],
           "line-width": 10,
           "line-opacity": 1,
+        }}
+        layout={{ "line-cap": "round", "line-join": "round" }}
+      />
+      <Layer
+        id="route-drive3d-guide"
+        type="line"
+        filter={["==", ["get", "isPrimary"], 1]}
+        paint={{
+          "line-color": "#67e8f9",
+          "line-width": 3.5,
+          "line-opacity": viewMode === "drive3d" ? 0.95 : 0,
         }}
         layout={{ "line-cap": "round", "line-join": "round" }}
       />

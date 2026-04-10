@@ -197,7 +197,8 @@ export function MapLibreMap({
   const distanceKm = activeRoute
     ? (activeRoute.distanceMeters / 1000).toFixed(1)
     : "0.0";
-  const safeProgress = Math.min(0.998, Math.max(0, navProgress));
+  const normalizedProgress = Number.isFinite(navProgress) ? navProgress : 0;
+  const safeProgress = Math.min(0.998, Math.max(0, normalizedProgress));
   const progressFadeStart = Math.min(0.999, safeProgress + 0.0005);
   const remainingProgressEnd = Math.min(0.9995, progressFadeStart + 0.018);
   const trafficCars = useMemo(() => {
@@ -206,6 +207,27 @@ export function MapLibreMap({
     const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
     return trafficSamples.slice(0, maxVehicles);
   }, [mapZoom, trafficSamples, viewMode]);
+
+  const resetRouteRuntime = () => {
+    pause();
+    reset();
+    setRoutePanelOpen(false);
+    setDrawerMinimalMode(false);
+    setMapLibreCar3D(false);
+  };
+
+  const handleToggleViewMode = (mode: "map" | "drive3d") => {
+    if (mode === "map") {
+      resetRouteRuntime();
+    }
+    setViewMode(mode);
+  };
+
+  const handleSwitchToCesium = () => {
+    resetRouteRuntime();
+    setViewMode("map");
+    setMapEngine("cesium");
+  };
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
     programmaticMoveRef.current = true;
@@ -309,12 +331,12 @@ export function MapLibreMap({
         availableSpeedMultipliers={availableSpeedMultipliers}
         drawerMinimalMode={drawerMinimalMode}
         navCoordinate={navCoordinate}
-        onToggleViewMode={setViewMode}
+        onToggleViewMode={handleToggleViewMode}
         onToggleMapLibreCar3D={() => {
           setMapLibreCar3D((prev) => !prev);
           setViewMode("drive3d");
         }}
-        onSwitchToCesium={() => setMapEngine("cesium")}
+        onSwitchToCesium={handleSwitchToCesium}
         onTogglePlayback={() => {
           if (navProgress >= 1) seek(0);
           togglePlayback();
