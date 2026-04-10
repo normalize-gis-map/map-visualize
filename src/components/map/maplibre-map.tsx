@@ -1,14 +1,11 @@
 "use client";
 
 import type { FeatureCollection } from "geojson";
-import { Menu } from "lucide-react";
 import maplibregl from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
+import Map, { NavigationControl } from "react-map-gl/maplibre";
 
-import drainageData from "@/data/geojson/drainage-sample.json";
 import floodData from "@/data/geojson/flood-sample.json";
-import riskZonesData from "@/data/geojson/risk-zones-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
@@ -24,19 +21,10 @@ import {
   MAP_STYLE_2D,
   MAP_STYLE_25D,
 } from "@/lib/constants/map.constants";
-import {
-  formatMeters,
-  formatScore,
-  formatSeverityTone,
-  formatStatusTone,
-  formatLevelTone,
-} from "@/utils/formatters";
 
-import { FeaturePopup } from "./feature-popup";
-import { MapLegend } from "./map-legend";
-import { NavigationMiniMapInset } from "./navigation/navigation-mini-map-inset";
-import { RouteDrawer } from "./navigation/route-drawer";
-import { RouteMarkers } from "./navigation/route-markers";
+import { MapDataLayers } from "./map-data-layers";
+import { MapFeatureOverlays } from "./map-feature-overlays";
+import { NavigationHud } from "./navigation/navigation-hud";
 import { RouteVisualLayers } from "./navigation/route-visual-layers";
 
 type Props = {
@@ -269,141 +257,13 @@ export function MapLibreMap({
       >
         <NavigationControl position="bottom-right" />
 
-        {visibleLayers.riskZones && (
-          <Source
-            id="risk-zones"
-            type="geojson"
-            data={riskZonesData as FeatureCollection}
-          >
-            <Layer
-              id="risk-zones-fill"
-              type="fill"
-              paint={{
-                "fill-color": [
-                  "match",
-                  ["get", "level"],
-                  "high",
-                  "#ef4444",
-                  "medium",
-                  "#f59e0b",
-                  "low",
-                  "#60a5fa",
-                  "#94a3b8",
-                ],
-                "fill-opacity": 0.18,
-              }}
-            />
-          </Source>
-        )}
-
-        {visibleLayers.drainage && (
-          <Source
-            id="drainage"
-            type="geojson"
-            data={drainageData as FeatureCollection}
-          >
-          <Layer
-            id="drainage-line"
-            type="line"
-            layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{
-              "line-color": "#0ea5e9",
-              "line-width": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                9,
-                1.6,
-                15,
-                4.5,
-              ],
-              "line-opacity": 0.8,
-              "line-blur": 0.25,
-              "line-dasharray": [1, 0],
-            }}
-          />
-          </Source>
-        )}
-
-        {visibleLayers.flood && (
-          <Source
-            id="flood"
-            type="geojson"
-            data={activeFloodData}
-          >
-            {mapMode === "2.5d" ? (
-              <Layer
-                id="flood-extrusion"
-                type="fill-extrusion"
-                paint={{
-                  "fill-extrusion-color": [
-                    "match",
-                    ["get", "severity"],
-                    "low",
-                    "#60a5fa",
-                    "medium",
-                    "#f59e0b",
-                    "high",
-                    "#ef4444",
-                    "#60a5fa",
-                  ],
-                  "fill-extrusion-height": [
-                    "interpolate",
-                    ["linear"],
-                    ["get", "depth"],
-                    0,
-                    0,
-                    2,
-                    1200,
-                  ],
-                  "fill-extrusion-opacity": [
-                    "case",
-                    ["==", ["get", "id"], selectedId],
-                    1,
-                    ["==", ["get", "id"], hoveredId],
-                    0.95,
-                    0.8,
-                  ],
-                }}
-              />
-            ) : (
-              <Layer
-                id="flood-fill"
-                type="fill"
-                paint={{
-                  "fill-color": [
-                    "match",
-                    ["get", "severity"],
-                    "low",
-                    "#60a5fa",
-                    "medium",
-                    "#f59e0b",
-                    "high",
-                    "#ef4444",
-                    "#60a5fa",
-                  ],
-                "fill-opacity": [
-                  "case",
-                  ["==", ["get", "id"], selectedId],
-                  0.68,
-                  ["==", ["get", "id"], hoveredId],
-                  0.58,
-                  0.42,
-                ],
-              }}
-            />
-            )}
-
-            <Layer
-              id="flood-outline"
-              type="line"
-              paint={{
-                "line-color": "#1e293b",
-                "line-width": 1.5,
-              }}
-            />
-          </Source>
-        )}
+        <MapDataLayers
+          visibleLayers={visibleLayers}
+          activeFloodData={activeFloodData}
+          mapMode={mapMode}
+          selectedId={selectedId}
+          hoveredId={hoveredId}
+        />
 
         <RouteVisualLayers
           routeCollection={routeCollection}
@@ -413,194 +273,68 @@ export function MapLibreMap({
           remainingProgressEnd={remainingProgressEnd}
         />
 
-        {selectedFlood && (
-          <FeaturePopup
-            longitude={selectedFlood.lngLat.lng}
-            latitude={selectedFlood.lngLat.lat}
-            title={selectedFlood.properties.areaName}
-            subtitle={selectedFlood.properties.district}
-            variant="flood"
-            onClose={resetSelections}
-            anchor={selectedFlood.anchor}
-            fields={[
-              {
-                label: "Depth",
-                value: formatMeters(selectedFlood.properties.depth),
-                tone: "info",
-              },
-              {
-                label: "Severity",
-                value: selectedFlood.properties.severity,
-                tone: formatSeverityTone(selectedFlood.properties.severity),
-              },
-              {
-                label: "Risk score",
-                value: formatScore(selectedFlood.properties.riskScore),
-              },
-            ]}
-          />
-        )}
-
-        {selectedBuilding && (
-          <FeaturePopup
-            longitude={selectedBuilding.lngLat.lng}
-            latitude={selectedBuilding.lngLat.lat}
-            title="Building"
-            subtitle="3D extrusion"
-            variant="building"
-            onClose={resetSelections}
-            anchor={selectedBuilding.anchor}
-            fields={[
-              {
-                label: "Height",
-                value: formatMeters(selectedBuilding.properties.render_height),
-                tone: "info",
-              },
-              {
-                label: "Base",
-                value: formatMeters(
-                  selectedBuilding.properties.render_min_height,
-                ),
-              },
-            ]}
-          />
-        )}
-
-        {selectedDrainage && (
-          <FeaturePopup
-            longitude={selectedDrainage.lngLat.lng}
-            latitude={selectedDrainage.lngLat.lat}
-            title="Drainage"
-            subtitle="Water channel"
-            variant="drainage"
-            onClose={resetSelections}
-            anchor={selectedDrainage.anchor}
-            fields={[
-              {
-                label: "Status",
-                value: selectedDrainage.properties.status,
-                tone: formatStatusTone(selectedDrainage.properties.status),
-              },
-            ]}
-          />
-        )}
-
-        {selectedRiskZone && (
-          <FeaturePopup
-            longitude={selectedRiskZone.lngLat.lng}
-            latitude={selectedRiskZone.lngLat.lat}
-            title={selectedRiskZone.properties.label}
-            subtitle="Flood risk"
-            variant="risk"
-            onClose={resetSelections}
-            anchor={selectedRiskZone.anchor}
-            fields={[
-              {
-                label: "Level",
-                value: selectedRiskZone.properties.level,
-                tone: formatLevelTone(selectedRiskZone.properties.level),
-              },
-            ]}
-          />
-        )}
-
-        {activeRoute ? (
-          <RouteMarkers
-            coordinates={activeRoute.geometry.coordinates}
-            navCoordinate={navCoordinate}
-            navHeading={navHeading}
-            navMode={navMode}
-            mapLibreCar3D={mapLibreCar3D}
-            trafficCars={trafficCars}
-          />
-        ) : null}
+        <MapFeatureOverlays
+          selectedFlood={selectedFlood}
+          selectedBuilding={selectedBuilding}
+          selectedDrainage={selectedDrainage}
+          selectedRiskZone={selectedRiskZone}
+          resetSelections={resetSelections}
+          activeRoute={activeRoute}
+          navCoordinate={navCoordinate}
+          navHeading={navHeading}
+          navMode={navMode}
+          mapLibreCar3D={mapLibreCar3D}
+          trafficCars={trafficCars}
+        />
       </Map>
 
-      {activeRoute && routePayload ? (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-20 hidden w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur md:block">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
-                Navigation
-              </div>
-              <div className="mt-1 text-sm font-semibold text-slate-900">
-                {routePayload.from.label} → {routePayload.to.label}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-semibold text-blue-700">
-                {etaMinutes} min
-              </div>
-              <div className="text-xs text-slate-500">{distanceKm} km</div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {activeRoute ? (
-        <>
-          <button
-            type="button"
-            onClick={() => setRoutePanelOpen((prev) => !prev)}
-            className="absolute bottom-24 left-1/2 z-30 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl md:bottom-4"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-
-          <RouteDrawer
-            routePanelOpen={routePanelOpen}
-            navProgress={navProgress}
-            navMode={navMode}
-            viewMode={viewMode}
-            mapLibreCar3D={mapLibreCar3D}
-            routeFromLabel={routeFromLabel}
-            routeToLabel={routeToLabel}
-            etaMinutes={etaMinutes}
-            distanceKm={distanceKm}
-            steps={activeRoute.steps}
-            activeStepIndex={activeStepIndex}
-            isNavigating={isNavigating}
-            speedMultiplier={speedMultiplier}
-            availableSpeedMultipliers={availableSpeedMultipliers}
-            drawerMinimalMode={drawerMinimalMode}
-            onToggleViewMode={setViewMode}
-            onToggleMapLibreCar3D={() => {
-              setMapLibreCar3D((prev) => !prev);
-              setViewMode("drive3d");
-            }}
-            onSwitchToCesium={() => setMapEngine("cesium")}
-            onTogglePlayback={() => {
-              if (navProgress >= 1) seek(0);
-              togglePlayback();
-            }}
-            onSeek={seek}
-            onSetSpeed={setSpeedMultiplier}
-            onToggleMinimalMode={() => setDrawerMinimalMode((prev) => !prev)}
-            onReset={() => {
-              pause();
-              reset();
-              if (mapInstance) {
-                const start = activeRoute.geometry.coordinates[0];
-                mapInstance.flyTo({
-                  center: [start[0], start[1]],
-                  zoom: Math.max(mapInstance.getZoom(), 13),
-                  pitch: mapMode === "2.5d" ? 62 : 0,
-                  duration: 700,
-                });
-              }
-            }}
-          />
-        </>
-      ) : null}
-
-      {visibleLayers.flood && <MapLegend />}
-
-      <NavigationMiniMapInset
-        visible={viewMode === "drive3d"}
-        routeGeometry={activeRoute?.geometry ?? null}
-        fromCenter={routePayload?.from.center ?? null}
-        navCoordinate={navCoordinate}
+      <NavigationHud
+        activeRoute={activeRoute}
+        routePayload={routePayload}
         mapZoom={mapZoom}
+        visibleFloodLegend={visibleLayers.flood}
+        routePanelOpen={routePanelOpen}
+        setRoutePanelOpen={setRoutePanelOpen}
+        navProgress={navProgress}
+        navMode={navMode}
+        viewMode={viewMode}
+        mapLibreCar3D={mapLibreCar3D}
+        routeFromLabel={routeFromLabel}
+        routeToLabel={routeToLabel}
+        etaMinutes={etaMinutes}
+        distanceKm={distanceKm}
+        activeStepIndex={activeStepIndex}
+        isNavigating={isNavigating}
+        speedMultiplier={speedMultiplier}
+        availableSpeedMultipliers={availableSpeedMultipliers}
+        drawerMinimalMode={drawerMinimalMode}
+        navCoordinate={navCoordinate}
+        onToggleViewMode={setViewMode}
+        onToggleMapLibreCar3D={() => {
+          setMapLibreCar3D((prev) => !prev);
+          setViewMode("drive3d");
+        }}
+        onSwitchToCesium={() => setMapEngine("cesium")}
+        onTogglePlayback={() => {
+          if (navProgress >= 1) seek(0);
+          togglePlayback();
+        }}
+        onSeek={seek}
+        onSetSpeed={setSpeedMultiplier}
+        onToggleMinimalMode={() => setDrawerMinimalMode((prev) => !prev)}
+        onReset={() => {
+          pause();
+          reset();
+          if (mapInstance && activeRoute) {
+            const start = activeRoute.geometry.coordinates[0];
+            mapInstance.flyTo({
+              center: [start[0], start[1]],
+              zoom: Math.max(mapInstance.getZoom(), 13),
+              pitch: mapMode === "2.5d" ? 62 : 0,
+              duration: 700,
+            });
+          }
+        }}
       />
 
     </div>
