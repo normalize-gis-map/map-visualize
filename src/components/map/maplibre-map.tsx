@@ -34,8 +34,10 @@ import {
 
 import { FeaturePopup } from "./feature-popup";
 import { MapLegend } from "./map-legend";
+import { NavigationMiniMapInset } from "./navigation/navigation-mini-map-inset";
 import { RouteDrawer } from "./navigation/route-drawer";
 import { RouteMarkers } from "./navigation/route-markers";
+import { RouteVisualLayers } from "./navigation/route-visual-layers";
 
 type Props = {
   selectedPlace: PlaceItem | null;
@@ -216,34 +218,6 @@ export function MapLibreMap({
     const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
     return trafficSamples.slice(0, maxVehicles);
   }, [mapZoom, trafficSamples, viewMode]);
-  const miniRouteCollection: FeatureCollection | null = activeRoute
-    ? {
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: activeRoute.geometry,
-            properties: {},
-          },
-        ],
-      }
-    : null;
-  const miniNavCollection: FeatureCollection | null = navCoordinate
-    ? {
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: navCoordinate,
-            },
-            properties: {},
-          },
-        ],
-      }
-    : null;
-
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
     programmaticMoveRef.current = true;
@@ -431,117 +405,13 @@ export function MapLibreMap({
           </Source>
         )}
 
-        {routeCollection ? (
-          <Source id="routes" type="geojson" data={routeCollection} lineMetrics>
-            <Layer
-              id="route-casing"
-              type="line"
-              paint={{
-                "line-color": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  "#0f172a",
-                  "#475569",
-                ],
-                "line-width": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  12,
-                  8,
-                ],
-                "line-opacity": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  viewMode === "drive3d" ? 0.08 : 0.32,
-                  viewMode === "drive3d" ? 0 : 0.12,
-                ],
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-alternatives"
-              type="line"
-              paint={{
-                "line-color": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  "#1d4ed8",
-                  "#93c5fd",
-                ],
-                "line-width": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  9,
-                  5,
-                ],
-                "line-opacity": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  viewMode === "drive3d" ? 0 : 0.95,
-                  viewMode === "drive3d" ? 0 : 0.45,
-                ],
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-glow"
-              type="line"
-              filter={["==", ["get", "isPrimary"], 1]}
-              paint={{
-                "line-color": "#60a5fa",
-                "line-width": 20,
-                "line-opacity": 0.12,
-                "line-blur": 1.1,
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-progress-highlight"
-              type="line"
-              filter={["==", ["get", "isPrimary"], 1]}
-              paint={{
-                "line-gradient": [
-                  "interpolate",
-                  ["linear"],
-                  ["line-progress"],
-                  0,
-                  "rgba(56,189,248,0)",
-                  safeProgress,
-                  "rgba(56,189,248,0)",
-                  progressFadeStart,
-                  "#38bdf8",
-                  remainingProgressEnd,
-                  "#38bdf8",
-                  1,
-                  "rgba(125,211,252,0.75)",
-                ],
-                "line-width": 10,
-                "line-opacity": 1,
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-direction-arrows"
-              type="symbol"
-              filter={["==", ["get", "isPrimary"], 1]}
-              layout={{
-                "symbol-placement": "line",
-                "symbol-spacing": 55,
-                "text-field": "▶",
-                "text-size": 12,
-                "text-keep-upright": false,
-                "text-allow-overlap": true,
-                "text-ignore-placement": true,
-              }}
-              paint={{
-                "text-color": "#1e40af",
-                "text-halo-color": "#ffffff",
-                "text-halo-width": 1,
-                "text-opacity": viewMode === "drive3d" ? 0 : 0.95,
-              }}
-            />
-          </Source>
-        ) : null}
+        <RouteVisualLayers
+          routeCollection={routeCollection}
+          viewMode={viewMode}
+          safeProgress={safeProgress}
+          progressFadeStart={progressFadeStart}
+          remainingProgressEnd={remainingProgressEnd}
+        />
 
         {selectedFlood && (
           <FeaturePopup
@@ -725,58 +595,14 @@ export function MapLibreMap({
 
       {visibleLayers.flood && <MapLegend />}
 
-      {viewMode === "drive3d" && activeRoute && miniRouteCollection ? (
-        <div className="absolute right-3 bottom-3 z-30 hidden h-36 w-28 overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-2xl backdrop-blur md:block">
-          <Map
-            initialViewState={{
-              longitude: routePayload?.from.center[0] ?? 106.73,
-              latitude: routePayload?.from.center[1] ?? 10.82,
-              zoom: 13,
-              pitch: 0,
-              bearing: 0,
-            }}
-            mapStyle={MAP_STYLE_2D}
-            interactive={false}
-            dragPan={false}
-            doubleClickZoom={false}
-            scrollZoom={false}
-            touchZoomRotate={false}
-            longitude={navCoordinate?.[0] ?? routePayload?.from.center[0] ?? 106.73}
-            latitude={navCoordinate?.[1] ?? routePayload?.from.center[1] ?? 10.82}
-            zoom={navCoordinate ? Math.max(12.5, mapZoom - 1.6) : 13}
-            pitch={0}
-            bearing={0}
-            style={{ width: "100%", height: "100%" }}
-          >
-            <Source id="mini-route" type="geojson" data={miniRouteCollection}>
-              <Layer
-                id="mini-route-line"
-                type="line"
-                paint={{
-                  "line-color": "#2563eb",
-                  "line-width": 3.2,
-                  "line-opacity": 0.9,
-                }}
-                layout={{ "line-cap": "round", "line-join": "round" }}
-              />
-            </Source>
-            {miniNavCollection ? (
-              <Source id="mini-nav" type="geojson" data={miniNavCollection}>
-                <Layer
-                  id="mini-nav-dot"
-                  type="circle"
-                  paint={{
-                    "circle-radius": 4.8,
-                    "circle-color": "#f43f5e",
-                    "circle-stroke-width": 1.4,
-                    "circle-stroke-color": "#ffffff",
-                  }}
-                />
-              </Source>
-            ) : null}
-          </Map>
-        </div>
-      ) : null}
+      <NavigationMiniMapInset
+        visible={viewMode === "drive3d"}
+        routeGeometry={activeRoute?.geometry ?? null}
+        fromCenter={routePayload?.from.center ?? null}
+        navCoordinate={navCoordinate}
+        mapZoom={mapZoom}
+      />
+
     </div>
   );
 }
