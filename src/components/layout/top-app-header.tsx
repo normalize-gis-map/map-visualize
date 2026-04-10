@@ -116,6 +116,13 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
                 >
                   Đường đi
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPreviewPlace(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Xoá
+                </button>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -142,10 +149,15 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
       {activeMode === "view" ? (
         <div className="fixed bottom-4 left-4 z-40">
           {searchOpen ? (
-            <div className="w-[min(92vw,380px)] rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur">
+            <div className="w-[min(92vw,420px)] rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
-                  Search
+                <div>
+                  <div className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
+                    Search
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Tip: dùng như command palette (⌘K style)
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -155,7 +167,7 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <SearchPanel onSelectPlace={handleSelectPlace} compact />
+              <SearchPanel onSelectPlace={handleSelectPlace} compact inlineResults />
             </div>
           ) : (
             <button
