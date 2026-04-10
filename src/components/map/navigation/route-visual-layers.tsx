@@ -17,7 +17,10 @@ export function RouteVisualLayers({
   remainingProgressEnd,
 }: Props) {
   if (!routeCollection) return null;
-  const p0 = Number.isFinite(safeProgress) ? Math.max(0, Math.min(safeProgress, 0.998)) : 0;
+  const minProgressStop = 0.0001;
+  const p0 = Number.isFinite(safeProgress)
+    ? Math.max(minProgressStop, Math.min(safeProgress, 0.998))
+    : minProgressStop;
   const p1 = Math.max(
     p0 + 0.0001,
     Number.isFinite(progressFadeStart)

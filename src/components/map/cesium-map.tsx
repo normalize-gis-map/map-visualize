@@ -241,6 +241,8 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     if (!viewer) return;
 
     viewer.entities.removeById("route-main");
+    viewer.entities.removeById("route-main-glow");
+    viewer.entities.removeById("route-remaining");
     viewer.entities.removeById("route-car");
     viewer.entities.removeById("route-traffic-1");
     viewer.entities.removeById("route-traffic-2");
@@ -257,12 +259,37 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     const cartesianPath = coordinates.map((coord) =>
       Cesium.Cartesian3.fromDegrees(coord[0], coord[1], 3),
     );
+    let progress = 0;
     const routeLine = viewer.entities.add({
       id: "route-main",
       polyline: {
         positions: cartesianPath,
-        width: 5,
-        material: Cesium.Color.fromCssColorString("#2563eb").withAlpha(0.9),
+        width: 8,
+        material: Cesium.Color.fromCssColorString("#1d4ed8").withAlpha(0.35),
+        clampToGround: true,
+      },
+    });
+    const routeGlow = viewer.entities.add({
+      id: "route-main-glow",
+      polyline: {
+        positions: cartesianPath,
+        width: 14,
+        material: Cesium.Color.fromCssColorString("#38bdf8").withAlpha(0.15),
+        clampToGround: true,
+      },
+    });
+    const routeRemaining = viewer.entities.add({
+      id: "route-remaining",
+      polyline: {
+        positions: new Cesium.CallbackProperty(() => {
+          const startIndex = Math.min(
+            cartesianPath.length - 1,
+            Math.floor(progress * (cartesianPath.length - 1)),
+          );
+          return cartesianPath.slice(startIndex);
+        }, false),
+        width: 7,
+        material: Cesium.Color.fromCssColorString("#38bdf8").withAlpha(0.95),
         clampToGround: true,
       },
     });
@@ -290,9 +317,9 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     const traffic2 = createCarEntity("route-traffic-2", 0.31);
     const traffic3 = createCarEntity("route-traffic-3", 0.49);
 
-    let progress = 0;
+    const speedStep = 0.0008;
     const tick = () => {
-      progress = (progress + 0.0008) % 1;
+      progress = (progress + speedStep) % 1;
       const positions = [
         sampleAt(progress),
         sampleAt((progress + 0.18) % 1),
@@ -307,9 +334,10 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       if (!viewerDestroyedRef.current) {
         updateChaseCamera(viewer, coordinates, progress, {
           altitude: 180,
-          pitchDegrees: -24,
+          pitchDegrees: -22,
           lookAheadProgress: 0.015,
           damping: 0.2,
+          speedFactor: speedStep * 1000,
         });
       }
       viewer.scene.requestRender();
@@ -325,7 +353,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       clock?.onTick.removeEventListener(tick);
     };
 
-    viewer.flyTo([routeLine, mainCar], {
+    viewer.flyTo([routeLine, routeGlow, routeRemaining, mainCar], {
       duration: 1.4,
       offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-28), 1800),
     });
