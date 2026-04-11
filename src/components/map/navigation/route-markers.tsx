@@ -1,5 +1,6 @@
 import type { Position } from "geojson";
 import { Bike, Car, Footprints } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Marker } from "react-map-gl/maplibre";
 
 type TrafficSample = {
@@ -28,6 +29,29 @@ export function RouteMarkers({
   mapLibreCar3D,
   trafficCars,
 }: Props) {
+  const [modelViewerReady, setModelViewerReady] = useState(
+    () => typeof window !== "undefined" && Boolean(customElements.get("model-viewer")),
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (customElements.get("model-viewer")) return;
+
+    const scriptId = "google-model-viewer-script";
+    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => setModelViewerReady(true), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.type = "module";
+    script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
+    script.onload = () => setModelViewerReady(true);
+    document.head.appendChild(script);
+  }, []);
+
   if (!coordinates.length) return null;
 
   const start = coordinates[0];
@@ -54,12 +78,19 @@ export function RouteMarkers({
             style={{ transform: `rotate(${navHeading}deg)` }}
           >
             {mapLibreCar3D && navMode === "car" ? (
-              <div className="relative h-5 w-5">
-                <div className="absolute inset-x-0 bottom-0 h-3 rounded-[3px] bg-blue-100 shadow-[0_2px_4px_rgba(0,0,0,0.35)]" />
-                <div className="absolute inset-x-1 top-0 h-2 rounded-[2px] bg-white/90" />
-                <div className="absolute bottom-0.5 left-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />
-                <div className="absolute right-0.5 bottom-0.5 h-1.5 w-1.5 rounded-full bg-slate-900" />
-              </div>
+              modelViewerReady ? (
+                <model-viewer
+                  src="https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb"
+                  disable-zoom
+                  disable-pan
+                  camera-controls={false}
+                  auto-rotate
+                  rotation-per-second="20deg"
+                  style={{ width: "28px", height: "28px", pointerEvents: "none" }}
+                />
+              ) : (
+                <Car className="h-4 w-4" />
+              )
             ) : navMode === "car" ? (
               <Car className="h-4 w-4" />
             ) : navMode === "bike" ? (

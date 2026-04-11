@@ -217,9 +217,6 @@ export function MapLibreMap({
   };
 
   const handleToggleViewMode = (mode: "map" | "drive3d") => {
-    if (mode === "map") {
-      resetRouteRuntime();
-    }
     setViewMode(mode);
   };
 
