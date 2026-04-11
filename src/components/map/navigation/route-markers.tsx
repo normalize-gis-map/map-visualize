@@ -1,6 +1,5 @@
 import type { Position } from "geojson";
-import { Bike, Car, Footprints } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Bike, Footprints } from "lucide-react";
 import { Marker } from "react-map-gl/maplibre";
 
 type TrafficSample = {
@@ -29,29 +28,6 @@ export function RouteMarkers({
   mapLibreCar3D,
   trafficCars,
 }: Props) {
-  const [modelViewerReady, setModelViewerReady] = useState(
-    () => typeof window !== "undefined" && Boolean(customElements.get("model-viewer")),
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (customElements.get("model-viewer")) return;
-
-    const scriptId = "google-model-viewer-script";
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", () => setModelViewerReady(true), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.type = "module";
-    script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
-    script.onload = () => setModelViewerReady(true);
-    document.head.appendChild(script);
-  }, []);
-
   if (!coordinates.length) return null;
 
   const start = coordinates[0];
@@ -74,25 +50,22 @@ export function RouteMarkers({
       {navCoordinate ? (
         <Marker longitude={navCoordinate[0]} latitude={navCoordinate[1]} anchor="center">
           <div
-            className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-lg"
+            className="flex h-10 w-10 items-center justify-center"
             style={{ transform: `rotate(${navHeading}deg)` }}
           >
             {mapLibreCar3D && navMode === "car" ? (
-              modelViewerReady ? (
-                <model-viewer
-                  src="https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb"
-                  disable-zoom
-                  disable-pan
-                  camera-controls={false}
-                  auto-rotate
-                  rotation-per-second="20deg"
-                  style={{ width: "28px", height: "28px", pointerEvents: "none" }}
-                />
-              ) : (
-                <Car className="h-4 w-4" />
-              )
+              <div className="relative h-7 w-4 rounded-md border border-white/80 bg-slate-900 shadow-[0_5px_10px_rgba(15,23,42,0.42)]">
+                <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-sky-300/85" />
+                <div className="absolute bottom-0.5 left-1/2 h-2 w-1.5 -translate-x-1/2 rounded-sm bg-slate-700" />
+                <div className="absolute -top-0.5 left-1/2 h-1.5 w-2 -translate-x-1/2 rounded-full bg-cyan-300" />
+                <div className="absolute -bottom-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-rose-500" />
+              </div>
             ) : navMode === "car" ? (
-              <Car className="h-4 w-4" />
+              <div className="relative h-7 w-4 rounded-md border border-white/80 bg-blue-700 shadow-[0_5px_10px_rgba(37,99,235,0.35)]">
+                <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-blue-200/90" />
+                <div className="absolute -top-0.5 left-1/2 h-1.5 w-2 -translate-x-1/2 rounded-full bg-cyan-300" />
+                <div className="absolute -bottom-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-rose-400" />
+              </div>
             ) : navMode === "bike" ? (
               <Bike className="h-4 w-4" />
             ) : (
@@ -105,7 +78,7 @@ export function RouteMarkers({
       {trafficCars.map((car) => (
         <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
           <div
-            className="relative flex h-7 w-7 items-center justify-center rounded-[7px] border border-white/70 bg-slate-900/85 text-[10px] text-white shadow-lg"
+            className="relative flex h-8 w-8 items-center justify-center"
             style={{ transform: `rotate(${car.bearing}deg)` }}
           >
             {car.vehicleType === "bike" ? (
@@ -115,18 +88,24 @@ export function RouteMarkers({
                 <div className="absolute right-0.5 bottom-0 h-1.5 w-1.5 rounded-full border border-slate-900 bg-white" />
               </div>
             ) : (
-              <div
-                className={`h-4 w-4 rounded-[4px] ${
-                  car.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
-                }`}
-              />
+              <div className="relative h-6 w-3.5 rounded-md border border-white/70 bg-slate-900 shadow-[0_4px_8px_rgba(15,23,42,0.35)]">
+                <div
+                  className={`absolute top-0.5 left-0.5 right-0.5 h-1.5 rounded-sm ${
+                    car.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
+                  }`}
+                />
+                <div
+                  className={`absolute -top-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full ${
+                    car.direction === "forward" ? "bg-cyan-300" : "bg-orange-200"
+                  }`}
+                />
+                <div
+                  className={`absolute -bottom-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full ${
+                    car.direction === "forward" ? "bg-rose-400" : "bg-emerald-300"
+                  }`}
+                />
+              </div>
             )}
-            <div className="absolute top-0.5 left-1/2 h-0.5 w-2 -translate-x-1/2 rounded-full bg-white/85" />
-            <div
-              className={`absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
-                car.direction === "forward" ? "bg-rose-400" : "bg-emerald-300"
-              }`}
-            />
           </div>
         </Marker>
       ))}
