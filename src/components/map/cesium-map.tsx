@@ -110,7 +110,12 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
   const routeTickCleanupRef = useRef<(() => void) | null>(null);
   const viewerDestroyedRef = useRef(false);
-  const { visibleLayers, buildingOpacity, notifyMapInteraction } = useMapStore();
+  const {
+    visibleLayers,
+    buildingOpacity,
+    trafficVisualizationEnabled,
+    notifyMapInteraction,
+  } = useMapStore();
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
   const [basemap, setBasemap] = useState<CesiumBasemap>("satelliteLabel");
@@ -127,6 +132,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     speedMultiplier,
     availableSpeedMultipliers,
     setSpeedMultiplier,
+    trafficSamples,
   } = useNavigationPlayback({
     geometry: activeRoute?.geometry ?? null,
     steps: activeRoute?.steps ?? [],
@@ -135,12 +141,16 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   const navProgressRef = useRef(navProgress);
   const isNavigatingRef = useRef(isNavigating);
   const speedMultiplierRef = useRef(speedMultiplier);
+  const trafficSamplesRef = useRef(trafficSamples);
+  const trafficVisualizationEnabledRef = useRef(trafficVisualizationEnabled);
 
   useEffect(() => {
     navProgressRef.current = navProgress;
     isNavigatingRef.current = isNavigating;
     speedMultiplierRef.current = speedMultiplier;
-  }, [isNavigating, navProgress, speedMultiplier]);
+    trafficSamplesRef.current = trafficSamples;
+    trafficVisualizationEnabledRef.current = trafficVisualizationEnabled;
+  }, [isNavigating, navProgress, speedMultiplier, trafficSamples, trafficVisualizationEnabled]);
 
   const resolveImageryStyle = (mode: CesiumBasemap) => {
     if (mode === "road") return Cesium.IonWorldImageryStyle.ROAD;
@@ -272,9 +282,9 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     viewer.entities.removeById("route-main-glow");
     viewer.entities.removeById("route-remaining");
     viewer.entities.removeById("route-car");
-    viewer.entities.removeById("route-traffic-1");
-    viewer.entities.removeById("route-traffic-2");
-    viewer.entities.removeById("route-traffic-3");
+    Array.from({ length: 8 }, (_, index) => {
+      viewer.entities.removeById(`route-traffic-${index + 1}`);
+    });
     routeTickCleanupRef.current?.();
     routeTickCleanupRef.current = null;
     resetChaseCamera();
@@ -343,27 +353,14 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       });
 
     const mainCar = createCarEntity("route-car", 0.001, 15);
-    const traffic1 = createCarEntity("route-traffic-1", 0.16);
-    const traffic2 = createCarEntity("route-traffic-2", 0.31);
-    const traffic3 = createCarEntity("route-traffic-3", 0.49);
+    const trafficEntities = Array.from({ length: 8 }, (_, index) =>
+      createCarEntity(`route-traffic-${index + 1}`, (0.15 + index * 0.1) % 1),
+    );
 
     const tick = () => {
-      const roadSamples = [
-        sampleRouteAtProgress(coordinates, navProgressRef.current),
-        sampleRouteAtProgress(coordinates, (navProgressRef.current + 0.18) % 1),
-        sampleRouteAtProgress(coordinates, (navProgressRef.current + 0.35) % 1),
-        sampleRouteAtProgress(coordinates, (navProgressRef.current + 0.52) % 1),
-      ];
-      const positions = [
-        sampleAt(navProgressRef.current),
-        sampleAt((navProgressRef.current + 0.18) % 1),
-        sampleAt((navProgressRef.current + 0.35) % 1),
-        sampleAt((navProgressRef.current + 0.52) % 1),
-      ];
-      mainCar.position = new Cesium.ConstantPositionProperty(positions[0]);
-      traffic1.position = new Cesium.ConstantPositionProperty(positions[1]);
-      traffic2.position = new Cesium.ConstantPositionProperty(positions[2]);
-      traffic3.position = new Cesium.ConstantPositionProperty(positions[3]);
+      const mainSample = sampleRouteAtProgress(coordinates, navProgressRef.current);
+      const mainPosition = sampleAt(navProgressRef.current);
+      mainCar.position = new Cesium.ConstantPositionProperty(mainPosition);
       const toOrientation = (position: Cesium.Cartesian3, bearing?: number) =>
         Cesium.Transforms.headingPitchRollQuaternion(
           position,
@@ -374,17 +371,24 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
           ),
         );
       mainCar.orientation = new Cesium.ConstantProperty(
-        toOrientation(positions[0], roadSamples[0]?.bearing),
+        toOrientation(mainPosition, mainSample?.bearing),
       );
-      traffic1.orientation = new Cesium.ConstantProperty(
-        toOrientation(positions[1], roadSamples[1]?.bearing),
-      );
-      traffic2.orientation = new Cesium.ConstantProperty(
-        toOrientation(positions[2], roadSamples[2]?.bearing),
-      );
-      traffic3.orientation = new Cesium.ConstantProperty(
-        toOrientation(positions[3], roadSamples[3]?.bearing),
-      );
+
+      const trafficActive = trafficVisualizationEnabledRef.current;
+      const trafficNow = trafficActive ? trafficSamplesRef.current.slice(0, trafficEntities.length) : [];
+      trafficEntities.forEach((entity, index) => {
+        const sample = trafficNow[index];
+        if (!sample) {
+          entity.show = false;
+          return;
+        }
+        entity.show = true;
+        const position = Cesium.Cartesian3.fromDegrees(sample.lng, sample.lat, 2.8);
+        entity.position = new Cesium.ConstantPositionProperty(position);
+        entity.orientation = new Cesium.ConstantProperty(
+          toOrientation(position, sample.bearing),
+        );
+      });
 
       if (!viewerDestroyedRef.current && isNavigatingRef.current) {
         updateChaseCamera(viewer, coordinates, navProgressRef.current, {

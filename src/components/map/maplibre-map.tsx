@@ -47,6 +47,7 @@ export function MapLibreMap({
     mapMode,
     visibleLayers,
     buildingOpacity,
+    trafficVisualizationEnabled,
     notifyMapInteraction,
     setMapEngine,
   } =
@@ -202,11 +203,11 @@ export function MapLibreMap({
   const progressFadeStart = Math.min(0.999, safeProgress + 0.0005);
   const remainingProgressEnd = Math.min(0.9995, progressFadeStart + 0.018);
   const trafficCars = useMemo(() => {
-    if (viewMode !== "drive3d") return [];
+    if (viewMode !== "drive3d" || !trafficVisualizationEnabled) return [];
 
     const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
     return trafficSamples.slice(0, maxVehicles);
-  }, [mapZoom, trafficSamples, viewMode]);
+  }, [mapZoom, trafficSamples, trafficVisualizationEnabled, viewMode]);
 
   const resetRouteRuntime = () => {
     pause();

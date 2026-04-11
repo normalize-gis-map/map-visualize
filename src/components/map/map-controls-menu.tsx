@@ -1,11 +1,18 @@
 "use client";
 
-import { Layers3, Map, Orbit } from "lucide-react";
+import { CarFront, Layers3, Map, Orbit } from "lucide-react";
 
 import { useFloodStore } from "@/features/map/store/map.store";
 
 export function MapControlsMenu() {
-  const { mapEngine, mapMode, setMapEngine, setMapMode } = useFloodStore();
+  const {
+    mapEngine,
+    mapMode,
+    trafficVisualizationEnabled,
+    setMapEngine,
+    setMapMode,
+    toggleTrafficVisualization,
+  } = useFloodStore();
 
   const handleSelectEngine = (engine: "maplibre" | "cesium") => {
     setMapEngine(engine);
@@ -71,17 +78,45 @@ export function MapControlsMenu() {
               {mode.toUpperCase()}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={toggleTrafficVisualization}
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+              trafficVisualizationEnabled
+                ? "bg-emerald-600 text-white"
+                : "text-slate-500 hover:bg-slate-100"
+            }`}
+            aria-label="Toggle traffic simulation"
+            title="Traffic simulation"
+          >
+            <CarFront className="h-4 w-4" />
+          </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => handleSelectMode("3d")}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white"
-          aria-label="3D mode active"
-          title="3D mode"
-        >
-          <Layers3 className="h-4 w-4" />
-        </button>
+        <div className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleSelectMode("3d")}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white"
+            aria-label="3D mode active"
+            title="3D mode"
+          >
+            <Layers3 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleTrafficVisualization}
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+              trafficVisualizationEnabled
+                ? "bg-emerald-600 text-white"
+                : "text-slate-500 hover:bg-slate-100"
+            }`}
+            aria-label="Toggle traffic simulation"
+            title="Traffic simulation"
+          >
+            <CarFront className="h-4 w-4" />
+          </button>
+        </div>
       )}
     </div>
   );

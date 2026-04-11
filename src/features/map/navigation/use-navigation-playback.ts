@@ -37,6 +37,7 @@ export function useNavigationPlayback({
   const [heading, setHeading] = useState(0);
   const [speedMultiplier, setSpeedMultiplier] =
     useState<(typeof SPEED_MULTIPLIERS)[number]>(1);
+  const [trafficPhase, setTrafficPhase] = useState(0);
   const headingRef = useRef(0);
 
   const coordinates = useMemo(() => geometry?.coordinates ?? [], [geometry]);
@@ -76,6 +77,22 @@ export function useNavigationPlayback({
     return () => cancelAnimationFrame(frameId);
   }, [coordinates, isPlaying, mode, speedMultiplier]);
 
+  useEffect(() => {
+    if (coordinates.length < 2) return;
+    let frameId = 0;
+    let last = performance.now();
+
+    const animateTraffic = (now: number) => {
+      const dt = now - last;
+      last = now;
+      setTrafficPhase((prev) => (prev + dt * 0.00005) % 1);
+      frameId = requestAnimationFrame(animateTraffic);
+    };
+
+    frameId = requestAnimationFrame(animateTraffic);
+    return () => cancelAnimationFrame(frameId);
+  }, [coordinates]);
+
   const navSample = useMemo(
     () => sampleRouteAtProgress(coordinates, progress),
     [coordinates, progress],
@@ -94,10 +111,10 @@ export function useNavigationPlayback({
     const forward: TrafficSample[] = [];
     const backward: TrafficSample[] = [];
 
-    buildTrafficProgress(progress, 6).forEach((item, index) => {
+    buildTrafficProgress(trafficPhase, 6).forEach((item, index) => {
       const sample = sampleRouteAtProgress(coordinates, item.progress);
       if (!sample) return;
-      const laneDrift = Math.sin((progress * 14 + index) * 1.5) * 0.35;
+      const laneDrift = Math.sin((trafficPhase * 14 + index) * 1.5) * 0.35;
       const shifted = offsetRouteSample(sample, forwardLaneOffset + laneDrift);
       forward.push({
         id: `${item.id}-forward`,
@@ -108,14 +125,14 @@ export function useNavigationPlayback({
       });
     });
 
-    buildTrafficProgress(1 - progress, 5).forEach((item, index) => {
+    buildTrafficProgress(1 - trafficPhase, 5).forEach((item, index) => {
       const sample = sampleRouteAtProgress(coordinates, item.progress);
       if (!sample) return;
       const reversed = {
         ...sample,
         bearing: normalizeBearing(sample.bearing + 180),
       };
-      const laneDrift = Math.cos((progress * 11 + index) * 1.4) * 0.28;
+      const laneDrift = Math.cos((trafficPhase * 11 + index) * 1.4) * 0.28;
       const shifted = offsetRouteSample(reversed, backwardLaneOffset + laneDrift);
       backward.push({
         id: `${item.id}-backward`,
@@ -127,7 +144,7 @@ export function useNavigationPlayback({
     });
 
     return [...forward, ...backward];
-  }, [coordinates, progress]);
+  }, [coordinates, trafficPhase]);
 
   const seek = (nextProgress: number) => {
     const clamped = Math.min(1, Math.max(0, Number.isFinite(nextProgress) ? nextProgress : 0));
