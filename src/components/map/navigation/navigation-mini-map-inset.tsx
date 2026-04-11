@@ -48,7 +48,7 @@ export function NavigationMiniMapInset({
     : null;
 
   return (
-    <div className="absolute right-3 bottom-3 z-30 hidden h-36 w-28 overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-2xl backdrop-blur md:block">
+    <div className="absolute left-3 bottom-24 z-20 hidden h-36 w-28 overflow-hidden rounded-2xl border border-white/70 bg-white/80 shadow-2xl backdrop-blur md:block">
       <Map
         initialViewState={{
           longitude: fromCenter?.[0] ?? 106.73,

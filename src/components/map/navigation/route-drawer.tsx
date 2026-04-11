@@ -1,4 +1,18 @@
-import { Bike, Car, Footprints, Navigation, Pause, Play } from "lucide-react";
+import {
+  Bike,
+  Car,
+  ChevronDown,
+  ChevronUp,
+  Footprints,
+  Gauge,
+  Map,
+  Navigation,
+  Pause,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Waypoints,
+} from "lucide-react";
 
 import type { RouteStep } from "@/features/map/types/route.types";
 
@@ -56,28 +70,39 @@ export function RouteDrawer({
   if (!routePanelOpen) return null;
 
   return (
-    <div className="absolute right-2 bottom-20 left-2 z-30 max-h-[52vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur md:right-3 md:bottom-20 md:left-3 md:max-h-[46vh]">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase">
-          Route drawer
-        </p>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span>{Math.round(navProgress * 100)}%</span>
-          <button
-            type="button"
-            onClick={onToggleMinimalMode}
-            className="rounded-lg border border-slate-200 px-2 py-0.5 font-medium text-slate-600"
-          >
-            {drawerMinimalMode ? "Hiện đầy đủ" : "Minimal"}
-          </button>
+    <div className="pointer-events-auto absolute right-2 bottom-3 left-2 z-30 rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur md:right-3 md:left-auto md:w-[min(96vw,420px)]">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
+            Navigation controls
+          </p>
+          <p className="truncate text-sm font-semibold text-slate-900">
+            {routeFromLabel} → {routeToLabel}
+          </p>
+          <p className="text-xs text-slate-500">
+            {etaMinutes} phút • {distanceKm} km
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={onToggleMinimalMode}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600"
+          aria-label={drawerMinimalMode ? "Expand route controls" : "Collapse route controls"}
+        >
+          {drawerMinimalMode ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
       </div>
 
-      <div className="mb-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
-        <div className="mb-1 flex items-center justify-between text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
-          <span>Playback</span>
-          <span>{Math.round(navProgress * 100)}%</span>
-        </div>
+      <div className="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2">
+        <button
+          type="button"
+          onClick={onTogglePlayback}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white"
+          aria-label={isNavigating ? "Pause navigation" : "Start navigation"}
+        >
+          {isNavigating ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+        </button>
+
         <input
           type="range"
           min={0}
@@ -88,27 +113,88 @@ export function RouteDrawer({
           className="h-1.5 w-full cursor-pointer accent-blue-600"
           aria-label="Seek route playback"
         />
-        <div className="mt-2 flex gap-2">
-          {availableSpeedMultipliers.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => onSetSpeed(item)}
-              className={`h-8 flex-1 rounded-xl border text-xs font-semibold ${
-                speedMultiplier === item
-                  ? "border-blue-300 bg-blue-50 text-blue-700"
-                  : "border-slate-200 text-slate-600"
-              }`}
-            >
-              {item}x
-            </button>
-          ))}
-        </div>
+
+        <button
+          type="button"
+          onClick={onReset}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600"
+          aria-label="Reset navigation"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mb-2 flex items-center gap-2 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 font-medium text-slate-600">
+          <Gauge className="h-3.5 w-3.5" />
+          {Math.round(navProgress * 100)}%
+        </span>
+        {availableSpeedMultipliers.map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onSetSpeed(item)}
+            className={`rounded-lg border px-2.5 py-1 font-semibold ${
+              speedMultiplier === item
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "border-slate-200 text-slate-600"
+            }`}
+          >
+            {item}x
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        <button
+          type="button"
+          onClick={() => onToggleViewMode("map")}
+          className={`flex h-10 items-center justify-center rounded-xl border ${
+            viewMode === "map"
+              ? "border-blue-300 bg-blue-50 text-blue-700"
+              : "border-slate-200 text-slate-600"
+          }`}
+          aria-label="Bản đồ thường"
+        >
+          <Map className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggleViewMode("drive3d")}
+          className={`flex h-10 items-center justify-center rounded-xl border ${
+            viewMode === "drive3d"
+              ? "border-blue-300 bg-blue-50 text-blue-700"
+              : "border-slate-200 text-slate-600"
+          }`}
+          aria-label="Góc nhìn lái xe 3D"
+        >
+          <Navigation className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleMapLibreCar3D}
+          className={`flex h-10 items-center justify-center rounded-xl border ${
+            mapLibreCar3D
+              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 text-slate-600"
+          }`}
+          aria-label="Toggle MapLibre car demo"
+        >
+          <Waypoints className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onSwitchToCesium}
+          className="flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700"
+          aria-label="Switch to Cesium cinematic"
+        >
+          <Sparkles className="h-4 w-4" />
+        </button>
       </div>
 
       {!drawerMinimalMode ? (
         <>
-          <div className="mb-3 flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700">
+          <div className="mt-2 flex h-9 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700">
             {navMode === "car" ? (
               <Car className="h-4 w-4" />
             ) : navMode === "bike" ? (
@@ -116,120 +202,32 @@ export function RouteDrawer({
             ) : (
               <Footprints className="h-4 w-4" />
             )}
-            Chế độ: {navMode === "car" ? "Ô tô" : navMode === "bike" ? "Xe đạp" : "Đi bộ"}
-          </div>
-
-          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => onToggleViewMode("map")}
-              className={`h-10 rounded-2xl border text-sm font-semibold ${
-                viewMode === "map"
-                  ? "border-blue-300 bg-blue-50 text-blue-700"
-                  : "border-slate-200 text-slate-600"
-              }`}
-            >
-              Bản đồ thường
-            </button>
-            <button
-              type="button"
-              onClick={() => onToggleViewMode("drive3d")}
-              className={`h-10 rounded-2xl border text-sm font-semibold ${
-                viewMode === "drive3d"
-                  ? "border-blue-300 bg-blue-50 text-blue-700"
-                  : "border-slate-200 text-slate-600"
-              }`}
-            >
-              Góc nhìn lái xe 3D
-            </button>
-          </div>
-
-          <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={onToggleMapLibreCar3D}
-              className={`flex h-10 items-center justify-center rounded-2xl border text-sm font-semibold ${
-                mapLibreCar3D
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                  : "border-slate-200 text-slate-600"
-              }`}
-            >
-              {mapLibreCar3D ? "Phase 1: Tắt demo MapLibre" : "Phase 1: Demo MapLibre"}
-            </button>
-            <button
-              type="button"
-              onClick={onSwitchToCesium}
-              className="flex h-10 items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700"
-            >
-              Phase 2: Cesium cinematic
-            </button>
-          </div>
-
-          <div className="mb-2 rounded-2xl bg-slate-50 px-3 py-2">
-            <div className="text-sm font-semibold text-slate-800">
-              {routeFromLabel} → {routeToLabel}
-            </div>
-            <div className="text-xs text-slate-600">ETA {etaMinutes} phút • {distanceKm} km</div>
+            {navMode === "car" ? "Ô tô" : navMode === "bike" ? "Xe đạp" : "Đi bộ"}
           </div>
 
           {steps.length ? (
-            <div className="mb-3 rounded-2xl border border-slate-200 bg-white p-3">
-              <p className="mb-1 text-[11px] font-semibold tracking-[0.13em] text-slate-500 uppercase">
+            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2">
+              <p className="mb-1 text-[10px] font-semibold tracking-[0.13em] text-slate-500 uppercase">
                 Turn by turn
               </p>
-              <ul className="space-y-1.5">
-                {steps.slice(activeStepIndex, activeStepIndex + 3).map((step, idx) => {
-                  const isActive = idx === 0;
-                  return (
-                    <li
-                      key={`${step.instruction}-${step.distanceMeters}`}
-                      className={`rounded-xl px-2.5 py-2 text-xs ${
-                        isActive
-                          ? "border border-blue-200 bg-blue-50 text-blue-800"
-                          : "bg-slate-50 text-slate-700"
-                      }`}
-                    >
-                      <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white/90 px-1 text-[10px] font-semibold text-slate-500">
-                        {activeStepIndex + idx + 1}
-                      </span>
-                      {step.instruction}
-                      {step.roadName ? ` (${step.roadName})` : ""} • {(step.distanceMeters / 1000).toFixed(2)} km • {Math.max(1, Math.round(step.durationSeconds / 60))} phút
-                    </li>
-                  );
-                })}
+              <ul className="space-y-1">
+                {steps.slice(activeStepIndex, activeStepIndex + 2).map((step, idx) => (
+                  <li
+                    key={`${step.instruction}-${step.distanceMeters}`}
+                    className={`rounded-lg px-2 py-1.5 text-xs ${
+                      idx === 0
+                        ? "border border-blue-200 bg-blue-50 text-blue-800"
+                        : "bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {step.instruction}
+                  </li>
+                ))}
               </ul>
             </div>
           ) : null}
         </>
       ) : null}
-
-      <div className="sticky bottom-0 flex gap-2 bg-white/95 pt-1">
-        <button
-          type="button"
-          onClick={onTogglePlayback}
-          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-semibold text-white"
-        >
-          {isNavigating ? (
-            <>
-              <Pause className="h-4 w-4" />
-              Tạm dừng
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4" />
-              Di chuyển
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-3 text-sm font-medium text-slate-700"
-        >
-          <Navigation className="h-4 w-4" />
-          Reset
-        </button>
-      </div>
     </div>
   );
 }

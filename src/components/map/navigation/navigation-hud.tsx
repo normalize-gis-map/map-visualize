@@ -1,7 +1,6 @@
-import { Menu } from "lucide-react";
+import { PanelBottomClose, PanelBottomOpen } from "lucide-react";
 
 import { MapLegend } from "@/components/map/map-legend";
-import { ControlBoard } from "@/components/map/navigation/control-board";
 import { NavigationMiniMapInset } from "@/components/map/navigation/navigation-mini-map-inset";
 import { RouteDrawer } from "@/components/map/navigation/route-drawer";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -75,7 +74,7 @@ export function NavigationHud({
   return (
     <>
       {activeRoute && routePayload ? (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-20 hidden w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur md:block">
+        <div className="pointer-events-none absolute top-24 left-1/2 z-20 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur md:block">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
@@ -95,23 +94,17 @@ export function NavigationHud({
 
       {activeRoute ? (
         <>
-          <ControlBoard
-            progress={navProgress}
-            isPlaying={isNavigating}
-            speedMultiplier={speedMultiplier}
-            availableSpeedMultipliers={availableSpeedMultipliers}
-            onSeek={onSeek}
-            onSetSpeed={onSetSpeed}
-            onTogglePlayback={onTogglePlayback}
-            onReset={onReset}
-            className="absolute right-3 bottom-3 z-30 hidden w-[min(92vw,360px)] rounded-2xl border border-white/70 bg-white/95 p-3 text-slate-900 shadow-2xl backdrop-blur md:block"
-          />
           <button
             type="button"
             onClick={() => setRoutePanelOpen(!routePanelOpen)}
-            className="absolute bottom-24 left-1/2 z-30 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl md:bottom-4"
+            className="absolute right-3 bottom-3 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl"
+            aria-label={routePanelOpen ? "Hide controls" : "Show controls"}
           >
-            <Menu className="h-5 w-5" />
+            {routePanelOpen ? (
+              <PanelBottomClose className="h-5 w-5" />
+            ) : (
+              <PanelBottomOpen className="h-5 w-5" />
+            )}
           </button>
 
           <RouteDrawer
