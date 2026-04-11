@@ -172,6 +172,14 @@ export function RouteDrawer({
         </button>
         <button
           type="button"
+          onClick={onSwitchToCesium}
+          className="flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700"
+          aria-label="Bật xe GLB cho xe chính (Cesium)"
+        >
+          <Sparkles className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
           onClick={onToggleMapLibreCar3D}
           className={`flex h-10 items-center justify-center rounded-xl border ${
             mapLibreCar3D
@@ -181,14 +189,6 @@ export function RouteDrawer({
           aria-label="Toggle MapLibre car demo"
         >
           <Waypoints className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onSwitchToCesium}
-          className="flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700"
-          aria-label="Switch to Cesium cinematic"
-        >
-          <Sparkles className="h-4 w-4" />
         </button>
       </div>
 

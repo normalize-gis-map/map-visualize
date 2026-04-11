@@ -1,4 +1,4 @@
-import { PanelBottomClose, PanelBottomOpen } from "lucide-react";
+import { PanelBottomClose, PanelBottomOpen, Pause, Play } from "lucide-react";
 
 import { MapLegend } from "@/components/map/map-legend";
 import { NavigationMiniMapInset } from "@/components/map/navigation/navigation-mini-map-inset";
@@ -94,6 +94,15 @@ export function NavigationHud({
 
       {activeRoute ? (
         <>
+          <button
+            type="button"
+            onClick={onTogglePlayback}
+            className="absolute right-3 bottom-16 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl"
+            aria-label={isNavigating ? "Pause navigation" : "Start navigation"}
+          >
+            {isNavigating ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          </button>
+
           <button
             type="button"
             onClick={() => setRoutePanelOpen(!routePanelOpen)}
