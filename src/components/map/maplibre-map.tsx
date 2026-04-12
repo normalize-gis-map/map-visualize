@@ -1,6 +1,6 @@
 "use client";
 
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, Position } from "geojson";
 import maplibregl from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Map, { NavigationControl } from "react-map-gl/maplibre";
@@ -93,6 +93,7 @@ export function MapLibreMap({
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
   const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);
   const [driveTiltDeg, setDriveTiltDeg] = useState(78);
+  const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<Position[][]>([]);
   const programmaticMoveRef = useRef(false);
 
   useEffect(() => {
@@ -157,6 +158,46 @@ export function MapLibreMap({
     };
   }, [mapInstance, mapMode]);
 
+  useEffect(() => {
+    if (!mapInstance || !trafficVisualizationEnabled) return;
+
+    const refreshRoadNetwork = () => {
+      const style = mapInstance.getStyle();
+      const roadLayerIds =
+        style.layers
+          ?.filter((layer) => layer.type === "line" && layer.id.toLowerCase().includes("road"))
+          .map((layer) => layer.id) ?? [];
+
+      if (!roadLayerIds.length) return;
+
+      const features = mapInstance.queryRenderedFeatures(undefined, {
+        layers: roadLayerIds.slice(0, 12),
+      });
+
+      const collected = features
+        .flatMap((feature) => {
+          const geometry = feature.geometry;
+          if (!geometry) return [];
+          if (geometry.type === "LineString") return [geometry.coordinates];
+          if (geometry.type === "MultiLineString") return geometry.coordinates;
+          return [];
+        })
+        .filter((coords) => coords.length > 3)
+        .slice(0, 220);
+
+      setAmbientNetworkRoutes(collected);
+    };
+
+    refreshRoadNetwork();
+    mapInstance.on("moveend", refreshRoadNetwork);
+    mapInstance.on("styledata", refreshRoadNetwork);
+
+    return () => {
+      mapInstance.off("moveend", refreshRoadNetwork);
+      mapInstance.off("styledata", refreshRoadNetwork);
+    };
+  }, [mapInstance, trafficVisualizationEnabled]);
+
   const routeCollection: FeatureCollection | null = routePayload
     ? {
         type: "FeatureCollection",
@@ -211,8 +252,11 @@ export function MapLibreMap({
     return trafficSamples.slice(0, maxVehicles);
   }, [mapZoom, trafficSamples, trafficVisualizationEnabled, viewMode]);
   const ambientRoutes = useMemo(
-    () => routePayload?.routes.map((route) => route.geometry.coordinates) ?? [],
-    [routePayload],
+    () =>
+      ambientNetworkRoutes.length
+        ? ambientNetworkRoutes
+        : routePayload?.routes.map((route) => route.geometry.coordinates) ?? [],
+    [ambientNetworkRoutes, routePayload],
   );
   const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
     routes: ambientRoutes,

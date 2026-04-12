@@ -1,5 +1,6 @@
 import type { Position } from "geojson";
 import { Bike, Footprints } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Marker } from "react-map-gl/maplibre";
 
 type TrafficSample = {
@@ -36,6 +37,29 @@ export function RouteMarkers({
   trafficCars,
   ambientTraffic,
 }: Props) {
+  const [modelViewerReady, setModelViewerReady] = useState(
+    () => typeof window !== "undefined" && Boolean(customElements.get("model-viewer")),
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (customElements.get("model-viewer")) return;
+
+    const scriptId = "google-model-viewer-script";
+    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => setModelViewerReady(true), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.type = "module";
+    script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
+    script.onload = () => setModelViewerReady(true);
+    document.head.appendChild(script);
+  }, []);
+
   if (!coordinates.length) return null;
 
   const start = coordinates[0];
@@ -62,12 +86,22 @@ export function RouteMarkers({
             style={{ transform: `rotate(${navHeading}deg)` }}
           >
             {mapLibreCar3D && navMode === "car" ? (
-              <div className="relative h-7 w-4 rounded-md border border-white/80 bg-slate-900 shadow-[0_5px_10px_rgba(15,23,42,0.42)]">
-                <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-sky-300/85" />
-                <div className="absolute bottom-0.5 left-1/2 h-2 w-1.5 -translate-x-1/2 rounded-sm bg-slate-700" />
-                <div className="absolute -top-0.5 left-1/2 h-1.5 w-2 -translate-x-1/2 rounded-full bg-cyan-300" />
-                <div className="absolute -bottom-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-rose-500" />
-              </div>
+              modelViewerReady ? (
+                <model-viewer
+                  src="https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb"
+                  disable-zoom
+                  disable-pan
+                  camera-controls={false}
+                  style={{ width: "30px", height: "30px", pointerEvents: "none" }}
+                />
+              ) : (
+                <div className="relative h-7 w-4 rounded-md border border-white/80 bg-slate-900 shadow-[0_5px_10px_rgba(15,23,42,0.42)]">
+                  <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-sky-300/85" />
+                  <div className="absolute bottom-0.5 left-1/2 h-2 w-1.5 -translate-x-1/2 rounded-sm bg-slate-700" />
+                  <div className="absolute -top-0.5 left-1/2 h-1.5 w-2 -translate-x-1/2 rounded-full bg-cyan-300" />
+                  <div className="absolute -bottom-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-rose-500" />
+                </div>
+              )
             ) : navMode === "car" ? (
               <div className="relative h-7 w-4 rounded-md border border-white/80 bg-blue-700 shadow-[0_5px_10px_rgba(37,99,235,0.35)]">
                 <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-blue-200/90" />
