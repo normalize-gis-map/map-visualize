@@ -13,6 +13,7 @@ import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
+import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
 import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -54,6 +55,7 @@ export function MapLibreMap({
     useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([106.73, 10.82]);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -208,6 +210,11 @@ export function MapLibreMap({
     const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
     return trafficSamples.slice(0, maxVehicles);
   }, [mapZoom, trafficSamples, trafficVisualizationEnabled, viewMode]);
+  const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
+    center: mapCenter,
+    zoom: mapZoom,
+    enabled: trafficVisualizationEnabled,
+  });
 
   const resetRouteRuntime = () => {
     pause();
@@ -269,7 +276,10 @@ export function MapLibreMap({
         onDragStart={() => {
           if (!programmaticMoveRef.current) notifyMapInteraction();
         }}
-        onMove={(event) => setMapZoom(event.viewState.zoom)}
+        onMove={(event) => {
+          setMapZoom(event.viewState.zoom);
+          setMapCenter([event.viewState.longitude, event.viewState.latitude]);
+        }}
         onLoad={(e) => {
           setMapInstance(e.target);
           setMapZoom(e.target.getZoom());
@@ -305,6 +315,7 @@ export function MapLibreMap({
           navMode={navMode}
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
+          ambientTraffic={ambientTraffic}
         />
       </Map>
 
@@ -356,6 +367,12 @@ export function MapLibreMap({
           }
         }}
       />
+
+      {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
+        <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">
+          Zoom ≥ {minZoomToRender} để hiện traffic thành phố
+        </div>
+      ) : null}
 
     </div>
   );

@@ -18,6 +18,13 @@ type Props = {
   navMode: "car" | "bike" | "walk";
   mapLibreCar3D: boolean;
   trafficCars: TrafficSample[];
+  ambientTraffic: Array<{
+    id: string;
+    lng: number;
+    lat: number;
+    bearing: number;
+    direction: "forward" | "backward";
+  }>;
 };
 
 export function RouteMarkers({
@@ -27,6 +34,7 @@ export function RouteMarkers({
   navMode,
   mapLibreCar3D,
   trafficCars,
+  ambientTraffic,
 }: Props) {
   if (!coordinates.length) return null;
 
@@ -106,6 +114,29 @@ export function RouteMarkers({
                 />
               </div>
             )}
+          </div>
+        </Marker>
+      ))}
+
+      {ambientTraffic.map((vehicle) => (
+        <Marker
+          key={vehicle.id}
+          longitude={vehicle.lng}
+          latitude={vehicle.lat}
+          anchor="center"
+        >
+          <div
+            className="relative flex h-7 w-7 items-center justify-center opacity-90"
+            style={{ transform: `rotate(${vehicle.bearing}deg)` }}
+          >
+            <div className="relative h-5 w-3 rounded-[6px] border border-white/60 bg-slate-800/95 shadow-[0_3px_7px_rgba(15,23,42,0.35)]">
+              <div
+                className={`absolute top-0.5 left-0.5 right-0.5 h-1 rounded-sm ${
+                  vehicle.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
+                }`}
+              />
+              <div className="absolute -bottom-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-rose-400" />
+            </div>
           </div>
         </Marker>
       ))}

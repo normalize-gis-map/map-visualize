@@ -29,6 +29,13 @@ type Props = {
     direction: "forward" | "backward";
     vehicleType: "car" | "bike";
   }>;
+  ambientTraffic: Array<{
+    id: string;
+    lng: number;
+    lat: number;
+    bearing: number;
+    direction: "forward" | "backward";
+  }>;
 };
 
 export function MapFeatureOverlays({
@@ -43,6 +50,7 @@ export function MapFeatureOverlays({
   navMode,
   mapLibreCar3D,
   trafficCars,
+  ambientTraffic,
 }: Props) {
   return (
     <>
@@ -143,6 +151,7 @@ export function MapFeatureOverlays({
           navMode={navMode}
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
+          ambientTraffic={ambientTraffic}
         />
       ) : null}
     </>
