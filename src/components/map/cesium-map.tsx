@@ -103,6 +103,10 @@ function getFeatureProperty(
 
 const CAR_MODEL_URL =
   "https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb";
+const BIKE_MODEL_URL =
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/VC/glTF-Binary/VC.glb";
+const WALK_MODEL_URL =
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb";
 
 export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -336,7 +340,12 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       return Cesium.Cartesian3.fromDegrees(sample.lng, sample.lat, 3);
     };
 
-    const createCarEntity = (id: string, progress: number, scale = 12) =>
+    const createVehicleEntity = (
+      id: string,
+      progress: number,
+      variant: "car" | "bike" | "walk" = "car",
+      scale = 12,
+    ) =>
       viewer.entities.add({
         id,
         position: sampleAt(progress),
@@ -345,16 +354,22 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
           new Cesium.HeadingPitchRoll(0, 0, 0),
         ),
         model: {
-          uri: CAR_MODEL_URL,
+          uri:
+            variant === "bike"
+              ? BIKE_MODEL_URL
+              : variant === "walk"
+                ? WALK_MODEL_URL
+                : CAR_MODEL_URL,
           minimumPixelSize: 26,
           maximumScale: scale,
-          scale: 1.6,
+          scale: variant === "walk" ? 1.2 : variant === "bike" ? 1.1 : 1.6,
         },
       });
 
-    const mainCar = createCarEntity("route-car", 0.001, 15);
+    const mainVehicleVariant = navMode === "walk" ? "walk" : navMode === "bike" ? "bike" : "car";
+    const mainCar = createVehicleEntity("route-car", 0.001, mainVehicleVariant, 15);
     const trafficEntities = Array.from({ length: 8 }, (_, index) =>
-      createCarEntity(`route-traffic-${index + 1}`, (0.15 + index * 0.1) % 1),
+      createVehicleEntity(`route-traffic-${index + 1}`, (0.15 + index * 0.1) % 1),
     );
 
     const tick = () => {

@@ -39,6 +39,8 @@ type Props = {
   onSetSpeed: (value: 0.5 | 1 | 2) => void;
   onToggleMinimalMode: () => void;
   onReset: () => void;
+  cameraTiltDeg: number;
+  onCameraTiltChange: (value: number) => void;
 };
 
 export function NavigationHud({
@@ -70,6 +72,8 @@ export function NavigationHud({
   onSetSpeed,
   onToggleMinimalMode,
   onReset,
+  cameraTiltDeg,
+  onCameraTiltChange,
 }: Props) {
   return (
     <>
@@ -140,6 +144,8 @@ export function NavigationHud({
             onSetSpeed={onSetSpeed}
             onToggleMinimalMode={onToggleMinimalMode}
             onReset={onReset}
+            cameraTiltDeg={cameraTiltDeg}
+            onCameraTiltChange={onCameraTiltChange}
           />
         </>
       ) : null}

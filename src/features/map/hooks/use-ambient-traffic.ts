@@ -1,4 +1,7 @@
+import type { Position } from "geojson";
 import { useEffect, useMemo, useState } from "react";
+
+import { normalizeBearing, offsetRouteSample, sampleRouteAtProgress } from "@/features/map/navigation/route-sampling";
 
 export type AmbientTrafficVehicle = {
   id: string;
@@ -9,67 +12,56 @@ export type AmbientTrafficVehicle = {
   direction: "forward" | "backward";
 };
 
+type SeedVehicle = {
+  id: string;
+  routeIndex: number;
+  progress: number;
+  speed: number;
+  direction: "forward" | "backward";
+  laneOffset: number;
+};
+
 type UseAmbientTrafficInput = {
-  center: [number, number];
+  routes: Position[][];
   zoom: number;
   enabled: boolean;
 };
 
 const MIN_ZOOM_TO_RENDER = 13;
 
-function wrapLng(lng: number) {
-  if (lng > 180) return lng - 360;
-  if (lng < -180) return lng + 360;
-  return lng;
-}
+export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficInput) {
+  const [seedVehicles, setSeedVehicles] = useState<SeedVehicle[]>([]);
 
-export function useAmbientTraffic({ center, zoom, enabled }: UseAmbientTrafficInput) {
-  const [vehicles, setVehicles] = useState<AmbientTrafficVehicle[]>([]);
-
-  const shouldRender = enabled && zoom >= MIN_ZOOM_TO_RENDER;
+  const shouldRender = enabled && zoom >= MIN_ZOOM_TO_RENDER && routes.some((r) => r.length > 1);
 
   const targetCount = useMemo(() => {
     if (!shouldRender) return 0;
-    if (zoom >= 15.5) return 56;
-    if (zoom >= 14.2) return 38;
-    return 24;
+    if (zoom >= 15.5) return 46;
+    if (zoom >= 14.2) return 30;
+    return 18;
   }, [shouldRender, zoom]);
 
   useEffect(() => {
     if (!shouldRender || targetCount === 0) {
-      const frame = requestAnimationFrame(() => setVehicles([]));
+      const frame = requestAnimationFrame(() => setSeedVehicles([]));
       return () => cancelAnimationFrame(frame);
     }
 
-    if (vehicles.length === targetCount) {
-      return;
-    }
+    const seeded = Array.from({ length: targetCount }, (_, index) => ({
+      id: `ambient-${index}`,
+      routeIndex: Math.floor(Math.random() * routes.length),
+      progress: Math.random(),
+      speed: 0.02 + Math.random() * 0.05,
+      direction: (index % 2 === 0 ? "forward" : "backward") as "forward" | "backward",
+      laneOffset: index % 2 === 0 ? 2.1 : -2.1,
+    }));
 
-    const spread = zoom >= 15 ? 0.012 : zoom >= 14 ? 0.018 : 0.024;
-    const seeded = Array.from({ length: targetCount }, (_, index) => {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * spread;
-      const lng = center[0] + Math.cos(angle) * radius;
-      const lat = center[1] + Math.sin(angle) * radius * 0.72;
-      const bearing = Math.random() * 360;
-      return {
-        id: `ambient-${index}`,
-        lng,
-        lat,
-        bearing,
-        speed: 7 + Math.random() * 14,
-        direction: (index % 2 === 0 ? "forward" : "backward") as
-          | "forward"
-          | "backward",
-      };
-    });
-
-    const frame = requestAnimationFrame(() => setVehicles(seeded));
+    const frame = requestAnimationFrame(() => setSeedVehicles(seeded));
     return () => cancelAnimationFrame(frame);
-  }, [center, shouldRender, targetCount, vehicles.length, zoom]);
+  }, [routes.length, shouldRender, targetCount]);
 
   useEffect(() => {
-    if (!shouldRender || !vehicles.length) return;
+    if (!shouldRender || !seedVehicles.length) return;
 
     let frame = 0;
     let last = performance.now();
@@ -78,28 +70,14 @@ export function useAmbientTraffic({ center, zoom, enabled }: UseAmbientTrafficIn
       const dt = (now - last) / 1000;
       last = now;
 
-      setVehicles((prev) =>
+      setSeedVehicles((prev) =>
         prev.map((vehicle) => {
-          const headingRad = (vehicle.bearing * Math.PI) / 180;
-          const stepMeters = vehicle.speed * dt;
-          const dLat = stepMeters / 111320;
-          const dLng = stepMeters / (111320 * Math.max(0.2, Math.cos((vehicle.lat * Math.PI) / 180)));
-
-          let nextLng = wrapLng(vehicle.lng + Math.sin(headingRad) * dLng);
-          let nextLat = vehicle.lat + Math.cos(headingRad) * dLat;
-          let nextBearing = vehicle.bearing;
-
-          if (Math.abs(nextLng - center[0]) > 0.03 || Math.abs(nextLat - center[1]) > 0.02) {
-            nextBearing = (vehicle.bearing + 140 + Math.random() * 70) % 360;
-            nextLng = center[0] + (Math.random() - 0.5) * 0.035;
-            nextLat = center[1] + (Math.random() - 0.5) * 0.024;
-          }
-
+          const dir = vehicle.direction === "forward" ? 1 : -1;
+          const nextProgressRaw = vehicle.progress + vehicle.speed * dt * dir;
+          const wrapped = ((nextProgressRaw % 1) + 1) % 1;
           return {
             ...vehicle,
-            lng: nextLng,
-            lat: nextLat,
-            bearing: nextBearing,
+            progress: wrapped,
           };
         }),
       );
@@ -109,7 +87,40 @@ export function useAmbientTraffic({ center, zoom, enabled }: UseAmbientTrafficIn
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [center, shouldRender, vehicles.length]);
+  }, [shouldRender, seedVehicles.length]);
+
+  const vehicles = useMemo<AmbientTrafficVehicle[]>(() => {
+    if (!shouldRender) return [];
+
+    return seedVehicles
+      .map((vehicle) => {
+        const route = routes[vehicle.routeIndex] ?? routes[0];
+        if (!route || route.length < 2) return null;
+
+        const sample = sampleRouteAtProgress(route, vehicle.progress);
+        if (!sample) return null;
+
+        const directionalBearing =
+          vehicle.direction === "forward"
+            ? normalizeBearing(sample.bearing)
+            : normalizeBearing(sample.bearing + 180);
+
+        const shifted = offsetRouteSample(
+          { ...sample, bearing: directionalBearing },
+          vehicle.laneOffset,
+        );
+
+        return {
+          id: vehicle.id,
+          lng: shifted.lng,
+          lat: shifted.lat,
+          bearing: normalizeBearing(shifted.bearing),
+          speed: vehicle.speed,
+          direction: vehicle.direction,
+        };
+      })
+      .filter((item): item is AmbientTrafficVehicle => Boolean(item));
+  }, [routes, seedVehicles, shouldRender]);
 
   return { vehicles, minZoomToRender: MIN_ZOOM_TO_RENDER };
 }

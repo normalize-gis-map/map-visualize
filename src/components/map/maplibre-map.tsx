@@ -55,7 +55,6 @@ export function MapLibreMap({
     useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([106.73, 10.82]);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -93,6 +92,7 @@ export function MapLibreMap({
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
   const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);
+  const [driveTiltDeg, setDriveTiltDeg] = useState(78);
   const programmaticMoveRef = useRef(false);
 
   useEffect(() => {
@@ -210,8 +210,12 @@ export function MapLibreMap({
     const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
     return trafficSamples.slice(0, maxVehicles);
   }, [mapZoom, trafficSamples, trafficVisualizationEnabled, viewMode]);
+  const ambientRoutes = useMemo(
+    () => routePayload?.routes.map((route) => route.geometry.coordinates) ?? [],
+    [routePayload],
+  );
   const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
-    center: mapCenter,
+    routes: ambientRoutes,
     zoom: mapZoom,
     enabled: trafficVisualizationEnabled,
   });
@@ -241,13 +245,18 @@ export function MapLibreMap({
     });
     mapInstance.easeTo({
       center: navCoordinate,
-      pitch: mapMode === "2.5d" ? (viewMode === "drive3d" ? 78 : 62) : 0,
+      pitch:
+        mapMode === "2.5d"
+          ? viewMode === "drive3d"
+            ? driveTiltDeg
+            : 62
+          : 0,
       bearing: mapMode === "2.5d" ? navHeading : mapInstance.getBearing(),
       zoom: viewMode === "drive3d" ? Math.max(mapInstance.getZoom(), 14.5) : undefined,
       duration: viewMode === "drive3d" ? 240 : 280,
       easing: (t) => t,
     });
-  }, [mapInstance, navCoordinate, isNavigating, mapMode, navHeading, viewMode]);
+  }, [driveTiltDeg, mapInstance, navCoordinate, isNavigating, mapMode, navHeading, viewMode]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -278,7 +287,6 @@ export function MapLibreMap({
         }}
         onMove={(event) => {
           setMapZoom(event.viewState.zoom);
-          setMapCenter([event.viewState.longitude, event.viewState.latitude]);
         }}
         onLoad={(e) => {
           setMapInstance(e.target);
@@ -366,6 +374,8 @@ export function MapLibreMap({
             });
           }
         }}
+        cameraTiltDeg={driveTiltDeg}
+        onCameraTiltChange={setDriveTiltDeg}
       />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (

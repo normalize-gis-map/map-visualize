@@ -40,6 +40,8 @@ type Props = {
   onSeek: (value: number) => void;
   onSetSpeed: (value: 0.5 | 1 | 2) => void;
   onToggleMinimalMode: () => void;
+  cameraTiltDeg: number;
+  onCameraTiltChange: (value: number) => void;
 };
 
 export function RouteDrawer({
@@ -66,6 +68,8 @@ export function RouteDrawer({
   onSeek,
   onSetSpeed,
   onToggleMinimalMode,
+  cameraTiltDeg,
+  onCameraTiltChange,
 }: Props) {
   if (!routePanelOpen) return null;
 
@@ -143,6 +147,23 @@ export function RouteDrawer({
             {item}x
           </button>
         ))}
+      </div>
+
+      <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2">
+        <div className="mb-1 flex items-center justify-between text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase">
+          <span>Góc nghiêng 3D</span>
+          <span>{Math.round(cameraTiltDeg)}°</span>
+        </div>
+        <input
+          type="range"
+          min={55}
+          max={83}
+          step={1}
+          value={cameraTiltDeg}
+          onChange={(event) => onCameraTiltChange(Number(event.target.value))}
+          className="h-1.5 w-full cursor-pointer accent-sky-600"
+          aria-label="Điều chỉnh góc nghiêng 3D"
+        />
       </div>
 
       <div className="grid grid-cols-4 gap-2">
