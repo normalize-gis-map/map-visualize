@@ -16,9 +16,9 @@ type SeedVehicle = {
   id: string;
   routeIndex: number;
   progress: number;
+  lane: 0 | 1;
   speed: number;
   direction: "forward" | "backward";
-  laneOffset: number;
 };
 
 type UseAmbientTrafficInput = {
@@ -58,15 +58,15 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
           { length: targetCount - limitedPrev.length },
           (_, index) => {
             const order = limitedPrev.length + index;
+            const lane = (order % 2) as 0 | 1;
+            const progressBand = ((order * 0.071) % 1 + Math.random() * 0.02) % 1;
             return {
               id: `ambient-${order}`,
               routeIndex: Math.floor(Math.random() * routes.length),
-              progress: Math.random(),
-              speed: 0.02 + Math.random() * 0.05,
-              direction: (order % 2 === 0 ? "forward" : "backward") as
-                | "forward"
-                | "backward",
-              laneOffset: order % 2 === 0 ? 2.1 : -2.1,
+              progress: progressBand,
+              lane,
+              speed: 0.012 + (order % 5) * 0.0025 + Math.random() * 0.003,
+              direction: (lane === 0 ? "forward" : "backward") as "forward" | "backward",
             };
           },
         );
@@ -88,15 +88,37 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
       last = now;
 
       setSeedVehicles((prev) =>
-        prev.map((vehicle) => {
-          const dir = vehicle.direction === "forward" ? 1 : -1;
-          const nextProgressRaw = vehicle.progress + vehicle.speed * dt * dir;
-          const wrapped = ((nextProgressRaw % 1) + 1) % 1;
-          return {
-            ...vehicle,
-            progress: wrapped,
-          };
-        }),
+        {
+          const moved = prev.map((vehicle, index) => {
+            const dir = vehicle.direction === "forward" ? 1 : -1;
+            const tempo = 0.85 + Math.sin(now * 0.00035 + index) * 0.15;
+            const nextProgressRaw = vehicle.progress + vehicle.speed * dt * dir * tempo;
+            const wrapped = ((nextProgressRaw % 1) + 1) % 1;
+            return { ...vehicle, progress: wrapped };
+          });
+
+          const minGap = 0.018;
+          const grouped = new Map<string, SeedVehicle[]>();
+          moved.forEach((vehicle) => {
+            const key = `${vehicle.routeIndex}-${vehicle.direction}-${vehicle.lane}`;
+            const list = grouped.get(key);
+            if (list) list.push(vehicle);
+            else grouped.set(key, [vehicle]);
+          });
+
+          grouped.forEach((items) => {
+            items.sort((a, b) => a.progress - b.progress);
+            for (let index = 1; index < items.length; index += 1) {
+              const prevItem = items[index - 1];
+              const current = items[index];
+              if (current.progress - prevItem.progress < minGap) {
+                current.progress = (prevItem.progress + minGap) % 1;
+              }
+            }
+          });
+
+          return moved;
+        },
       );
 
       frame = requestAnimationFrame(tick);
@@ -122,10 +144,8 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
             ? normalizeBearing(sample.bearing)
             : normalizeBearing(sample.bearing + 180);
 
-        const shifted = offsetRouteSample(
-          { ...sample, bearing: directionalBearing },
-          vehicle.laneOffset,
-        );
+        const laneOffset = vehicle.direction === "forward" ? 0.85 : -0.85;
+        const shifted = offsetRouteSample({ ...sample, bearing: directionalBearing }, laneOffset);
 
         return {
           id: vehicle.id,

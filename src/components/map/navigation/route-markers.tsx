@@ -29,48 +29,30 @@ type Props = {
 };
 
 function Vehicle3D({
-  tone = "slate",
   compact = false,
+  simplified = false,
 }: {
-  tone?: "blue" | "slate" | "emerald" | "amber";
   compact?: boolean;
+  simplified?: boolean;
 }) {
-  const palette = {
-    blue: {
-      base: "from-blue-700 to-blue-500",
-      roof: "from-sky-200 to-blue-100",
-      side: "from-blue-800 to-blue-600",
-    },
-    slate: {
-      base: "from-slate-800 to-slate-600",
-      roof: "from-slate-200 to-slate-100",
-      side: "from-slate-700 to-slate-500",
-    },
-    emerald: {
-      base: "from-emerald-700 to-emerald-500",
-      roof: "from-emerald-200 to-emerald-100",
-      side: "from-emerald-800 to-emerald-600",
-    },
-    amber: {
-      base: "from-amber-700 to-amber-500",
-      roof: "from-amber-200 to-amber-100",
-      side: "from-amber-800 to-amber-600",
-    },
-  }[tone];
+  const sizeClass = compact ? "h-5 w-3.5" : "h-7 w-4.5";
+  if (simplified) {
+    return <div className={`rounded-full border border-slate-200 bg-white/95 shadow ${sizeClass}`} />;
+  }
 
   return (
     <div
-      className={`relative ${compact ? "h-5 w-3.5" : "h-7 w-4.5"} [transform-style:preserve-3d]`}
+      className={`relative ${sizeClass} [transform-style:preserve-3d]`}
       style={{ transform: "rotateX(56deg)" }}
     >
       <div
-        className={`absolute inset-0 rounded-[7px] bg-gradient-to-b ${palette.base} shadow-[0_8px_10px_rgba(2,6,23,0.38)]`}
+        className="absolute inset-0 rounded-[7px] bg-gradient-to-b from-slate-700 to-slate-500 shadow-[0_8px_10px_rgba(2,6,23,0.38)]"
       />
       <div
-        className={`absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b ${palette.roof} opacity-95`}
+        className="absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b from-slate-200 to-white opacity-95"
       />
       <div
-        className={`absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b ${palette.side} opacity-90`}
+        className="absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b from-slate-800 to-slate-600 opacity-90"
       />
       <div className="absolute -top-[6%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-cyan-300/95 blur-[0.2px]" />
       <div className="absolute -bottom-[5%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-rose-400/95 blur-[0.2px]" />
@@ -93,6 +75,7 @@ export function RouteMarkers({
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
   const zoomScale = Math.min(4.4, Math.max(0.9, (mapZoom - 9) * 0.55));
+  const simplifiedTraffic = mapZoom < 14.6;
 
   return (
     <>
@@ -125,7 +108,7 @@ export function RouteMarkers({
             style={{ transform: `rotate(${navHeading}deg) scale(${zoomScale})` }}
           >
             {mapLibreCar3D && navMode === "car" ? (
-              <Vehicle3D tone="blue" />
+              <Vehicle3D simplified={simplifiedTraffic} />
             ) : navMode === "car" ? (
               <div className="relative h-7 w-4 rounded-md border border-white/80 bg-blue-700 shadow-[0_5px_10px_rgba(37,99,235,0.35)]">
                 <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-blue-200/90" />
@@ -156,14 +139,8 @@ export function RouteMarkers({
                 style={{ transform: `rotate(${car.bearing}deg) scale(${zoomScale * 0.9})` }}
               >
                 <Vehicle3D
-                  tone={
-                    car.vehicleType === "bike"
-                      ? "emerald"
-                      : car.direction === "forward"
-                        ? "slate"
-                        : "amber"
-                  }
                   compact
+                  simplified={simplifiedTraffic}
                 />
               </div>
             </Marker>
@@ -183,7 +160,7 @@ export function RouteMarkers({
             className="relative flex h-7 w-7 items-center justify-center opacity-90"
             style={{ transform: `rotate(${vehicle.bearing}deg) scale(${zoomScale * 0.8})` }}
           >
-            <Vehicle3D tone={vehicle.direction === "forward" ? "slate" : "amber"} compact />
+            <Vehicle3D compact simplified={simplifiedTraffic} />
           </div>
         </Marker>
       ))}

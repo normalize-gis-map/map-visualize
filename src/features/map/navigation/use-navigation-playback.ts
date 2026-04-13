@@ -106,16 +106,15 @@ export function useNavigationPlayback({
   const trafficSamples = useMemo<TrafficSample[]>(() => {
     if (!coordinates.length) return [];
 
-    const forwardLaneOffset = 2.4;
-    const backwardLaneOffset = -2.4;
+    const forwardLaneOffset = 1;
+    const backwardLaneOffset = -1;
     const forward: TrafficSample[] = [];
     const backward: TrafficSample[] = [];
 
     buildTrafficProgress(trafficPhase, 6).forEach((item, index) => {
       const sample = sampleRouteAtProgress(coordinates, item.progress);
       if (!sample) return;
-      const laneDrift = Math.sin((trafficPhase * 14 + index) * 1.5) * 0.35;
-      const shifted = offsetRouteSample(sample, forwardLaneOffset + laneDrift);
+      const shifted = offsetRouteSample(sample, forwardLaneOffset);
       forward.push({
         id: `${item.id}-forward`,
         direction: "forward",
@@ -132,8 +131,7 @@ export function useNavigationPlayback({
         ...sample,
         bearing: normalizeBearing(sample.bearing + 180),
       };
-      const laneDrift = Math.cos((trafficPhase * 11 + index) * 1.4) * 0.28;
-      const shifted = offsetRouteSample(reversed, backwardLaneOffset + laneDrift);
+      const shifted = offsetRouteSample(reversed, backwardLaneOffset);
       backward.push({
         id: `${item.id}-backward`,
         direction: "backward",

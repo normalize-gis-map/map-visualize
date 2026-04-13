@@ -159,10 +159,6 @@ export function MapLibreMap({
     };
 
     patchStyleGlyphs();
-    mapInstance.on("styledata", patchStyleGlyphs);
-    return () => {
-      mapInstance.off("styledata", patchStyleGlyphs);
-    };
   }, [mapInstance, mapMode]);
 
   useEffect(() => {
