@@ -4,9 +4,9 @@ import {
   PanelBottomOpen,
   Pause,
   Play,
-  Search,
   TriangleAlert,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -51,6 +51,8 @@ type Props = {
   onReset: () => void;
   cameraTiltDeg: number;
   onCameraTiltChange: (value: number) => void;
+  onFocusVehicle: () => void;
+  onToggleTraffic: () => void;
 };
 
 export function NavigationHud({
@@ -84,8 +86,11 @@ export function NavigationHud({
   onReset,
   cameraTiltDeg,
   onCameraTiltChange,
+  onFocusVehicle,
+  onToggleTraffic,
 }: Props) {
   const [utilityExpanded, setUtilityExpanded] = useState(false);
+  const [muted, setMuted] = useState(false);
 
   return (
     <>
@@ -171,16 +176,34 @@ export function NavigationHud({
                 >
                   <PanelBottomClose className="h-4.5 w-4.5" />
                 </button>
-                {[Compass, Search, Volume2, TriangleAlert].map((Icon, index) => (
-                  <button
-                    key={Icon.displayName ?? index}
-                    type="button"
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
-                    aria-label="Navigation utility action"
-                  >
-                    <Icon className="h-4.5 w-4.5" />
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={onFocusVehicle}
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
+                  aria-label="Focus current vehicle"
+                >
+                  <Compass className="h-4.5 w-4.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMuted((prev) => !prev)}
+                  className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur ${
+                    muted
+                      ? "border-amber-200 bg-amber-50 text-amber-700"
+                      : "border-white/70 bg-white/90 text-slate-700"
+                  }`}
+                  aria-label={muted ? "Unmute navigation sounds" : "Mute navigation sounds"}
+                >
+                  {muted ? <VolumeX className="h-4.5 w-4.5" /> : <Volume2 className="h-4.5 w-4.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={onToggleTraffic}
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
+                  aria-label="Toggle traffic visualization"
+                >
+                  <TriangleAlert className="h-4.5 w-4.5" />
+                </button>
               </div>
             ) : (
               <button

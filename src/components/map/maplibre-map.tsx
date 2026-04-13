@@ -49,6 +49,7 @@ export function MapLibreMap({
     visibleLayers,
     buildingOpacity,
     trafficVisualizationEnabled,
+    toggleTrafficVisualization,
     notifyMapInteraction,
     setMapEngine,
   } =
@@ -462,6 +463,14 @@ export function MapLibreMap({
         }}
         cameraTiltDeg={driveTiltDeg}
         onCameraTiltChange={setDriveTiltDeg}
+        onFocusVehicle={() => {
+          if (!mapInstance || !navCoordinate) return;
+          mapInstance.easeTo({
+            center: navCoordinate,
+            duration: 320,
+          });
+        }}
+        onToggleTraffic={toggleTrafficVisualization}
       />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
