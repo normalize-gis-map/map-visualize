@@ -324,6 +324,31 @@ export function MapLibreMap({
     });
   }, [driveTiltDeg, mapInstance, navCoordinate, isNavigating, mapMode, navHeading, viewMode]);
 
+  useEffect(() => {
+    if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
+
+    const applyZoomAdaptivePitch = () => {
+      const zoom = mapInstance.getZoom();
+      const nextPitch = zoom >= 14 ? Math.min(64, 44 + (zoom - 14) * 4.2) : zoom >= 12.5 ? 34 : 0;
+      const nextBearing = zoom >= 12.5 ? -12 : 0;
+      const pitchDiff = Math.abs(mapInstance.getPitch() - nextPitch);
+      const bearingDiff = Math.abs(mapInstance.getBearing() - nextBearing);
+      if (pitchDiff < 1 && bearingDiff < 1) return;
+
+      mapInstance.easeTo({
+        pitch: nextPitch,
+        bearing: nextBearing,
+        duration: 380,
+      });
+    };
+
+    applyZoomAdaptivePitch();
+    mapInstance.on("moveend", applyZoomAdaptivePitch);
+    return () => {
+      mapInstance.off("moveend", applyZoomAdaptivePitch);
+    };
+  }, [mapInstance, mapMode, viewMode]);
+
   return (
     <div className="map-shell relative h-full w-full">
       <Map

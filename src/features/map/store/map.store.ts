@@ -32,7 +32,7 @@ type MapUiStore = {
 export const useMapStore = create<MapUiStore>()(
   persist(
     (set) => ({
-      mapMode: "2d",
+      mapMode: "2.5d",
       mapEngine: "maplibre",
       visibleLayers: {
         flood: false,
@@ -74,6 +74,9 @@ export const useMapStore = create<MapUiStore>()(
         trafficVisualizationEnabled: state.trafficVisualizationEnabled,
       }),
       onRehydrateStorage: () => (state) => {
+        if (state?.mapMode === "2d") {
+          state.setMapMode("2.5d");
+        }
         state?.setHasHydrated(true);
       },
     },
