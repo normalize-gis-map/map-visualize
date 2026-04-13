@@ -37,7 +37,11 @@ function Vehicle3D({
 }) {
   const sizeClass = compact ? "h-5 w-3.5" : "h-7 w-4.5";
   if (simplified) {
-    return <div className={`rounded-full border border-slate-200 bg-white/95 shadow ${sizeClass}`} />;
+    return (
+      <div
+        className={`rounded-full border border-slate-300/85 bg-white/95 ${compact ? "h-3.5 w-2.5" : "h-4.5 w-3"} shadow-[0_1px_3px_rgba(15,23,42,0.35)]`}
+      />
+    );
   }
 
   return (
@@ -46,16 +50,16 @@ function Vehicle3D({
       style={{ transform: "rotateX(56deg)" }}
     >
       <div
-        className="absolute inset-0 rounded-[7px] bg-gradient-to-b from-slate-700 to-slate-500 shadow-[0_8px_10px_rgba(2,6,23,0.38)]"
+        className="absolute inset-0 rounded-[7px] bg-gradient-to-b from-slate-100 to-slate-300 shadow-[0_8px_10px_rgba(2,6,23,0.3)]"
       />
       <div
-        className="absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b from-slate-200 to-white opacity-95"
+        className="absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b from-white to-slate-100 opacity-95"
       />
       <div
-        className="absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b from-slate-800 to-slate-600 opacity-90"
+        className="absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b from-slate-200 to-slate-400 opacity-90"
       />
-      <div className="absolute -top-[6%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-cyan-300/95 blur-[0.2px]" />
-      <div className="absolute -bottom-[5%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-rose-400/95 blur-[0.2px]" />
+      <div className="absolute -top-[6%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-white/95 blur-[0.2px]" />
+      <div className="absolute -bottom-[5%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-slate-300/95 blur-[0.2px]" />
     </div>
   );
 }

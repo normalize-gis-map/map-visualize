@@ -36,9 +36,11 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
 
   const targetCount = useMemo(() => {
     if (!shouldRender) return 0;
-    if (zoom >= 15.5) return 46;
-    if (zoom >= 14.2) return 30;
-    return 18;
+    if (zoom >= 16.5) return 180;
+    if (zoom >= 15.5) return 130;
+    if (zoom >= 14.6) return 90;
+    if (zoom >= 13.8) return 58;
+    return 34;
   }, [shouldRender, zoom]);
 
   useEffect(() => {
@@ -97,7 +99,7 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
             return { ...vehicle, progress: wrapped };
           });
 
-          const minGap = 0.018;
+          const minGap = 0.011;
           const grouped = new Map<string, SeedVehicle[]>();
           moved.forEach((vehicle) => {
             const key = `${vehicle.routeIndex}-${vehicle.direction}-${vehicle.lane}`;
@@ -113,6 +115,14 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
               const current = items[index];
               if (current.progress - prevItem.progress < minGap) {
                 current.progress = (prevItem.progress + minGap) % 1;
+              }
+            }
+            if (items.length > 1) {
+              const first = items[0];
+              const lastItem = items[items.length - 1];
+              const wrappedGap = (first.progress + 1) - lastItem.progress;
+              if (wrappedGap < minGap) {
+                first.progress = (lastItem.progress + minGap) % 1;
               }
             }
           });

@@ -111,20 +111,20 @@ export function useNavigationPlayback({
     const forward: TrafficSample[] = [];
     const backward: TrafficSample[] = [];
 
-    buildTrafficProgress(trafficPhase, 6).forEach((item, index) => {
+    buildTrafficProgress(trafficPhase, 12).forEach((item, index) => {
       const sample = sampleRouteAtProgress(coordinates, item.progress);
       if (!sample) return;
       const shifted = offsetRouteSample(sample, forwardLaneOffset);
       forward.push({
         id: `${item.id}-forward`,
         direction: "forward",
-        vehicleType: index % 3 === 0 ? "car" : "bike",
+        vehicleType: index % 7 === 0 ? "bike" : "car",
         ...shifted,
         bearing: normalizeBearing(shifted.bearing),
       });
     });
 
-    buildTrafficProgress(1 - trafficPhase, 5).forEach((item, index) => {
+    buildTrafficProgress(1 - trafficPhase, 10).forEach((item, index) => {
       const sample = sampleRouteAtProgress(coordinates, item.progress);
       if (!sample) return;
       const reversed = {
@@ -135,7 +135,7 @@ export function useNavigationPlayback({
       backward.push({
         id: `${item.id}-backward`,
         direction: "backward",
-        vehicleType: index % 4 === 0 ? "car" : "bike",
+        vehicleType: index % 8 === 0 ? "bike" : "car",
         ...shifted,
         bearing: normalizeBearing(shifted.bearing),
       });

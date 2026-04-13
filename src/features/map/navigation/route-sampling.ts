@@ -59,9 +59,13 @@ export function normalizeBearing(bearing: number) {
 }
 
 export function buildTrafficProgress(baseProgress: number, count = 8) {
-  const offsets = [0.04, 0.11, 0.19, 0.27, 0.35, 0.46, 0.58, 0.69].slice(0, count);
-  return offsets.map((offset, index) => ({
-    id: `traffic-${index}`,
-    progress: (baseProgress + offset) % 1,
-  }));
+  const safeCount = Math.max(1, Math.floor(count));
+  return Array.from({ length: safeCount }, (_, index) => {
+    const spacing = 0.86 / safeCount;
+    const offset = 0.05 + spacing * index + Math.sin(index * 1.7) * 0.0045;
+    return {
+      id: `traffic-${index}`,
+      progress: (baseProgress + offset) % 1,
+    };
+  });
 }
