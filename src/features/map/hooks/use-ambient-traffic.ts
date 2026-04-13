@@ -47,16 +47,31 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
       return () => cancelAnimationFrame(frame);
     }
 
-    const seeded = Array.from({ length: targetCount }, (_, index) => ({
-      id: `ambient-${index}`,
-      routeIndex: Math.floor(Math.random() * routes.length),
-      progress: Math.random(),
-      speed: 0.02 + Math.random() * 0.05,
-      direction: (index % 2 === 0 ? "forward" : "backward") as "forward" | "backward",
-      laneOffset: index % 2 === 0 ? 2.1 : -2.1,
-    }));
+    const frame = requestAnimationFrame(() =>
+      setSeedVehicles((prev) => {
+        const limitedPrev = prev.slice(0, targetCount);
+        if (limitedPrev.length === targetCount) return limitedPrev;
 
-    const frame = requestAnimationFrame(() => setSeedVehicles(seeded));
+        const appended = Array.from(
+          { length: targetCount - limitedPrev.length },
+          (_, index) => {
+            const order = limitedPrev.length + index;
+            return {
+              id: `ambient-${order}`,
+              routeIndex: Math.floor(Math.random() * routes.length),
+              progress: Math.random(),
+              speed: 0.02 + Math.random() * 0.05,
+              direction: (order % 2 === 0 ? "forward" : "backward") as
+                | "forward"
+                | "backward",
+              laneOffset: order % 2 === 0 ? 2.1 : -2.1,
+            };
+          },
+        );
+
+        return [...limitedPrev, ...appended];
+      }),
+    );
     return () => cancelAnimationFrame(frame);
   }, [routes.length, shouldRender, targetCount]);
 
