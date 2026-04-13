@@ -55,6 +55,12 @@ export function MapLibreMap({
     useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
+  const [mapBounds, setMapBounds] = useState<{
+    west: number;
+    south: number;
+    east: number;
+    north: number;
+  } | null>(null);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -263,6 +269,16 @@ export function MapLibreMap({
     zoom: mapZoom,
     enabled: trafficVisualizationEnabled,
   });
+  const visibleAmbientTraffic = useMemo(() => {
+    if (!mapBounds) return ambientTraffic;
+    return ambientTraffic.filter(
+      (vehicle) =>
+        vehicle.lng >= mapBounds.west &&
+        vehicle.lng <= mapBounds.east &&
+        vehicle.lat >= mapBounds.south &&
+        vehicle.lat <= mapBounds.north,
+    );
+  }, [ambientTraffic, mapBounds]);
 
   const resetRouteRuntime = () => {
     pause();
@@ -331,10 +347,24 @@ export function MapLibreMap({
         }}
         onMove={(event) => {
           setMapZoom(event.viewState.zoom);
+          const bounds = event.target.getBounds();
+          setMapBounds({
+            west: bounds.getWest(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            north: bounds.getNorth(),
+          });
         }}
         onLoad={(e) => {
           setMapInstance(e.target);
           setMapZoom(e.target.getZoom());
+          const bounds = e.target.getBounds();
+          setMapBounds({
+            west: bounds.getWest(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            north: bounds.getNorth(),
+          });
         }}
       >
         <NavigationControl position="bottom-right" />
@@ -367,7 +397,7 @@ export function MapLibreMap({
           navMode={navMode}
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
-          ambientTraffic={ambientTraffic}
+          ambientTraffic={visibleAmbientTraffic}
         />
       </Map>
 
