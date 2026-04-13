@@ -60,24 +60,28 @@ export function RouteMarkers({
     document.head.appendChild(script);
   }, []);
 
-  if (!coordinates.length) return null;
+  if (!coordinates.length && !ambientTraffic.length) return null;
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
 
   return (
     <>
-      <Marker longitude={start[0]} latitude={start[1]} anchor="bottom">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-xs font-bold text-white shadow-lg">
-          A
-        </div>
-      </Marker>
+      {start && end ? (
+        <>
+          <Marker longitude={start[0]} latitude={start[1]} anchor="bottom">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-xs font-bold text-white shadow-lg">
+              A
+            </div>
+          </Marker>
 
-      <Marker longitude={end[0]} latitude={end[1]} anchor="bottom">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-xs font-bold text-white shadow-lg">
-          B
-        </div>
-      </Marker>
+          <Marker longitude={end[0]} latitude={end[1]} anchor="bottom">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-xs font-bold text-white shadow-lg">
+              B
+            </div>
+          </Marker>
+        </>
+      ) : null}
 
       {navCoordinate ? (
         <Marker longitude={navCoordinate[0]} latitude={navCoordinate[1]} anchor="center">
@@ -117,7 +121,8 @@ export function RouteMarkers({
         </Marker>
       ) : null}
 
-      {trafficCars.map((car) => (
+      {coordinates.length
+        ? trafficCars.map((car) => (
         <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
           <div
             className="relative flex h-8 w-8 items-center justify-center"
@@ -150,7 +155,8 @@ export function RouteMarkers({
             )}
           </div>
         </Marker>
-      ))}
+          ))
+        : null}
 
       {ambientTraffic.map((vehicle) => (
         <Marker

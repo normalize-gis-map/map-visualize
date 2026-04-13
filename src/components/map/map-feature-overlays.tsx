@@ -143,9 +143,9 @@ export function MapFeatureOverlays({
         />
       )}
 
-      {activeRoute ? (
+      {activeRoute || ambientTraffic.length ? (
         <RouteMarkers
-          coordinates={activeRoute.geometry.coordinates}
+          coordinates={activeRoute?.geometry.coordinates ?? []}
           navCoordinate={navCoordinate}
           navHeading={navHeading}
           navMode={navMode}
