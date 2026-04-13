@@ -62,6 +62,7 @@ export function MapLibreMap({
     east: number;
     north: number;
   } | null>(null);
+  const [cameraDistanceMeters, setCameraDistanceMeters] = useState<number | null>(null);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -103,6 +104,15 @@ export function MapLibreMap({
   const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<Position[][]>([]);
   const programmaticMoveRef = useRef(false);
   const zoomPitchStateRef = useRef<"far" | "near" | null>(null);
+
+  const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+    const lat = (bounds.getNorth() + bounds.getSouth()) / 2;
+    const deltaLng = Math.abs(east - west);
+    const metersPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
+    return Math.max(0, deltaLng * metersPerDegLng);
+  };
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
@@ -328,7 +338,8 @@ export function MapLibreMap({
   useEffect(() => {
     if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
 
-    const thresholdState: "far" | "near" = mapZoom >= 14.2 ? "near" : "far";
+    const thresholdState: "far" | "near" =
+      cameraDistanceMeters !== null && cameraDistanceMeters <= 500 ? "near" : "far";
     if (zoomPitchStateRef.current === thresholdState) return;
     zoomPitchStateRef.current = thresholdState;
 
@@ -349,7 +360,7 @@ export function MapLibreMap({
         duration: 520,
       });
     }
-  }, [mapInstance, mapMode, viewMode, mapZoom]);
+  }, [mapInstance, mapMode, viewMode, mapZoom, cameraDistanceMeters]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -381,6 +392,7 @@ export function MapLibreMap({
         onMove={(event) => {
           setMapZoom(event.viewState.zoom);
           const bounds = event.target.getBounds();
+          setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
           setMapBounds({
             west: bounds.getWest(),
             south: bounds.getSouth(),
@@ -392,6 +404,7 @@ export function MapLibreMap({
           setMapInstance(e.target);
           setMapZoom(e.target.getZoom());
           const bounds = e.target.getBounds();
+          setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
           setMapBounds({
             west: bounds.getWest(),
             south: bounds.getSouth(),
@@ -499,6 +512,10 @@ export function MapLibreMap({
           Zoom ≥ {minZoomToRender} để hiện traffic thành phố
         </div>
       ) : null}
+
+      <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border border-white/70 bg-white/90 px-2.5 py-1 text-[11px] text-slate-600 shadow-sm">
+        Camera: {cameraDistanceMeters ? `${Math.round(cameraDistanceMeters)} m` : "--"}
+      </div>
 
     </div>
   );

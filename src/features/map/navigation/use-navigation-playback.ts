@@ -106,8 +106,8 @@ export function useNavigationPlayback({
   const trafficSamples = useMemo<TrafficSample[]>(() => {
     if (!coordinates.length) return [];
 
-    const forwardLaneOffset = 1;
-    const backwardLaneOffset = -1;
+    const forwardLaneOffset = 0.45;
+    const backwardLaneOffset = -0.45;
     const forward: TrafficSample[] = [];
     const backward: TrafficSample[] = [];
 

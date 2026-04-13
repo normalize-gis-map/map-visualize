@@ -39,7 +39,7 @@ function Vehicle3D({
   if (simplified) {
     return (
       <div
-        className={`rounded-full border border-slate-300/90 bg-slate-100/95 ${compact ? "h-2.5 w-1.6" : "h-3.5 w-2"} shadow-[0_1px_2px_rgba(15,23,42,0.2)]`}
+        className={`rounded-full border border-slate-500/85 bg-slate-400/95 ${compact ? "h-2.5 w-1.6" : "h-3.5 w-2"} shadow-[0_1px_2px_rgba(15,23,42,0.28)]`}
       />
     );
   }
@@ -49,17 +49,15 @@ function Vehicle3D({
       className={`relative ${sizeClass} [transform-style:preserve-3d]`}
       style={{ transform: "rotateX(56deg)" }}
     >
+      <div className="absolute inset-0 rounded-[7px] bg-gradient-to-b from-slate-400 to-slate-600 shadow-[0_8px_10px_rgba(2,6,23,0.32)]" />
       <div
-        className="absolute inset-0 rounded-[7px] bg-gradient-to-b from-slate-100 to-slate-300 shadow-[0_8px_10px_rgba(2,6,23,0.3)]"
+        className="absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b from-slate-200 to-slate-300 opacity-95"
       />
       <div
-        className="absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b from-white to-slate-100 opacity-95"
+        className="absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b from-slate-500 to-slate-700 opacity-90"
       />
-      <div
-        className="absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b from-slate-200 to-slate-400 opacity-90"
-      />
-      <div className="absolute -top-[6%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-white/95" />
-      <div className="absolute -bottom-[5%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-slate-300/95" />
+      <div className="absolute -top-[6%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-slate-200/95" />
+      <div className="absolute -bottom-[5%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-slate-800/95" />
     </div>
   );
 }
@@ -78,8 +76,8 @@ export function RouteMarkers({
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
-  const zoomScale = Math.min(1.25, Math.max(0.45, (mapZoom - 11.5) * 0.2));
-  const simplifiedTraffic = mapZoom < 15;
+  const zoomScale = Math.min(2.3, Math.max(0.55, (mapZoom - 11) * 0.28));
+  const simplifiedTraffic = mapZoom < 14.3;
 
   return (
     <>

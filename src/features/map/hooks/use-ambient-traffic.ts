@@ -154,7 +154,7 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
             ? normalizeBearing(sample.bearing)
             : normalizeBearing(sample.bearing + 180);
 
-        const laneOffset = vehicle.direction === "forward" ? 0.85 : -0.85;
+        const laneOffset = vehicle.direction === "forward" ? 0.45 : -0.45;
         const shifted = offsetRouteSample({ ...sample, bearing: directionalBearing }, laneOffset);
 
         return {
