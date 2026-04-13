@@ -102,6 +102,7 @@ export function MapLibreMap({
   const [driveTiltDeg, setDriveTiltDeg] = useState(78);
   const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<Position[][]>([]);
   const programmaticMoveRef = useRef(false);
+  const zoomPitchStateRef = useRef<"far" | "near" | null>(null);
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
@@ -327,27 +328,28 @@ export function MapLibreMap({
   useEffect(() => {
     if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
 
-    const applyZoomAdaptivePitch = () => {
-      const zoom = mapInstance.getZoom();
-      const nextPitch = zoom >= 14 ? Math.min(64, 44 + (zoom - 14) * 4.2) : zoom >= 12.5 ? 34 : 0;
-      const nextBearing = zoom >= 12.5 ? -12 : 0;
-      const pitchDiff = Math.abs(mapInstance.getPitch() - nextPitch);
-      const bearingDiff = Math.abs(mapInstance.getBearing() - nextBearing);
-      if (pitchDiff < 1 && bearingDiff < 1) return;
+    const thresholdState: "far" | "near" = mapZoom >= 14.2 ? "near" : "far";
+    if (zoomPitchStateRef.current === thresholdState) return;
+    zoomPitchStateRef.current = thresholdState;
 
+    if (thresholdState === "far") {
       mapInstance.easeTo({
-        pitch: nextPitch,
-        bearing: nextBearing,
-        duration: 380,
+        pitch: 0,
+        bearing: 0,
+        duration: 420,
       });
-    };
+      return;
+    }
 
-    applyZoomAdaptivePitch();
-    mapInstance.on("moveend", applyZoomAdaptivePitch);
-    return () => {
-      mapInstance.off("moveend", applyZoomAdaptivePitch);
-    };
-  }, [mapInstance, mapMode, viewMode]);
+    const currentPitch = mapInstance.getPitch();
+    if (currentPitch < 25) {
+      mapInstance.easeTo({
+        pitch: 52,
+        bearing: -10,
+        duration: 520,
+      });
+    }
+  }, [mapInstance, mapMode, viewMode, mapZoom]);
 
   return (
     <div className="map-shell relative h-full w-full">
