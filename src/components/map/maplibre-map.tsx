@@ -191,7 +191,18 @@ export function MapLibreMap({
         .filter((coords) => coords.length > 3)
         .slice(0, 220);
 
-      setAmbientNetworkRoutes(collected);
+      setAmbientNetworkRoutes((prev) => {
+        if (prev.length === collected.length) {
+          const sameHead =
+            prev[0]?.[0]?.[0] === collected[0]?.[0]?.[0] &&
+            prev[0]?.[0]?.[1] === collected[0]?.[0]?.[1];
+          const sameTail =
+            prev[prev.length - 1]?.[0]?.[0] === collected[collected.length - 1]?.[0]?.[0] &&
+            prev[prev.length - 1]?.[0]?.[1] === collected[collected.length - 1]?.[0]?.[1];
+          if (sameHead && sameTail) return prev;
+        }
+        return collected;
+      });
     };
 
     refreshRoadNetwork();

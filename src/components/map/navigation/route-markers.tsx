@@ -80,7 +80,7 @@ export function RouteMarkers({
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
-  const zoomScale = Math.min(1.8, Math.max(0.75, 0.75 + (mapZoom - 12) * 0.18));
+  const zoomScale = Math.min(2.4, Math.max(1, 1 + (mapZoom - 12) * 0.24));
 
   return (
     <>
@@ -101,7 +101,13 @@ export function RouteMarkers({
       ) : null}
 
       {navCoordinate ? (
-        <Marker longitude={navCoordinate[0]} latitude={navCoordinate[1]} anchor="center">
+        <Marker
+          longitude={navCoordinate[0]}
+          latitude={navCoordinate[1]}
+          anchor="bottom"
+          pitchAlignment="map"
+          rotationAlignment="map"
+        >
           <div
             className="flex h-10 w-10 items-center justify-center"
             style={{ transform: `rotate(${navHeading}deg) scale(${zoomScale})` }}
@@ -145,7 +151,14 @@ export function RouteMarkers({
 
       {coordinates.length
         ? trafficCars.map((car) => (
-        <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
+        <Marker
+          key={car.id}
+          longitude={car.lng}
+          latitude={car.lat}
+          anchor="bottom"
+          pitchAlignment="map"
+          rotationAlignment="map"
+        >
           <div
             className="relative flex h-8 w-8 items-center justify-center"
             style={{ transform: `rotate(${car.bearing}deg) scale(${zoomScale * 0.9})` }}
@@ -195,7 +208,9 @@ export function RouteMarkers({
           key={vehicle.id}
           longitude={vehicle.lng}
           latitude={vehicle.lat}
-          anchor="center"
+          anchor="bottom"
+          pitchAlignment="map"
+          rotationAlignment="map"
         >
           <div
             className="relative flex h-7 w-7 items-center justify-center opacity-90"

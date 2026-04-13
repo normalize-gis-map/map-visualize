@@ -43,7 +43,9 @@ export function useAmbientTraffic({ routes, zoom, enabled }: UseAmbientTrafficIn
 
   useEffect(() => {
     if (!shouldRender || targetCount === 0) {
-      const frame = requestAnimationFrame(() => setSeedVehicles([]));
+      const frame = requestAnimationFrame(() =>
+        setSeedVehicles((prev) => (prev.length ? [] : prev)),
+      );
       return () => cancelAnimationFrame(frame);
     }
 
