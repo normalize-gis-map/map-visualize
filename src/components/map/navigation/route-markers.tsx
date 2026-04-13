@@ -35,11 +35,11 @@ function Vehicle3D({
   compact?: boolean;
   simplified?: boolean;
 }) {
-  const sizeClass = compact ? "h-5 w-3.5" : "h-7 w-4.5";
+  const sizeClass = compact ? "h-3.5 w-2.4" : "h-4.5 w-3";
   if (simplified) {
     return (
       <div
-        className={`rounded-full border border-slate-300/85 bg-white/95 ${compact ? "h-3.5 w-2.5" : "h-4.5 w-3"} shadow-[0_1px_3px_rgba(15,23,42,0.35)]`}
+        className={`rounded-full border border-slate-300/90 bg-slate-100/95 ${compact ? "h-2.5 w-1.6" : "h-3.5 w-2"} shadow-[0_1px_2px_rgba(15,23,42,0.2)]`}
       />
     );
   }
@@ -58,8 +58,8 @@ function Vehicle3D({
       <div
         className="absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b from-slate-200 to-slate-400 opacity-90"
       />
-      <div className="absolute -top-[6%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-white/95 blur-[0.2px]" />
-      <div className="absolute -bottom-[5%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-slate-300/95 blur-[0.2px]" />
+      <div className="absolute -top-[6%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-white/95" />
+      <div className="absolute -bottom-[5%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-slate-300/95" />
     </div>
   );
 }
@@ -78,8 +78,8 @@ export function RouteMarkers({
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
-  const zoomScale = Math.min(4.4, Math.max(0.9, (mapZoom - 9) * 0.55));
-  const simplifiedTraffic = mapZoom < 14.6;
+  const zoomScale = Math.min(1.25, Math.max(0.45, (mapZoom - 11.5) * 0.2));
+  const simplifiedTraffic = mapZoom < 15;
 
   return (
     <>
@@ -111,14 +111,8 @@ export function RouteMarkers({
             className="flex h-10 w-10 items-center justify-center"
             style={{ transform: `rotate(${navHeading}deg) scale(${zoomScale})` }}
           >
-            {mapLibreCar3D && navMode === "car" ? (
-              <Vehicle3D simplified={simplifiedTraffic} />
-            ) : navMode === "car" ? (
-              <div className="relative h-7 w-4 rounded-md border border-white/80 bg-blue-700 shadow-[0_5px_10px_rgba(37,99,235,0.35)]">
-                <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-blue-200/90" />
-                <div className="absolute -top-0.5 left-1/2 h-1.5 w-2 -translate-x-1/2 rounded-full bg-cyan-300" />
-                <div className="absolute -bottom-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-rose-400" />
-              </div>
+            {navMode === "car" ? (
+              <Vehicle3D simplified={simplifiedTraffic && !mapLibreCar3D} />
             ) : navMode === "bike" ? (
               <Bike className="h-4 w-4" />
             ) : (
