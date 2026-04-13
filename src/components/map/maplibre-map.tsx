@@ -208,11 +208,9 @@ export function MapLibreMap({
 
     refreshRoadNetwork();
     mapInstance.on("moveend", refreshRoadNetwork);
-    mapInstance.on("styledata", refreshRoadNetwork);
 
     return () => {
       mapInstance.off("moveend", refreshRoadNetwork);
-      mapInstance.off("styledata", refreshRoadNetwork);
     };
   }, [mapInstance, trafficVisualizationEnabled]);
 
