@@ -94,7 +94,7 @@ export function MapLibreMap({
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
   const patchedGlyphUrlRef = useRef<string | null>(null);
-  const [routePanelOpen, setRoutePanelOpen] = useState(true);
+  const [routePanelOpen, setRoutePanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
   const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);

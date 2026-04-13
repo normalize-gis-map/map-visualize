@@ -80,7 +80,7 @@ export function RouteMarkers({
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
-  const zoomScale = Math.min(2.4, Math.max(1, 1 + (mapZoom - 12) * 0.24));
+  const zoomScale = Math.min(4.4, Math.max(0.9, (mapZoom - 9) * 0.55));
 
   return (
     <>
@@ -104,7 +104,7 @@ export function RouteMarkers({
         <Marker
           longitude={navCoordinate[0]}
           latitude={navCoordinate[1]}
-          anchor="bottom"
+          anchor="center"
           pitchAlignment="map"
           rotationAlignment="map"
         >
@@ -155,7 +155,7 @@ export function RouteMarkers({
           key={car.id}
           longitude={car.lng}
           latitude={car.lat}
-          anchor="bottom"
+          anchor="center"
           pitchAlignment="map"
           rotationAlignment="map"
         >
@@ -208,7 +208,7 @@ export function RouteMarkers({
           key={vehicle.id}
           longitude={vehicle.lng}
           latitude={vehicle.lat}
-          anchor="bottom"
+          anchor="center"
           pitchAlignment="map"
           rotationAlignment="map"
         >

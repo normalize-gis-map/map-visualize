@@ -33,6 +33,7 @@ type TopAppHeaderProps = {
 export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
   const [mode, setMode] = useState<"view" | "route">("view");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
   const [selectedPreviewPlace, setSelectedPreviewPlace] = useState<PlaceItem | null>(
     null,
   );
@@ -90,11 +91,26 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
 
           {activeMode === "route" ? (
             <div className="mt-3">
-              <RoutePlanner
-                onRoutesChange={onRoutesChange}
-                initialToLabel={selectedPreviewPlace?.label}
-                onBackToSearch={() => setMode("view")}
-              />
+              <div className="mb-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setRoutePlannerCollapsed((prev) => !prev)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600"
+                >
+                  {routePlannerCollapsed ? "Mở Route panel" : "Thu gọn Route panel"}
+                </button>
+              </div>
+              {!routePlannerCollapsed ? (
+                <RoutePlanner
+                  onRoutesChange={onRoutesChange}
+                  initialToLabel={selectedPreviewPlace?.label}
+                  onBackToSearch={() => setMode("view")}
+                />
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-600">
+                  Route panel đã thu gọn. Bấm “Mở Route panel” để chỉnh tuyến.
+                </div>
+              )}
             </div>
           ) : null}
 
