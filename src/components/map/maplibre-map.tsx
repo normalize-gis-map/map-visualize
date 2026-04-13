@@ -398,6 +398,7 @@ export function MapLibreMap({
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
           ambientTraffic={visibleAmbientTraffic}
+          mapZoom={mapZoom}
         />
       </Map>
 

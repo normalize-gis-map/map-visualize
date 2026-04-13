@@ -40,6 +40,7 @@ type Props = {
     bearing: number;
     direction: "forward" | "backward";
   }>;
+  mapZoom: number;
 };
 
 export function RouteMarkers({
@@ -50,6 +51,7 @@ export function RouteMarkers({
   mapLibreCar3D,
   trafficCars,
   ambientTraffic,
+  mapZoom,
 }: Props) {
   const [modelViewerReady, setModelViewerReady] = useState(
     () => typeof window !== "undefined" && Boolean(customElements.get("model-viewer")),
@@ -78,6 +80,7 @@ export function RouteMarkers({
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
+  const zoomScale = Math.min(1.8, Math.max(0.75, 0.75 + (mapZoom - 12) * 0.18));
 
   return (
     <>
@@ -101,7 +104,7 @@ export function RouteMarkers({
         <Marker longitude={navCoordinate[0]} latitude={navCoordinate[1]} anchor="center">
           <div
             className="flex h-10 w-10 items-center justify-center"
-            style={{ transform: `rotate(${navHeading}deg)` }}
+            style={{ transform: `rotate(${navHeading}deg) scale(${zoomScale})` }}
           >
             {mapLibreCar3D && navMode === "car" ? (
               modelViewerReady ? (
@@ -145,7 +148,7 @@ export function RouteMarkers({
         <Marker key={car.id} longitude={car.lng} latitude={car.lat} anchor="center">
           <div
             className="relative flex h-8 w-8 items-center justify-center"
-            style={{ transform: `rotate(${car.bearing}deg)` }}
+            style={{ transform: `rotate(${car.bearing}deg) scale(${zoomScale * 0.9})` }}
           >
             {modelViewerReady ? (
               <model-viewer
@@ -196,7 +199,7 @@ export function RouteMarkers({
         >
           <div
             className="relative flex h-7 w-7 items-center justify-center opacity-90"
-            style={{ transform: `rotate(${vehicle.bearing}deg)` }}
+            style={{ transform: `rotate(${vehicle.bearing}deg) scale(${zoomScale * 0.8})` }}
           >
             {modelViewerReady ? (
               <model-viewer

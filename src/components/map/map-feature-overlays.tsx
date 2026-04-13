@@ -36,6 +36,7 @@ type Props = {
     bearing: number;
     direction: "forward" | "backward";
   }>;
+  mapZoom: number;
 };
 
 export function MapFeatureOverlays({
@@ -51,6 +52,7 @@ export function MapFeatureOverlays({
   mapLibreCar3D,
   trafficCars,
   ambientTraffic,
+  mapZoom,
 }: Props) {
   return (
     <>
@@ -152,6 +154,7 @@ export function MapFeatureOverlays({
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
           ambientTraffic={ambientTraffic}
+          mapZoom={mapZoom}
         />
       ) : null}
     </>
