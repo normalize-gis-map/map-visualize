@@ -12,6 +12,20 @@ type TrafficSample = {
   vehicleType: "car" | "bike";
 };
 
+const MAPLIBRE_GLB_VARIANTS = [
+  "https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb",
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/ToyCar/glTF-Binary/ToyCar.glb",
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/VC/glTF-Binary/VC.glb",
+] as const;
+
+function pickModelById(id: string) {
+  let hash = 0;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+  }
+  return MAPLIBRE_GLB_VARIANTS[hash % MAPLIBRE_GLB_VARIANTS.length];
+}
+
 type Props = {
   coordinates: Position[];
   navCoordinate: [number, number] | null;
@@ -92,11 +106,16 @@ export function RouteMarkers({
             {mapLibreCar3D && navMode === "car" ? (
               modelViewerReady ? (
                 <model-viewer
-                  src="https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb"
+                  src={MAPLIBRE_GLB_VARIANTS[0]}
                   disable-zoom
                   disable-pan
                   camera-controls={false}
-                  style={{ width: "30px", height: "30px", pointerEvents: "none" }}
+                  style={{
+                    width: "30px",
+                    height: "30px",
+                    pointerEvents: "none",
+                    filter: "grayscale(100%) contrast(0.85)",
+                  }}
                 />
               ) : (
                 <div className="relative h-7 w-4 rounded-md border border-white/80 bg-slate-900 shadow-[0_5px_10px_rgba(15,23,42,0.42)]">
@@ -128,12 +147,22 @@ export function RouteMarkers({
             className="relative flex h-8 w-8 items-center justify-center"
             style={{ transform: `rotate(${car.bearing}deg)` }}
           >
-            {car.vehicleType === "bike" ? (
-              <div className="relative h-4 w-4">
-                <div className="absolute top-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-slate-100" />
-                <div className="absolute bottom-0 left-0.5 h-1.5 w-1.5 rounded-full border border-slate-900 bg-white" />
-                <div className="absolute right-0.5 bottom-0 h-1.5 w-1.5 rounded-full border border-slate-900 bg-white" />
-              </div>
+            {modelViewerReady ? (
+              <model-viewer
+                src={pickModelById(car.id)}
+                disable-zoom
+                disable-pan
+                camera-controls={false}
+                style={{
+                  width: "24px",
+                  height: "24px",
+                  pointerEvents: "none",
+                  filter:
+                    car.vehicleType === "bike"
+                      ? "grayscale(100%) brightness(0.92)"
+                      : "grayscale(100%) contrast(0.85)",
+                }}
+              />
             ) : (
               <div className="relative h-6 w-3.5 rounded-md border border-white/70 bg-slate-900 shadow-[0_4px_8px_rgba(15,23,42,0.35)]">
                 <div
@@ -169,14 +198,29 @@ export function RouteMarkers({
             className="relative flex h-7 w-7 items-center justify-center opacity-90"
             style={{ transform: `rotate(${vehicle.bearing}deg)` }}
           >
-            <div className="relative h-5 w-3 rounded-[6px] border border-white/60 bg-slate-800/95 shadow-[0_3px_7px_rgba(15,23,42,0.35)]">
-              <div
-                className={`absolute top-0.5 left-0.5 right-0.5 h-1 rounded-sm ${
-                  vehicle.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
-                }`}
+            {modelViewerReady ? (
+              <model-viewer
+                src={pickModelById(vehicle.id)}
+                disable-zoom
+                disable-pan
+                camera-controls={false}
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  pointerEvents: "none",
+                  filter: "grayscale(100%) contrast(0.85)",
+                }}
               />
-              <div className="absolute -bottom-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-rose-400" />
-            </div>
+            ) : (
+              <div className="relative h-5 w-3 rounded-[6px] border border-white/60 bg-slate-800/95 shadow-[0_3px_7px_rgba(15,23,42,0.35)]">
+                <div
+                  className={`absolute top-0.5 left-0.5 right-0.5 h-1 rounded-sm ${
+                    vehicle.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
+                  }`}
+                />
+                <div className="absolute -bottom-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-rose-400" />
+              </div>
+            )}
           </div>
         </Marker>
       ))}
