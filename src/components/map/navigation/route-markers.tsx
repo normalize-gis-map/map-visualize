@@ -1,6 +1,5 @@
 import type { Position } from "geojson";
 import { Bike, Footprints } from "lucide-react";
-import { useEffect, useState } from "react";
 import { Marker } from "react-map-gl/maplibre";
 
 type TrafficSample = {
@@ -11,20 +10,6 @@ type TrafficSample = {
   direction: "forward" | "backward";
   vehicleType: "car" | "bike";
 };
-
-const MAPLIBRE_GLB_VARIANTS = [
-  "https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb",
-  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/ToyCar/glTF-Binary/ToyCar.glb",
-  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/VC/glTF-Binary/VC.glb",
-] as const;
-
-function pickModelById(id: string) {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-  }
-  return MAPLIBRE_GLB_VARIANTS[hash % MAPLIBRE_GLB_VARIANTS.length];
-}
 
 type Props = {
   coordinates: Position[];
@@ -43,6 +28,56 @@ type Props = {
   mapZoom: number;
 };
 
+function Vehicle3D({
+  tone = "slate",
+  compact = false,
+}: {
+  tone?: "blue" | "slate" | "emerald" | "amber";
+  compact?: boolean;
+}) {
+  const palette = {
+    blue: {
+      base: "from-blue-700 to-blue-500",
+      roof: "from-sky-200 to-blue-100",
+      side: "from-blue-800 to-blue-600",
+    },
+    slate: {
+      base: "from-slate-800 to-slate-600",
+      roof: "from-slate-200 to-slate-100",
+      side: "from-slate-700 to-slate-500",
+    },
+    emerald: {
+      base: "from-emerald-700 to-emerald-500",
+      roof: "from-emerald-200 to-emerald-100",
+      side: "from-emerald-800 to-emerald-600",
+    },
+    amber: {
+      base: "from-amber-700 to-amber-500",
+      roof: "from-amber-200 to-amber-100",
+      side: "from-amber-800 to-amber-600",
+    },
+  }[tone];
+
+  return (
+    <div
+      className={`relative ${compact ? "h-5 w-3.5" : "h-7 w-4.5"} [transform-style:preserve-3d]`}
+      style={{ transform: "rotateX(56deg)" }}
+    >
+      <div
+        className={`absolute inset-0 rounded-[7px] bg-gradient-to-b ${palette.base} shadow-[0_8px_10px_rgba(2,6,23,0.38)]`}
+      />
+      <div
+        className={`absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b ${palette.roof} opacity-95`}
+      />
+      <div
+        className={`absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b ${palette.side} opacity-90`}
+      />
+      <div className="absolute -top-[6%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-cyan-300/95 blur-[0.2px]" />
+      <div className="absolute -bottom-[5%] left-1/2 h-1.5 w-2.5 -translate-x-1/2 rounded-full bg-rose-400/95 blur-[0.2px]" />
+    </div>
+  );
+}
+
 export function RouteMarkers({
   coordinates,
   navCoordinate,
@@ -53,29 +88,6 @@ export function RouteMarkers({
   ambientTraffic,
   mapZoom,
 }: Props) {
-  const [modelViewerReady, setModelViewerReady] = useState(
-    () => typeof window !== "undefined" && Boolean(customElements.get("model-viewer")),
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (customElements.get("model-viewer")) return;
-
-    const scriptId = "google-model-viewer-script";
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", () => setModelViewerReady(true), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.type = "module";
-    script.src = "https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js";
-    script.onload = () => setModelViewerReady(true);
-    document.head.appendChild(script);
-  }, []);
-
   if (!coordinates.length && !ambientTraffic.length) return null;
 
   const start = coordinates[0];
@@ -113,27 +125,7 @@ export function RouteMarkers({
             style={{ transform: `rotate(${navHeading}deg) scale(${zoomScale})` }}
           >
             {mapLibreCar3D && navMode === "car" ? (
-              modelViewerReady ? (
-                <model-viewer
-                  src={MAPLIBRE_GLB_VARIANTS[0]}
-                  disable-zoom
-                  disable-pan
-                  camera-controls={false}
-                  style={{
-                    width: "30px",
-                    height: "30px",
-                    pointerEvents: "none",
-                    filter: "grayscale(100%) contrast(0.85)",
-                  }}
-                />
-              ) : (
-                <div className="relative h-7 w-4 rounded-md border border-white/80 bg-slate-900 shadow-[0_5px_10px_rgba(15,23,42,0.42)]">
-                  <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-sky-300/85" />
-                  <div className="absolute bottom-0.5 left-1/2 h-2 w-1.5 -translate-x-1/2 rounded-sm bg-slate-700" />
-                  <div className="absolute -top-0.5 left-1/2 h-1.5 w-2 -translate-x-1/2 rounded-full bg-cyan-300" />
-                  <div className="absolute -bottom-0.5 left-1/2 h-1 w-2 -translate-x-1/2 rounded-full bg-rose-500" />
-                </div>
-              )
+              <Vehicle3D tone="blue" />
             ) : navMode === "car" ? (
               <div className="relative h-7 w-4 rounded-md border border-white/80 bg-blue-700 shadow-[0_5px_10px_rgba(37,99,235,0.35)]">
                 <div className="absolute top-0.5 left-0.5 right-0.5 h-2 rounded-sm bg-blue-200/90" />
@@ -151,55 +143,30 @@ export function RouteMarkers({
 
       {coordinates.length
         ? trafficCars.map((car) => (
-        <Marker
-          key={car.id}
-          longitude={car.lng}
-          latitude={car.lat}
-          anchor="center"
-          pitchAlignment="map"
-          rotationAlignment="map"
-        >
-          <div
-            className="relative flex h-8 w-8 items-center justify-center"
-            style={{ transform: `rotate(${car.bearing}deg) scale(${zoomScale * 0.9})` }}
-          >
-            {modelViewerReady ? (
-              <model-viewer
-                src={pickModelById(car.id)}
-                disable-zoom
-                disable-pan
-                camera-controls={false}
-                style={{
-                  width: "24px",
-                  height: "24px",
-                  pointerEvents: "none",
-                  filter:
+            <Marker
+              key={car.id}
+              longitude={car.lng}
+              latitude={car.lat}
+              anchor="center"
+              pitchAlignment="map"
+              rotationAlignment="map"
+            >
+              <div
+                className="relative flex h-8 w-8 items-center justify-center"
+                style={{ transform: `rotate(${car.bearing}deg) scale(${zoomScale * 0.9})` }}
+              >
+                <Vehicle3D
+                  tone={
                     car.vehicleType === "bike"
-                      ? "grayscale(100%) brightness(0.92)"
-                      : "grayscale(100%) contrast(0.85)",
-                }}
-              />
-            ) : (
-              <div className="relative h-6 w-3.5 rounded-md border border-white/70 bg-slate-900 shadow-[0_4px_8px_rgba(15,23,42,0.35)]">
-                <div
-                  className={`absolute top-0.5 left-0.5 right-0.5 h-1.5 rounded-sm ${
-                    car.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
-                  }`}
-                />
-                <div
-                  className={`absolute -top-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full ${
-                    car.direction === "forward" ? "bg-cyan-300" : "bg-orange-200"
-                  }`}
-                />
-                <div
-                  className={`absolute -bottom-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full ${
-                    car.direction === "forward" ? "bg-rose-400" : "bg-emerald-300"
-                  }`}
+                      ? "emerald"
+                      : car.direction === "forward"
+                        ? "slate"
+                        : "amber"
+                  }
+                  compact
                 />
               </div>
-            )}
-          </div>
-        </Marker>
+            </Marker>
           ))
         : null}
 
@@ -216,29 +183,7 @@ export function RouteMarkers({
             className="relative flex h-7 w-7 items-center justify-center opacity-90"
             style={{ transform: `rotate(${vehicle.bearing}deg) scale(${zoomScale * 0.8})` }}
           >
-            {modelViewerReady ? (
-              <model-viewer
-                src={pickModelById(vehicle.id)}
-                disable-zoom
-                disable-pan
-                camera-controls={false}
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  pointerEvents: "none",
-                  filter: "grayscale(100%) contrast(0.85)",
-                }}
-              />
-            ) : (
-              <div className="relative h-5 w-3 rounded-[6px] border border-white/60 bg-slate-800/95 shadow-[0_3px_7px_rgba(15,23,42,0.35)]">
-                <div
-                  className={`absolute top-0.5 left-0.5 right-0.5 h-1 rounded-sm ${
-                    vehicle.direction === "forward" ? "bg-sky-300" : "bg-amber-300"
-                  }`}
-                />
-                <div className="absolute -bottom-0.5 left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-rose-400" />
-              </div>
-            )}
+            <Vehicle3D tone={vehicle.direction === "forward" ? "slate" : "amber"} compact />
           </div>
         </Marker>
       ))}

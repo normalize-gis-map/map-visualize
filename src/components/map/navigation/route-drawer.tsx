@@ -1,8 +1,6 @@
 import {
   Bike,
   Car,
-  ChevronDown,
-  ChevronUp,
   Footprints,
   Gauge,
   Map,
@@ -13,6 +11,7 @@ import {
   Sparkles,
   Waypoints,
 } from "lucide-react";
+import { useState } from "react";
 
 import type { RouteStep } from "@/features/map/types/route.types";
 
@@ -71,14 +70,15 @@ export function RouteDrawer({
   cameraTiltDeg,
   onCameraTiltChange,
 }: Props) {
+  const [activeTab, setActiveTab] = useState<"playback" | "tools">("playback");
   if (!routePanelOpen) return null;
 
   return (
-    <div className="pointer-events-auto absolute right-2 bottom-3 left-2 z-30 rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur md:right-3 md:left-auto md:w-[min(96vw,420px)]">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="pointer-events-auto absolute right-2 bottom-3 left-2 z-30 rounded-3xl border border-white/70 bg-white/92 p-3 shadow-2xl backdrop-blur md:right-3 md:left-auto md:w-[min(95vw,390px)]">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
-            Navigation controls
+            Navigation
           </p>
           <p className="truncate text-sm font-semibold text-slate-900">
             {routeFromLabel} → {routeToLabel}
@@ -90,130 +90,157 @@ export function RouteDrawer({
         <button
           type="button"
           onClick={onToggleMinimalMode}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-600"
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 px-2.5 text-xs font-semibold text-slate-600"
           aria-label={drawerMinimalMode ? "Expand route controls" : "Collapse route controls"}
         >
-          {drawerMinimalMode ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {drawerMinimalMode ? "Expand" : "Minimal"}
         </button>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2">
+      <div className="mb-2 grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
         <button
           type="button"
-          onClick={onTogglePlayback}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white"
-          aria-label={isNavigating ? "Pause navigation" : "Start navigation"}
-        >
-          {isNavigating ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        </button>
-
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={navProgress}
-          onChange={(event) => onSeek(Number(event.target.value))}
-          className="h-1.5 w-full cursor-pointer accent-blue-600"
-          aria-label="Seek route playback"
-        />
-
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600"
-          aria-label="Reset navigation"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="mb-2 flex items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 font-medium text-slate-600">
-          <Gauge className="h-3.5 w-3.5" />
-          {Math.round(navProgress * 100)}%
-        </span>
-        {availableSpeedMultipliers.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => onSetSpeed(item)}
-            className={`rounded-lg border px-2.5 py-1 font-semibold ${
-              speedMultiplier === item
-                ? "border-blue-300 bg-blue-50 text-blue-700"
-                : "border-slate-200 text-slate-600"
-            }`}
-          >
-            {item}x
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2">
-        <div className="mb-1 flex items-center justify-between text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase">
-          <span>Góc nghiêng 3D</span>
-          <span>{Math.round(cameraTiltDeg)}°</span>
-        </div>
-        <input
-          type="range"
-          min={55}
-          max={83}
-          step={1}
-          value={cameraTiltDeg}
-          onChange={(event) => onCameraTiltChange(Number(event.target.value))}
-          className="h-1.5 w-full cursor-pointer accent-sky-600"
-          aria-label="Điều chỉnh góc nghiêng 3D"
-        />
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        <button
-          type="button"
-          onClick={() => onToggleViewMode("map")}
-          className={`flex h-10 items-center justify-center rounded-xl border ${
-            viewMode === "map"
-              ? "border-blue-300 bg-blue-50 text-blue-700"
-              : "border-slate-200 text-slate-600"
+          onClick={() => setActiveTab("playback")}
+          className={`rounded-lg px-2 py-1.5 text-xs font-semibold ${
+            activeTab === "playback" ? "bg-white text-slate-900 shadow" : "text-slate-500"
           }`}
-          aria-label="Bản đồ thường"
         >
-          <Map className="h-4 w-4" />
+          Playback
         </button>
         <button
           type="button"
-          onClick={() => onToggleViewMode("drive3d")}
-          className={`flex h-10 items-center justify-center rounded-xl border ${
-            viewMode === "drive3d"
-              ? "border-blue-300 bg-blue-50 text-blue-700"
-              : "border-slate-200 text-slate-600"
+          onClick={() => setActiveTab("tools")}
+          className={`rounded-lg px-2 py-1.5 text-xs font-semibold ${
+            activeTab === "tools" ? "bg-white text-slate-900 shadow" : "text-slate-500"
           }`}
-          aria-label="Góc nhìn lái xe 3D"
         >
-          <Navigation className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onSwitchToCesium}
-          className="flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700"
-          aria-label="Bật xe GLB cho xe chính (Cesium)"
-        >
-          <Sparkles className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onToggleMapLibreCar3D}
-          className={`flex h-10 items-center justify-center rounded-xl border ${
-            mapLibreCar3D
-              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-              : "border-slate-200 text-slate-600"
-          }`}
-          aria-label="Toggle MapLibre car demo"
-        >
-          <Waypoints className="h-4 w-4" />
+          Tools
         </button>
       </div>
 
-      {!drawerMinimalMode ? (
+      {activeTab === "playback" ? (
+        <>
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2">
+            <button
+              type="button"
+              onClick={onTogglePlayback}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white"
+              aria-label={isNavigating ? "Pause navigation" : "Start navigation"}
+            >
+              {isNavigating ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </button>
+
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={navProgress}
+              onChange={(event) => onSeek(Number(event.target.value))}
+              className="h-1.5 w-full cursor-pointer accent-blue-600"
+              aria-label="Seek route playback"
+            />
+
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600"
+              aria-label="Reset navigation"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mb-2 flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 font-medium text-slate-600">
+              <Gauge className="h-3.5 w-3.5" />
+              {Math.round(navProgress * 100)}%
+            </span>
+            {availableSpeedMultipliers.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => onSetSpeed(item)}
+                className={`rounded-lg border px-2.5 py-1 font-semibold ${
+                  speedMultiplier === item
+                    ? "border-blue-300 bg-blue-50 text-blue-700"
+                    : "border-slate-200 text-slate-600"
+                }`}
+              >
+                {item}x
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mb-2 grid grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => onToggleViewMode("map")}
+              className={`flex h-10 items-center justify-center rounded-xl border ${
+                viewMode === "map"
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-slate-200 text-slate-600"
+              }`}
+              aria-label="Bản đồ thường"
+            >
+              <Map className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onToggleViewMode("drive3d")}
+              className={`flex h-10 items-center justify-center rounded-xl border ${
+                viewMode === "drive3d"
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-slate-200 text-slate-600"
+              }`}
+              aria-label="Góc nhìn lái xe 3D"
+            >
+              <Navigation className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onToggleMapLibreCar3D}
+              className={`flex h-10 items-center justify-center rounded-xl border ${
+                mapLibreCar3D
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 text-slate-600"
+              }`}
+              aria-label="Toggle MapLibre car 3D style"
+            >
+              <Waypoints className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToCesium}
+              className="flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700"
+              aria-label="Switch to Cesium"
+            >
+              <Sparkles className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mb-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2">
+            <div className="mb-1 flex items-center justify-between text-[11px] font-semibold tracking-[0.1em] text-slate-500 uppercase">
+              <span>Góc nghiêng 3D</span>
+              <span>{Math.round(cameraTiltDeg)}°</span>
+            </div>
+            <input
+              type="range"
+              min={55}
+              max={83}
+              step={1}
+              value={cameraTiltDeg}
+              onChange={(event) => onCameraTiltChange(Number(event.target.value))}
+              className="h-1.5 w-full cursor-pointer accent-sky-600"
+              aria-label="Điều chỉnh góc nghiêng 3D"
+            />
+          </div>
+        </>
+      )}
+
+      {!drawerMinimalMode && activeTab === "playback" ? (
         <>
           <div className="mt-2 flex h-9 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700">
             {navMode === "car" ? (

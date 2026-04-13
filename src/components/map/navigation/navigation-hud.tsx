@@ -1,7 +1,6 @@
 import {
+  ChevronsUpDown,
   Compass,
-  PanelBottomClose,
-  PanelBottomOpen,
   Pause,
   Play,
   TriangleAlert,
@@ -89,25 +88,20 @@ export function NavigationHud({
   onFocusVehicle,
   onToggleTraffic,
 }: Props) {
-  const [utilityExpanded, setUtilityExpanded] = useState(false);
   const [muted, setMuted] = useState(false);
 
   return (
     <>
       {activeRoute && routePayload ? (
-        <div className="pointer-events-none absolute top-24 left-1/2 z-20 w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur md:block">
-          <div className="flex items-center justify-between gap-3">
+        <div className="pointer-events-none absolute top-24 left-1/2 z-20 w-[min(90vw,420px)] -translate-x-1/2 rounded-2xl border border-white/70 bg-white/85 px-4 py-2.5 shadow-lg backdrop-blur">
+          <div className="flex items-center justify-between gap-3 text-sm">
             <div>
-              <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
-                Navigation
-              </div>
-              <div className="mt-1 text-sm font-semibold text-slate-900">
+              <div className="font-semibold text-slate-900">
                 {routePayload.from.label} → {routePayload.to.label}
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-lg font-semibold text-blue-700">{etaMinutes} min</div>
-              <div className="text-xs text-slate-500">{distanceKm} km</div>
+            <div className="text-right text-xs text-slate-600">
+              <span className="font-semibold text-blue-700">{etaMinutes} min</span> • {distanceKm} km
             </div>
           </div>
         </div>
@@ -130,11 +124,7 @@ export function NavigationHud({
             className="absolute right-3 bottom-3 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl"
             aria-label={routePanelOpen ? "Hide controls" : "Show controls"}
           >
-            {routePanelOpen ? (
-              <PanelBottomClose className="h-5 w-5" />
-            ) : (
-              <PanelBottomOpen className="h-5 w-5" />
-            )}
+            <ChevronsUpDown className="h-5 w-5" />
           </button>
 
           <RouteDrawer
@@ -165,56 +155,33 @@ export function NavigationHud({
             onCameraTiltChange={onCameraTiltChange}
           />
 
-          <div className="pointer-events-auto absolute right-4 bottom-28 z-30 hidden md:flex">
-            {utilityExpanded ? (
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUtilityExpanded(false)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg"
-                  aria-label="Collapse utility actions"
-                >
-                  <PanelBottomClose className="h-4.5 w-4.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onFocusVehicle}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
-                  aria-label="Focus current vehicle"
-                >
-                  <Compass className="h-4.5 w-4.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMuted((prev) => !prev)}
-                  className={`flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur ${
-                    muted
-                      ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : "border-white/70 bg-white/90 text-slate-700"
-                  }`}
-                  aria-label={muted ? "Unmute navigation sounds" : "Mute navigation sounds"}
-                >
-                  {muted ? <VolumeX className="h-4.5 w-4.5" /> : <Volume2 className="h-4.5 w-4.5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={onToggleTraffic}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
-                  aria-label="Toggle traffic visualization"
-                >
-                  <TriangleAlert className="h-4.5 w-4.5" />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setUtilityExpanded(true)}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-lg"
-                aria-label="Open utility actions"
-              >
-                <PanelBottomOpen className="h-4.5 w-4.5" />
-              </button>
-            )}
+          <div className="pointer-events-auto absolute right-4 top-24 z-30 hidden flex-col gap-2 md:flex">
+            <button
+              type="button"
+              onClick={onFocusVehicle}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
+              aria-label="Focus current vehicle"
+            >
+              <Compass className="h-4.5 w-4.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMuted((prev) => !prev)}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur ${
+                muted ? "border-amber-200 bg-amber-50 text-amber-700" : "border-white/70 bg-white/90 text-slate-700"
+              }`}
+              aria-label={muted ? "Unmute navigation sounds" : "Mute navigation sounds"}
+            >
+              {muted ? <VolumeX className="h-4.5 w-4.5" /> : <Volume2 className="h-4.5 w-4.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleTraffic}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
+              aria-label="Toggle traffic visualization"
+            >
+              <TriangleAlert className="h-4.5 w-4.5" />
+            </button>
           </div>
 
           <div className="pointer-events-auto absolute bottom-2 left-1/2 z-30 hidden w-[min(92vw,360px)] -translate-x-1/2 items-center justify-between rounded-2xl border border-white/70 bg-white/95 px-3 py-2 shadow-xl backdrop-blur md:flex">
