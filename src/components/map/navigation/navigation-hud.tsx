@@ -1,4 +1,13 @@
-import { PanelBottomClose, PanelBottomOpen, Pause, Play } from "lucide-react";
+import {
+  Compass,
+  PanelBottomClose,
+  PanelBottomOpen,
+  Pause,
+  Play,
+  Search,
+  TriangleAlert,
+  Volume2,
+} from "lucide-react";
 
 import { MapLegend } from "@/components/map/map-legend";
 import { NavigationMiniMapInset } from "@/components/map/navigation/navigation-mini-map-inset";
@@ -147,6 +156,33 @@ export function NavigationHud({
             cameraTiltDeg={cameraTiltDeg}
             onCameraTiltChange={onCameraTiltChange}
           />
+
+          <div className="pointer-events-auto absolute right-4 bottom-28 z-30 hidden flex-col gap-2 md:flex">
+            {[Compass, Search, Volume2, TriangleAlert].map((Icon, index) => (
+              <button
+                key={Icon.displayName ?? index}
+                type="button"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
+                aria-label="Navigation utility action"
+              >
+                <Icon className="h-4.5 w-4.5" />
+              </button>
+            ))}
+          </div>
+
+          <div className="pointer-events-auto absolute bottom-2 left-1/2 z-30 hidden w-[min(92vw,360px)] -translate-x-1/2 items-center justify-between rounded-2xl border border-white/70 bg-white/95 px-3 py-2 shadow-xl backdrop-blur md:flex">
+            <div>
+              <div className="text-lg font-semibold text-rose-600">{etaMinutes} min</div>
+              <div className="text-xs text-slate-500">{distanceKm} km</div>
+            </div>
+            <button
+              type="button"
+              onClick={onReset}
+              className="rounded-xl bg-rose-500 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Exit
+            </button>
+          </div>
         </>
       ) : null}
 
