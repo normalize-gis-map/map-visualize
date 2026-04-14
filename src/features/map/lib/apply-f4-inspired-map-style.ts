@@ -47,6 +47,16 @@ function setPaintSafe(
   }
 }
 
+function withOptionalFilter(
+  layerDef: Record<string, unknown>,
+  sourceFilter: unknown,
+) {
+  if (Array.isArray(sourceFilter)) {
+    layerDef.filter = sourceFilter;
+  }
+  return layerDef;
+}
+
 function getRoadWidthExpression(
   kind: "major" | "medium" | "local" | "casing",
 ): unknown {
@@ -254,7 +264,7 @@ export function applyF4InspiredMapStyle(
 
   if (firstWaterFillLayer && !map.getLayer("f4-water-shimmer")) {
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: "f4-water-shimmer",
           type: "line",
@@ -263,7 +273,6 @@ export function applyF4InspiredMapStyle(
             "source-layer" in firstWaterFillLayer
               ? firstWaterFillLayer["source-layer"]
               : undefined,
-          filter: firstWaterFillLayer.filter,
           paint: {
             "line-color": "#dbeafe",
             "line-opacity": 0.16,
@@ -283,6 +292,10 @@ export function applyF4InspiredMapStyle(
             "line-dasharray": [1.2, 1.8],
           },
         } as any,
+        firstWaterFillLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         firstWaterFillLayer.id,
       );
     } catch {}
@@ -290,7 +303,7 @@ export function applyF4InspiredMapStyle(
 
   if (firstParkFillLayer && !map.getLayer("f4-park-grass")) {
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: "f4-park-grass",
           type: "fill",
@@ -299,12 +312,15 @@ export function applyF4InspiredMapStyle(
             "source-layer" in firstParkFillLayer
               ? firstParkFillLayer["source-layer"]
               : undefined,
-          filter: firstParkFillLayer.filter,
           paint: {
             "fill-color": "#78a95f",
             "fill-opacity": 0.11,
           },
         } as any,
+        firstParkFillLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         firstParkFillLayer.id,
       );
     } catch {}
@@ -312,7 +328,7 @@ export function applyF4InspiredMapStyle(
 
   if (firstParkFillLayer && !map.getLayer("f4-park-grass-depth")) {
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: "f4-park-grass-depth",
           type: "line",
@@ -321,7 +337,6 @@ export function applyF4InspiredMapStyle(
             "source-layer" in firstParkFillLayer
               ? firstParkFillLayer["source-layer"]
               : undefined,
-          filter: firstParkFillLayer.filter,
           paint: {
             "line-color": "#5f8e4b",
             "line-opacity": 0.14,
@@ -338,6 +353,10 @@ export function applyF4InspiredMapStyle(
             ],
           },
         } as any,
+        firstParkFillLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         firstParkFillLayer.id,
       );
     } catch {}
@@ -345,7 +364,7 @@ export function applyF4InspiredMapStyle(
 
   if (firstParkFillLayer && !map.getLayer("f4-park-tree-shadow")) {
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: "f4-park-tree-shadow",
           type: "symbol",
@@ -354,7 +373,6 @@ export function applyF4InspiredMapStyle(
             "source-layer" in firstParkFillLayer
               ? firstParkFillLayer["source-layer"]
               : undefined,
-          filter: firstParkFillLayer.filter,
           minzoom: 14,
           layout: {
             "text-field": "●",
@@ -369,14 +387,18 @@ export function applyF4InspiredMapStyle(
             ],
             "text-allow-overlap": true,
             "text-ignore-placement": true,
-            "text-translate": [1.3, 1.5],
             "symbol-spacing": 150,
           },
           paint: {
             "text-color": "#2f4a28",
             "text-opacity": 0.22,
+            "text-translate": [1.3, 1.5],
           },
         } as any,
+        firstParkFillLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         firstParkFillLayer.id,
       );
     } catch {}
@@ -384,7 +406,7 @@ export function applyF4InspiredMapStyle(
 
   if (firstParkFillLayer && !map.getLayer("f4-park-trees-tall")) {
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: "f4-park-trees-tall",
           type: "symbol",
@@ -393,7 +415,6 @@ export function applyF4InspiredMapStyle(
             "source-layer" in firstParkFillLayer
               ? firstParkFillLayer["source-layer"]
               : undefined,
-          filter: firstParkFillLayer.filter,
           minzoom: 14,
           layout: {
             "text-field": "▴",
@@ -408,6 +429,10 @@ export function applyF4InspiredMapStyle(
             "text-halo-width": 0.3,
           },
         } as any,
+        firstParkFillLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         firstParkFillLayer.id,
       );
     } catch {}
@@ -415,7 +440,7 @@ export function applyF4InspiredMapStyle(
 
   if (firstParkFillLayer && !map.getLayer("f4-park-trees-compact")) {
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: "f4-park-trees-compact",
           type: "symbol",
@@ -424,7 +449,6 @@ export function applyF4InspiredMapStyle(
             "source-layer" in firstParkFillLayer
               ? firstParkFillLayer["source-layer"]
               : undefined,
-          filter: firstParkFillLayer.filter,
           minzoom: 15,
           layout: {
             "text-field": "●",
@@ -439,6 +463,10 @@ export function applyF4InspiredMapStyle(
             "text-halo-width": 0.25,
           },
         } as any,
+        firstParkFillLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         firstParkFillLayer.id,
       );
     } catch {}
@@ -446,7 +474,7 @@ export function applyF4InspiredMapStyle(
 
   if (firstParkFillLayer && !map.getLayer("f4-park-trees-ornamental")) {
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: "f4-park-trees-ornamental",
           type: "symbol",
@@ -455,7 +483,6 @@ export function applyF4InspiredMapStyle(
             "source-layer" in firstParkFillLayer
               ? firstParkFillLayer["source-layer"]
               : undefined,
-          filter: firstParkFillLayer.filter,
           minzoom: 16,
           layout: {
             "text-field": "◆",
@@ -470,6 +497,10 @@ export function applyF4InspiredMapStyle(
             "text-halo-width": 0.2,
           },
         } as any,
+        firstParkFillLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         firstParkFillLayer.id,
       );
     } catch {}
@@ -489,14 +520,13 @@ export function applyF4InspiredMapStyle(
     if (map.getLayer(laneLayerId)) continue;
 
     try {
-      map.addLayer(
+      const layerDef = withOptionalFilter(
         {
           id: laneLayerId,
           type: "line",
           source: roadLayer.source,
           "source-layer":
             "source-layer" in roadLayer ? roadLayer["source-layer"] : undefined,
-          filter: roadLayer.filter,
           minzoom: 13.5,
           layout: {
             "line-cap": "round",
@@ -521,6 +551,10 @@ export function applyF4InspiredMapStyle(
             "line-dasharray": [0.55, 1.55],
           },
         } as any,
+        roadLayer.filter,
+      );
+      map.addLayer(
+        layerDef as any,
         roadLayer.id,
       );
       laneLayerCount += 1;
