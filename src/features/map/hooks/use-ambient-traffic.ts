@@ -260,12 +260,14 @@ export function useAmbientTraffic({
         if (!route || route.length < 2) return null;
 
         const baseLaneOffset = getClampedLaneOffsetMeters(vehicle.roadClass, zoom);
-        const laneSpread =
+        const laneSpread = Math.min(
           vehicle.roadClass === "major"
-            ? 1
+            ? 0.62
             : vehicle.roadClass === "medium"
-              ? 0.75
-              : 0.5;
+              ? 0.5
+              : 0.36,
+          baseLaneOffset * 0.22,
+        );
         const directionSign = vehicle.direction === "forward" ? 1 : -1;
         const laneOffset =
           directionSign * baseLaneOffset +

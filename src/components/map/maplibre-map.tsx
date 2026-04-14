@@ -152,10 +152,10 @@ export function MapLibreMap({
     AmbientTrafficRoute[]
   >([]);
   const ambientTrafficSourceId = "ambient-traffic-source";
-  const ambientTrafficShadowLayerId = "ambient-traffic-shadow";
-  const ambientTrafficBodyLayerId = "ambient-traffic-body";
-  const ambientTrafficRoofLayerId = "ambient-traffic-roof";
-  const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield";
+  const ambientTrafficShadowLayerId = "ambient-traffic-shadow-fill";
+  const ambientTrafficBodyLayerId = "ambient-traffic-body-3d";
+  const ambientTrafficRoofLayerId = "ambient-traffic-roof-3d";
+  const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
   const programmaticMoveRef = useRef(false);
   const hasAppliedInitial25DCameraRef = useRef(false);
   const patchedStyleSignatureRef = useRef<string | null>(null);
@@ -556,30 +556,21 @@ export function MapLibreMap({
       mapInstance.addLayer(
         {
           id: ambientTrafficShadowLayerId,
-          type: "line",
+          type: "fill",
           source: ambientTrafficSourceId,
           filter: ["==", ["get", "part"], "body"],
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
           paint: {
-            "line-color": "#0f172a",
-            "line-opacity": 0.18,
-            "line-width": [
+            "fill-color": "#0f172a",
+            "fill-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
               12,
-              1,
-              14,
-              1.35,
+              0.08,
               16,
-              1.8,
-              18,
-              2.3,
+              0.12,
               20,
-              2.8,
+              0.16,
             ],
           },
         },
@@ -591,39 +582,23 @@ export function MapLibreMap({
       mapInstance.addLayer(
         {
           id: ambientTrafficBodyLayerId,
-          type: "line",
+          type: "fill-extrusion",
           source: ambientTrafficSourceId,
           filter: ["==", ["get", "part"], "body"],
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
           paint: {
-            "line-color": [
+            "fill-extrusion-color": [
               "match",
               ["get", "roadClass"],
               "major",
-              "#f8fafc",
+              "#d8dde5",
               "medium",
-              "#e2e8f0",
-              "#d1d5db",
+              "#c8d0db",
+              "#bcc4d0",
             ],
-            "line-opacity": 0.95,
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12,
-              0.6,
-              14,
-              0.8,
-              16,
-              1.05,
-              18,
-              1.35,
-              20,
-              1.7,
-            ],
+            "fill-extrusion-opacity": 0.95,
+            "fill-extrusion-height": 0.42,
+            "fill-extrusion-base": 0.02,
+            "fill-extrusion-vertical-gradient": true,
           },
         },
         beforeLayerId,
@@ -634,31 +609,15 @@ export function MapLibreMap({
       mapInstance.addLayer(
         {
           id: ambientTrafficRoofLayerId,
-          type: "line",
+          type: "fill-extrusion",
           source: ambientTrafficSourceId,
           filter: ["==", ["get", "part"], "roof"],
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
           paint: {
-            "line-color": "#f8fafc",
-            "line-opacity": 0.92,
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12,
-              0.38,
-              14,
-              0.52,
-              16,
-              0.68,
-              18,
-              0.9,
-              20,
-              1.1,
-            ],
+            "fill-extrusion-color": "#f8fafc",
+            "fill-extrusion-opacity": 0.93,
+            "fill-extrusion-height": 0.6,
+            "fill-extrusion-base": 0.18,
+            "fill-extrusion-vertical-gradient": true,
           },
         },
         beforeLayerId,
@@ -669,31 +628,15 @@ export function MapLibreMap({
       mapInstance.addLayer(
         {
           id: ambientTrafficWindshieldLayerId,
-          type: "line",
+          type: "fill-extrusion",
           source: ambientTrafficSourceId,
           filter: ["==", ["get", "part"], "windshield"],
-          layout: {
-            "line-cap": "round",
-            "line-join": "round",
-          },
           paint: {
-            "line-color": "#94a3b8",
-            "line-opacity": 0.88,
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12,
-              0.2,
-              14,
-              0.28,
-              16,
-              0.36,
-              18,
-              0.5,
-              20,
-              0.64,
-            ],
+            "fill-extrusion-color": "#8ea0b5",
+            "fill-extrusion-opacity": 0.9,
+            "fill-extrusion-height": 0.72,
+            "fill-extrusion-base": 0.28,
+            "fill-extrusion-vertical-gradient": true,
           },
         },
         beforeLayerId,
