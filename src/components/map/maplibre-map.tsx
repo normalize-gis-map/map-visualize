@@ -8,6 +8,10 @@ import Map, { NavigationControl } from "react-map-gl/maplibre";
 import floodData from "@/data/geojson/flood-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import {
+  AMBIENT_TRAFFIC_ROUTE_SCAN,
+  MAP_DETAIL_ZOOM,
+} from "@/features/map/constants/map-detail.constants";
 import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
@@ -56,6 +60,10 @@ export function MapLibreMap({
     visibleLayers,
     buildingOpacity,
     trafficVisualizationEnabled,
+    trafficDensity,
+    laneDetailEnabled,
+    routeAutoCameraEnabled,
+    detailPreset,
     toggleTrafficVisualization,
     notifyMapInteraction,
     setMapEngine,
@@ -128,9 +136,15 @@ export function MapLibreMap({
     return Math.max(0, deltaLng * metersPerDegLng);
   };
 
-  const applyMapVisualStyle = useCallback((map: maplibregl.Map) => {
-    applyF4InspiredMapStyle(map);
-  }, []);
+  const applyMapVisualStyle = useCallback(
+    (map: maplibregl.Map) => {
+      applyF4InspiredMapStyle(map, {
+        laneDetailEnabled,
+        detailPreset,
+      });
+    },
+    [detailPreset, laneDetailEnabled],
+  );
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
@@ -203,14 +217,23 @@ export function MapLibreMap({
   }, [applyMapVisualStyle, mapInstance]);
 
   useEffect(() => {
-    if (!mapInstance || !trafficVisualizationEnabled) return;
+    if (
+      !mapInstance ||
+      !trafficVisualizationEnabled ||
+      trafficDensity === "off"
+    )
+      return;
 
     const refreshRoadNetwork = () => {
       const now = performance.now();
-      if (now - roadRefreshTickRef.current < 700) return;
+      if (
+        now - roadRefreshTickRef.current <
+        AMBIENT_TRAFFIC_ROUTE_SCAN.throttleMs
+      )
+        return;
       roadRefreshTickRef.current = now;
 
-      if (mapInstance.getZoom() < 13) {
+      if (mapInstance.getZoom() < MAP_DETAIL_ZOOM.LOW) {
         setAmbientNetworkRoutes((prev) => (prev.length ? [] : prev));
         return;
       }
@@ -227,7 +250,7 @@ export function MapLibreMap({
       if (!roadLayerIds.length) return;
 
       const features = mapInstance.queryRenderedFeatures(undefined, {
-        layers: roadLayerIds.slice(0, 6),
+        layers: roadLayerIds.slice(0, AMBIENT_TRAFFIC_ROUTE_SCAN.layers),
       });
 
       const collected = features
@@ -239,7 +262,7 @@ export function MapLibreMap({
           return [];
         })
         .filter((coords) => coords.length > 3)
-        .slice(0, 80);
+        .slice(0, AMBIENT_TRAFFIC_ROUTE_SCAN.maxRoutes);
 
       setAmbientNetworkRoutes((prev) => {
         if (prev.length === collected.length) {
@@ -263,7 +286,7 @@ export function MapLibreMap({
     return () => {
       mapInstance.off("moveend", refreshRoadNetwork);
     };
-  }, [mapInstance, trafficVisualizationEnabled]);
+  }, [mapInstance, trafficDensity, trafficVisualizationEnabled]);
 
   const routeCollection: FeatureCollection | null = routePayload
     ? {
@@ -331,6 +354,8 @@ export function MapLibreMap({
     routes: ambientRoutes,
     zoom: mapZoom,
     enabled: trafficVisualizationEnabled,
+    density: trafficDensity,
+    detailPreset,
   });
   const visibleAmbientTraffic = useMemo(() => {
     if (!mapBounds) return ambientTraffic;
@@ -355,8 +380,19 @@ export function MapLibreMap({
       if (!deduped.has(key)) deduped.set(key, vehicle);
     }
 
-    return Array.from(deduped.values());
-  }, [ambientTraffic, mapBounds, mapZoom]);
+    const cap =
+      mapZoom >= MAP_DETAIL_ZOOM.CLOSE
+        ? trafficDensity === "full"
+          ? 60
+          : 38
+        : mapZoom >= MAP_DETAIL_ZOOM.MID
+          ? trafficDensity === "full"
+            ? 36
+            : 22
+          : 10;
+
+    return Array.from(deduped.values()).slice(0, cap);
+  }, [ambientTraffic, mapBounds, mapZoom, trafficDensity]);
 
   const vehicleScale = useMemo(() => {
     const points: Array<[number, number]> = [
@@ -416,10 +452,15 @@ export function MapLibreMap({
     setViewMode("map");
     setMapEngine("cesium");
   };
+  const isRouteCameraActive =
+    routeAutoCameraEnabled &&
+    viewMode === "drive3d" &&
+    Boolean(isNavigating && navCoordinate);
+
   useEffect(() => {
-    if (!mapInstance || !isNavigating || !navCoordinate) return;
+    if (!mapInstance || !isRouteCameraActive || !navCoordinate) return;
     const now = performance.now();
-    const minFollowInterval = viewMode === "drive3d" ? 140 : 220;
+    const minFollowInterval = 140;
     if (now - followTickRef.current < minFollowInterval) return;
 
     const prevCenter = lastFollowCenterRef.current;
@@ -444,14 +485,14 @@ export function MapLibreMap({
         viewMode === "drive3d"
           ? Math.max(mapInstance.getZoom(), 14.5)
           : undefined,
-      duration: viewMode === "drive3d" ? 280 : 320,
+      duration: 280,
       easing: (t) => 1 - Math.pow(1 - t, 2.2),
     });
   }, [
     driveTiltDeg,
     mapInstance,
     navCoordinate,
-    isNavigating,
+    isRouteCameraActive,
     mapMode,
     navHeading,
     viewMode,

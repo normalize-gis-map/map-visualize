@@ -121,7 +121,10 @@ function setPaintSafe(
   }
 }
 
-export function applyF4InspiredMapStyle(map: maplibregl.Map): void {
+export function applyF4InspiredMapStyle(
+  map: maplibregl.Map,
+  options?: { laneDetailEnabled?: boolean; detailPreset?: "balanced" | "high" },
+): void {
   const style = map.getStyle();
   if (!style?.layers?.length) return;
 
@@ -227,11 +230,15 @@ export function applyF4InspiredMapStyle(map: maplibregl.Map): void {
     }
   }
 
+  const laneDetailEnabled = options?.laneDetailEnabled ?? true;
+  const laneLayerCap = options?.detailPreset === "high" ? 4 : 2;
+
   let laneLayerCount = 0;
   for (const roadLayer of roadLayers) {
+    if (!laneDetailEnabled) continue;
     if (!MAJOR_ROAD_RE.test(roadLayer.id) || CASING_RE.test(roadLayer.id))
       continue;
-    if (laneLayerCount >= 3) continue;
+    if (laneLayerCount >= laneLayerCap) continue;
 
     const laneLayerId = `${roadLayer.id}__f4_lane_marking`;
     if (map.getLayer(laneLayerId)) continue;

@@ -6,6 +6,10 @@ import {
   offsetRouteSample,
   sampleRouteAtProgress,
 } from "@/features/map/navigation/route-sampling";
+import type {
+  DetailPreset,
+  TrafficDensity,
+} from "@/features/map/store/map.store";
 
 export type AmbientTrafficVehicle = {
   id: string;
@@ -29,6 +33,8 @@ type UseAmbientTrafficInput = {
   routes: Position[][];
   zoom: number;
   enabled: boolean;
+  density: TrafficDensity;
+  detailPreset: DetailPreset;
 };
 
 const MIN_ZOOM_TO_RENDER = 13;
@@ -37,20 +43,36 @@ export function useAmbientTraffic({
   routes,
   zoom,
   enabled,
+  density,
+  detailPreset,
 }: UseAmbientTrafficInput) {
   const [seedVehicles, setSeedVehicles] = useState<SeedVehicle[]>([]);
 
   const shouldRender =
-    enabled && zoom >= MIN_ZOOM_TO_RENDER && routes.some((r) => r.length > 1);
+    enabled &&
+    density !== "off" &&
+    zoom >= MIN_ZOOM_TO_RENDER &&
+    routes.some((r) => r.length > 1);
 
   const targetCount = useMemo(() => {
     if (!shouldRender) return 0;
-    if (zoom >= 17.2) return 72;
-    if (zoom >= 16) return 54;
-    if (zoom >= 15) return 38;
-    if (zoom >= 14) return 24;
-    return 14;
-  }, [shouldRender, zoom]);
+
+    const multiplier = density === "full" ? 1 : 0.62;
+    const detailBoost = detailPreset === "high" ? 1.12 : 1;
+
+    const base =
+      zoom >= 17.2
+        ? 72
+        : zoom >= 16
+          ? 54
+          : zoom >= 15
+            ? 38
+            : zoom >= 14
+              ? 24
+              : 14;
+
+    return Math.max(8, Math.round(base * multiplier * detailBoost));
+  }, [detailPreset, density, shouldRender, zoom]);
 
   useEffect(() => {
     if (!shouldRender || targetCount === 0) {
