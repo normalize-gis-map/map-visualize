@@ -195,7 +195,28 @@ export function applyF4InspiredMapStyle(
     }
 
     if (layer.type === "fill" && /(water|ocean|river|lake)/i.test(id)) {
-      setPaintSafe(map, layerId, "fill-opacity", 0.9);
+      setPaintSafe(map, layerId, "fill-color", [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        "#7cbce3",
+        13,
+        "#70b2dd",
+        17,
+        "#66abd8",
+      ]);
+      setPaintSafe(map, layerId, "fill-opacity", [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        0.88,
+        13,
+        0.92,
+        17,
+        0.95,
+      ]);
       continue;
     }
 

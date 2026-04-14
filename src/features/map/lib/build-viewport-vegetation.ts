@@ -31,7 +31,12 @@ function getSpacingDeg(
   mode: GreenAreaRenderMode,
 ): { lng: number; lat: number } {
   const baseSpacing = zoom >= 17 ? 0.00038 : zoom >= 15 ? 0.0005 : 0.00072;
-  const adjusted = mode === "tree_rich" ? baseSpacing * 0.92 : baseSpacing * 1.85;
+  const adjusted =
+    mode === "grass_first"
+      ? baseSpacing * 2.1
+      : mode === "dense_wooded"
+        ? baseSpacing * 0.76
+        : baseSpacing * 0.96;
   return { lng: adjusted, lat: adjusted * 0.9 };
 }
 
@@ -77,8 +82,8 @@ function clampBounds(bounds: Bounds, clip: Bounds): Bounds {
 
 function getTreeType(seed: number, lng: number, lat: number): TreeType {
   const typeRoll = unitFromStableHash(seed, Math.round(lng * 1e5), Math.round(lat * 1e5), "type");
-  if (typeRoll < 0.22) return "tall";
-  if (typeRoll < 0.75) return "compact";
+  if (typeRoll < 0.2) return "tall";
+  if (typeRoll < 0.77) return "compact";
   return "ornamental";
 }
 
@@ -120,7 +125,9 @@ function getTreeBudget(
           : 110
         : 65;
 
-  return mode === "tree_rich" ? base : Math.max(16, Math.floor(base * 0.28));
+  if (mode === "grass_first") return Math.max(12, Math.floor(base * 0.2));
+  if (mode === "dense_wooded") return Math.floor(base * 1.2);
+  return base;
 }
 
 function getGlobalTreeBudget(
@@ -138,8 +145,11 @@ function buildClusterCenters(
   rings: Position[][],
   mode: GreenAreaRenderMode,
 ): Array<[number, number]> {
-  if (mode !== "tree_rich") return [];
-  const centerCount = 2 + Math.floor(unitFromStableHash(seed, "cluster-count") * 3);
+  if (mode === "grass_first") return [];
+  const centerCount =
+    mode === "dense_wooded"
+      ? 3 + Math.floor(unitFromStableHash(seed, "cluster-count") * 3)
+      : 2 + Math.floor(unitFromStableHash(seed, "cluster-count") * 2);
   const centers: Array<[number, number]> = [];
 
   for (let index = 0; index < centerCount; index += 1) {
@@ -157,6 +167,31 @@ function buildClusterCenters(
   return centers;
 }
 
+function buildClearingCenters(
+  seed: number,
+  clipped: Bounds,
+  rings: Position[][],
+  mode: GreenAreaRenderMode,
+): Array<[number, number]> {
+  if (mode === "grass_first") return [];
+
+  const centerCount =
+    mode === "dense_wooded"
+      ? 1 + Math.floor(unitFromStableHash(seed, "clearing-count") * 2)
+      : 1 + Math.floor(unitFromStableHash(seed, "clearing-count") * 3);
+  const centers: Array<[number, number]> = [];
+  for (let index = 0; index < centerCount; index += 1) {
+    const lng =
+      clipped.west +
+      unitFromStableHash(seed, "clearing", index, "lng") * (clipped.east - clipped.west);
+    const lat =
+      clipped.south +
+      unitFromStableHash(seed, "clearing", index, "lat") * (clipped.north - clipped.south);
+    if (pointInPolygon(lng, lat, rings)) centers.push([lng, lat]);
+  }
+  return centers;
+}
+
 function acceptCandidate(params: {
   mode: GreenAreaRenderMode;
   seed: number;
@@ -167,6 +202,7 @@ function acceptCandidate(params: {
   spacingLng: number;
   ring: Position[];
   clusterCenters: Array<[number, number]>;
+  clearingCenters: Array<[number, number]>;
 }): boolean {
   const {
     mode,
@@ -178,6 +214,7 @@ function acceptCandidate(params: {
     spacingLng,
     ring,
     clusterCenters,
+    clearingCenters,
   } = params;
 
   const roll = unitFromStableHash(seed, cellX, cellY, "accept");
@@ -188,20 +225,28 @@ function acceptCandidate(params: {
     return nearEdge ? roll < 0.44 : roll < 0.08;
   }
 
+  if (clearingCenters.length) {
+    const clearingRadius = mode === "dense_wooded" ? spacingLng * 2.2 : spacingLng * 2.8;
+    for (const center of clearingCenters) {
+      const dist = Math.hypot(lng - center[0], lat - center[1]);
+      if (dist < clearingRadius) return false;
+    }
+  }
+
   if (!clusterCenters.length) {
-    return roll < 0.52;
+    return mode === "dense_wooded" ? roll < 0.76 : roll < 0.56;
   }
 
   let nearestCenter = Number.POSITIVE_INFINITY;
   for (const center of clusterCenters) {
     nearestCenter = Math.min(nearestCenter, Math.hypot(lng - center[0], lat - center[1]));
   }
-  const denseRadius = spacingLng * 2.3;
-  const softRadius = spacingLng * 4.6;
+  const denseRadius = mode === "dense_wooded" ? spacingLng * 3.4 : spacingLng * 2.4;
+  const softRadius = mode === "dense_wooded" ? spacingLng * 6.2 : spacingLng * 4.8;
 
-  if (nearestCenter < denseRadius) return roll < 0.94;
-  if (nearestCenter < softRadius) return roll < 0.58;
-  return roll < 0.2;
+  if (nearestCenter < denseRadius) return mode === "dense_wooded" ? roll < 0.97 : roll < 0.88;
+  if (nearestCenter < softRadius) return mode === "dense_wooded" ? roll < 0.78 : roll < 0.56;
+  return mode === "dense_wooded" ? roll < 0.32 : roll < 0.17;
 }
 
 export function buildViewportVegetation(params: {
@@ -240,6 +285,7 @@ export function buildViewportVegetation(params: {
 
       const spacing = getSpacingDeg(mapZoom, mode);
       const clusterCenters = buildClusterCenters(featureSeed, clipped, rings, mode);
+      const clearingCenters = buildClearingCenters(featureSeed, clipped, rings, mode);
       const minX = Math.floor(clipped.west / spacing.lng);
       const maxX = Math.ceil(clipped.east / spacing.lng);
       const minY = Math.floor(clipped.south / spacing.lat);
@@ -280,6 +326,7 @@ export function buildViewportVegetation(params: {
               spacingLng: spacing.lng,
               ring: outerRing,
               clusterCenters,
+              clearingCenters,
             })
           ) {
             continue;

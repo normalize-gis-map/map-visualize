@@ -1,6 +1,6 @@
 import type { GeoJsonProperties, Position } from "geojson";
 
-export type GreenAreaRenderMode = "grass_first" | "tree_rich";
+export type GreenAreaRenderMode = "grass_first" | "park_trees" | "dense_wooded";
 
 type GreenClassificationInput = {
   properties?: GeoJsonProperties;
@@ -8,7 +8,10 @@ type GreenClassificationInput = {
 };
 
 const GRASS_FIRST_RE = /(golf|course|lawn|field|fairway|greens?|pitch|meadow|commons?|open\s+space)/i;
-const TREE_RICH_RE = /(park|garden|botanical|arboretum|riverside|waterfront|plaza|square|urban\s+green|civic)/i;
+const PARK_TREES_RE =
+  /(park|garden|botanical|arboretum|riverside|waterfront|plaza|square|urban\s+green|civic)/i;
+const DENSE_WOODED_RE =
+  /(forest|woodland|wooded|mangrove|nature\s+reserve|national\s+park|rainforest|jungle)/i;
 
 function readSemanticText(properties?: GeoJsonProperties): string {
   if (!properties) return "";
@@ -72,7 +75,8 @@ export function classifyGreenArea({
   outerRing,
 }: GreenClassificationInput): GreenAreaRenderMode {
   const semanticText = readSemanticText(properties);
-  if (TREE_RICH_RE.test(semanticText)) return "tree_rich";
+  if (DENSE_WOODED_RE.test(semanticText)) return "dense_wooded";
+  if (PARK_TREES_RE.test(semanticText)) return "park_trees";
   if (GRASS_FIRST_RE.test(semanticText)) return "grass_first";
 
   const areaSqMeters = estimatePolygonAreaSqMeters(outerRing);
@@ -83,8 +87,8 @@ export function classifyGreenArea({
   }
 
   if (areaSqMeters < 35_000) {
-    return "tree_rich";
+    return "park_trees";
   }
 
-  return compactness > 0.3 ? "tree_rich" : "grass_first";
+  return compactness > 0.3 ? "park_trees" : "grass_first";
 }

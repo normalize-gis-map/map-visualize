@@ -159,6 +159,8 @@ export function MapLibreMap({
   const ambientTrafficRoofLayerId = "ambient-traffic-roof-3d";
   const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
   const waterViewportSourceId = "f4-water-viewport-source";
+  const waterViewportToneLayerId = "f4-water-viewport-tone-fill";
+  const waterViewportShoreLayerId = "f4-water-viewport-shore-line";
   const waterViewportBaseLayerId = "f4-water-viewport-shimmer-base";
   const waterViewportDetailLayerId = "f4-water-viewport-shimmer-detail";
   const parkTreeSourceId = "f4-park-tree-points";
@@ -797,21 +799,82 @@ export function MapLibreMap({
 
       if (mapInstance.getSource(waterViewportSourceId)) {
         addLayerIfMissing({
+          id: waterViewportToneLayerId,
+          type: "fill",
+          source: waterViewportSourceId,
+          paint: {
+            "fill-color": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              "#7fc5ea",
+              13,
+              "#74bde8",
+              17,
+              "#6cb4e2",
+            ],
+            "fill-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.08,
+              13,
+              0.13,
+              17,
+              0.18,
+            ],
+          },
+        });
+
+        addLayerIfMissing({
+          id: waterViewportShoreLayerId,
+          type: "line",
+          source: waterViewportSourceId,
+          paint: {
+            "line-color": "#c8e8f8",
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.08,
+              14,
+              0.15,
+              18,
+              0.22,
+            ],
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.25,
+              15,
+              0.6,
+              19,
+              1.1,
+            ],
+          },
+        });
+
+        addLayerIfMissing({
           id: waterViewportBaseLayerId,
           type: "line",
           source: waterViewportSourceId,
           paint: {
-            "line-color": "#dbeafe",
+            "line-color": "#d7f0ff",
             "line-opacity": [
               "interpolate",
               ["linear"],
               ["zoom"],
               9,
-              detailPreset === "high" ? 0.14 : 0.1,
+              detailPreset === "high" ? 0.1 : 0.07,
               14,
-              detailPreset === "high" ? 0.2 : 0.14,
+              detailPreset === "high" ? 0.16 : 0.12,
               18,
-              detailPreset === "high" ? 0.24 : 0.18,
+              detailPreset === "high" ? 0.21 : 0.16,
             ],
             "line-width": [
               "interpolate",
@@ -826,7 +889,7 @@ export function MapLibreMap({
               20,
               1.3,
             ],
-            "line-dasharray": [1.2, 1.8],
+            "line-dasharray": [1.1, 2.2],
           },
         });
 
@@ -836,8 +899,8 @@ export function MapLibreMap({
           source: waterViewportSourceId,
           minzoom: 14.5,
           paint: {
-            "line-color": "#eef6ff",
-            "line-opacity": detailPreset === "high" ? 0.14 : 0.08,
+            "line-color": "#f4fbff",
+            "line-opacity": detailPreset === "high" ? 0.12 : 0.07,
             "line-width": [
               "interpolate",
               ["linear"],
@@ -849,7 +912,7 @@ export function MapLibreMap({
               20,
               1.1,
             ],
-            "line-dasharray": [0.6, 1.2],
+            "line-dasharray": [0.45, 1.1],
           },
         });
       }
@@ -865,6 +928,8 @@ export function MapLibreMap({
             ["get", "greenMode"],
             "grass_first",
             0.11,
+            "dense_wooded",
+            0.24,
             0.2,
           ],
           "circle-translate": [1.4, 1.7],
@@ -875,7 +940,7 @@ export function MapLibreMap({
             2.9,
             "compact",
             2.4,
-            1.9,
+            2.05,
           ],
         },
       });
@@ -898,7 +963,9 @@ export function MapLibreMap({
             "match",
             ["get", "greenMode"],
             "grass_first",
-            0.66,
+            0.63,
+            "dense_wooded",
+            0.82,
             0.78,
           ],
           "circle-radius": [
@@ -908,7 +975,7 @@ export function MapLibreMap({
             2.6,
             "compact",
             2.1,
-            1.7,
+            1.8,
           ],
           "circle-stroke-color": "#3e6430",
           "circle-stroke-width": 0.6,
@@ -926,6 +993,8 @@ export function MapLibreMap({
             ["get", "greenMode"],
             "grass_first",
             0.18,
+            "dense_wooded",
+            0.23,
             0.28,
           ],
           "circle-translate": [-0.6, -0.6],
@@ -951,6 +1020,72 @@ export function MapLibreMap({
       mapInstance.off("style.load", refreshEnvironmentViewport);
     };
   }, [detailPreset, mapInstance, mapZoom]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    let phase = 0;
+    const interval = window.setInterval(() => {
+      if (!mapInstance.getLayer(waterViewportBaseLayerId)) return;
+      phase += 0.23;
+      const baseOpacity = 0.12 + Math.sin(phase) * 0.03;
+      const detailOpacity = 0.08 + Math.cos(phase * 1.4) * 0.025;
+      const shoreOpacity = 0.16 + Math.sin(phase * 0.7) * 0.02;
+
+      try {
+        mapInstance.setPaintProperty(
+          waterViewportBaseLayerId,
+          "line-opacity",
+          [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            9,
+            baseOpacity * 0.62,
+            14,
+            baseOpacity,
+            18,
+            baseOpacity * 1.08,
+          ],
+        );
+        mapInstance.setPaintProperty(
+          waterViewportDetailLayerId,
+          "line-opacity",
+          [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            14.5,
+            detailOpacity * 0.8,
+            18,
+            detailOpacity * 1.12,
+          ],
+        );
+        mapInstance.setPaintProperty(
+          waterViewportShoreLayerId,
+          "line-opacity",
+          [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            10,
+            shoreOpacity * 0.6,
+            15,
+            shoreOpacity,
+            18,
+            shoreOpacity * 1.08,
+          ],
+        );
+      } catch {}
+    }, 280);
+
+    return () => window.clearInterval(interval);
+  }, [
+    mapInstance,
+    waterViewportBaseLayerId,
+    waterViewportDetailLayerId,
+    waterViewportShoreLayerId,
+  ]);
 
   const resetRouteRuntime = () => {
     pause();
