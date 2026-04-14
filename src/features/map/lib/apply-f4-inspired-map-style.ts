@@ -29,7 +29,6 @@ const ROAD_NAME_RE =
   /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|living|unclassified|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
 const MEDIUM_ROAD_RE = /(secondary|tertiary|collector)/i;
-const SERVICE_ROAD_RE = /(service|living|unclassified)/i;
 const LOCAL_ROAD_RE = /(residential|service|living|unclassified|local)/i;
 const CASING_RE = /(casing|outline|border)/i;
 const RAIL_TRANSIT_HATCH_RE = /(rail|transit|hatching|hatch)/i;
@@ -49,7 +48,7 @@ function setPaintSafe(
 }
 
 function getRoadWidthExpression(
-  kind: "major" | "medium" | "local" | "service" | "casing",
+  kind: "major" | "medium" | "local" | "casing",
 ): unknown {
   switch (kind) {
     case "major":
@@ -84,22 +83,6 @@ function getRoadWidthExpression(
         20,
         20,
       ];
-    case "service":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        1.2,
-        14,
-        2.5,
-        16,
-        5,
-        18,
-        8.5,
-        20,
-        13,
-      ];
     case "local":
       return [
         "interpolate",
@@ -122,15 +105,15 @@ function getRoadWidthExpression(
         ["linear"],
         ["zoom"],
         12,
-        2.8,
+        2.5,
         14,
-        5.6,
+        4.8,
         16,
-        10.2,
+        8.8,
         18,
-        17.5,
+        14.5,
         20,
-        27,
+        21,
       ];
   }
 }
@@ -182,17 +165,13 @@ export function applyF4InspiredMapStyle(
       const isRailTransitHatch = RAIL_TRANSIT_HATCH_RE.test(id);
       const isMajor = MAJOR_ROAD_RE.test(id);
       const isMedium = MEDIUM_ROAD_RE.test(id);
-      const isService = SERVICE_ROAD_RE.test(id);
       const isLocal = LOCAL_ROAD_RE.test(id);
-      const widthKind: "major" | "medium" | "local" | "service" | "casing" =
-        isCasing
+      const widthKind: "major" | "medium" | "local" | "casing" = isCasing
         ? "casing"
         : isMajor
           ? "major"
           : isMedium
             ? "medium"
-            : isService
-              ? "service"
             : isLocal
               ? "local"
               : "local";
