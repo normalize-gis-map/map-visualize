@@ -15,25 +15,26 @@ const LANE_MARKING_WIDTH = [
   ["linear"],
   ["zoom"],
   10,
-  0.32,
+  0.2,
   12,
-  0.5,
+  0.32,
   14,
-  0.94,
+  0.56,
   16,
-  1.85,
+  0.95,
   18,
-  3.1,
+  1.5,
   20,
-  4.4,
+  2.2,
 ];
 
 const ROAD_NAME_RE =
   /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|living|unclassified|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
-const MEDIUM_ROAD_RE = /(secondary|collector)/i;
-const LOCAL_ROAD_RE = /(residential|tertiary|service|living|unclassified|local)/i;
+const MEDIUM_ROAD_RE = /(secondary|tertiary|collector)/i;
+const LOCAL_ROAD_RE = /(residential|service|living|unclassified|local)/i;
 const CASING_RE = /(casing|outline|border)/i;
+const RAIL_TRANSIT_HATCH_RE = /(rail|transit|hatching|hatch)/i;
 
 function setPaintSafe(
   map: maplibregl.Map,
@@ -181,6 +182,7 @@ export function applyF4InspiredMapStyle(
 
     if (layer.type === "line" && ROAD_NAME_RE.test(id)) {
       const isCasing = CASING_RE.test(id);
+      const isRailTransitHatch = RAIL_TRANSIT_HATCH_RE.test(id);
       const isMajor = MAJOR_ROAD_RE.test(id);
       const isMedium = MEDIUM_ROAD_RE.test(id);
       const isLocal = LOCAL_ROAD_RE.test(id);
@@ -208,13 +210,37 @@ export function applyF4InspiredMapStyle(
         map,
         layerId,
         "line-opacity",
-        isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
+        isRailTransitHatch
+          ? 0.72
+          : isCasing
+            ? 0.92
+            : isMajor
+              ? 0.97
+              : isMedium
+                ? 0.94
+                : 0.9,
       );
       setPaintSafe(
         map,
         layerId,
         "line-width",
-        getRoadWidthExpression(widthKind),
+        isRailTransitHatch
+          ? [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              0.7,
+              14,
+              1.1,
+              16,
+              1.7,
+              18,
+              2.4,
+              20,
+              3,
+            ]
+          : getRoadWidthExpression(widthKind),
       );
       continue;
     }
@@ -278,6 +304,7 @@ export function applyF4InspiredMapStyle(
         } as any,
         roadLayer.id,
       );
+      laneLayerCount += 1;
     } catch {}
   }
 
