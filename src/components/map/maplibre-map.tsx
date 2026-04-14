@@ -1,6 +1,6 @@
 "use client";
 
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, Position } from "geojson";
 import maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { NavigationControl } from "react-map-gl/maplibre";
@@ -54,6 +54,37 @@ export function MapLibreMap({
   routePayload,
   onRouteClear,
 }: Props) {
+  const estimateRouteLengthMeters = useCallback((coordinates: Position[]) => {
+    if (coordinates.length < 2) return 0;
+
+    let total = 0;
+    for (let index = 0; index < coordinates.length - 1; index += 1) {
+      const start = coordinates[index];
+      const end = coordinates[index + 1];
+      if (!start || !end) continue;
+      const avgLat = ((start[1] + end[1]) * Math.PI) / 360;
+      const dx = (end[0] - start[0]) * (111320 * Math.cos(avgLat));
+      const dy = (end[1] - start[1]) * 111320;
+      total += Math.hypot(dx, dy);
+    }
+
+    return total;
+  }, []);
+
+  const classifyRoadClass = useCallback((className: string) => {
+    if (
+      className.includes("motorway") ||
+      className.includes("trunk") ||
+      className.includes("primary")
+    ) {
+      return "major" as const;
+    }
+    if (className.includes("secondary")) {
+      return "medium" as const;
+    }
+    return "local" as const;
+  }, []);
+
   const {
     mapMode,
     visibleLayers,
@@ -238,6 +269,7 @@ export function MapLibreMap({
       }
 
       const style = mapInstance.getStyle();
+      const currentZoom = mapInstance.getZoom();
       const roadLayerIds =
         style.layers
           ?.filter(
@@ -252,6 +284,24 @@ export function MapLibreMap({
         layers: roadLayerIds.slice(0, AMBIENT_TRAFFIC_ROUTE_SCAN.layers),
       });
 
+      const serviceSelectionMod = currentZoom >= MAP_DETAIL_ZOOM.CLOSE ? 3 : 5;
+      const maxCollected =
+        currentZoom >= MAP_DETAIL_ZOOM.CLOSE
+          ? detailPreset === "high"
+            ? 120
+            : 96
+          : currentZoom >= MAP_DETAIL_ZOOM.MID
+            ? detailPreset === "high"
+              ? 84
+              : 64
+            : 36;
+      const minLengthMeters =
+        currentZoom >= MAP_DETAIL_ZOOM.CLOSE
+          ? 90
+          : currentZoom >= MAP_DETAIL_ZOOM.MID
+            ? 130
+            : 190;
+
       const collected = features
         .flatMap((feature) => {
           const geometry = feature.geometry;
@@ -261,30 +311,69 @@ export function MapLibreMap({
               "",
           ).toLowerCase();
 
-          const roadClass =
-            className.includes("motorway") ||
-            className.includes("trunk") ||
-            className.includes("primary")
-              ? "major"
-              : className.includes("secondary") ||
-                  className.includes("collector")
-                ? "medium"
-                : "local";
+          const isPrimary = className.includes("primary");
+          const isSecondary = className.includes("secondary");
+          const isTertiary = className.includes("tertiary");
+          const isResidential = className.includes("residential");
+          const isService = className.includes("service");
+
+          const isEligible =
+            isPrimary || isSecondary || isTertiary || isResidential || isService;
+          if (!isEligible) return [];
 
           if (!geometry) return [];
           if (geometry.type === "LineString") {
-            return [{ coordinates: geometry.coordinates, roadClass } satisfies AmbientTrafficRoute];
+            const lengthMeters = estimateRouteLengthMeters(geometry.coordinates);
+            if (lengthMeters < minLengthMeters) return [];
+
+            if (isService) {
+              const keep =
+                Math.floor((geometry.coordinates[0]?.[0] ?? 0) * 10000) %
+                  serviceSelectionMod ===
+                0;
+              if (!keep) return [];
+            }
+
+            return [
+              {
+                coordinates: geometry.coordinates,
+                roadClass: classifyRoadClass(className),
+                lengthMeters,
+              } satisfies AmbientTrafficRoute,
+            ];
           }
           if (geometry.type === "MultiLineString") {
             return geometry.coordinates.map(
-              (coordinates) =>
-                ({ coordinates, roadClass }) satisfies AmbientTrafficRoute,
+              (coordinates) => {
+                const lengthMeters = estimateRouteLengthMeters(coordinates);
+                return {
+                  coordinates,
+                  roadClass: classifyRoadClass(className),
+                  lengthMeters,
+                } satisfies AmbientTrafficRoute;
+              },
             );
           }
           return [];
         })
-        .filter((route) => route.coordinates.length > 3)
-        .slice(0, AMBIENT_TRAFFIC_ROUTE_SCAN.maxRoutes);
+        .filter(
+          (route) =>
+            route.coordinates.length > 3 &&
+            (route.lengthMeters ?? 0) >= minLengthMeters,
+        )
+        .map((route) => {
+          const classScore =
+            route.roadClass === "major" ? 1.25 : route.roadClass === "medium" ? 1 : 0.82;
+          const zoomScore = currentZoom >= MAP_DETAIL_ZOOM.CLOSE ? 1.08 : 0.94;
+          const lengthScore = Math.min(1.4, Math.max(0.35, (route.lengthMeters ?? 0) / 520));
+          return {
+            route,
+            score: classScore * lengthScore * zoomScore,
+          };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Math.min(maxCollected, AMBIENT_TRAFFIC_ROUTE_SCAN.maxRoutes * 2))
+        .map((item) => item.route);
 
       setAmbientNetworkRoutes((prev) => {
         if (prev.length === collected.length) {
@@ -308,7 +397,14 @@ export function MapLibreMap({
     return () => {
       mapInstance.off("moveend", refreshRoadNetwork);
     };
-  }, [mapInstance, trafficDensity, trafficVisualizationEnabled]);
+  }, [
+    classifyRoadClass,
+    detailPreset,
+    estimateRouteLengthMeters,
+    mapInstance,
+    trafficDensity,
+    trafficVisualizationEnabled,
+  ]);
 
   const routeCollection: FeatureCollection | null = routePayload
     ? {
@@ -408,16 +504,24 @@ export function MapLibreMap({
     const cap =
       mapZoom >= MAP_DETAIL_ZOOM.CLOSE
         ? trafficDensity === "full"
-          ? 60
-          : 38
+          ? detailPreset === "high"
+            ? 96
+            : 78
+          : detailPreset === "high"
+            ? 66
+            : 52
         : mapZoom >= MAP_DETAIL_ZOOM.MID
           ? trafficDensity === "full"
-            ? 36
-            : 22
-          : 10;
+            ? detailPreset === "high"
+              ? 54
+              : 42
+            : detailPreset === "high"
+              ? 34
+              : 24
+          : 14;
 
     return Array.from(deduped.values()).slice(0, cap);
-  }, [ambientTraffic, mapBounds, mapZoom, trafficDensity]);
+  }, [ambientTraffic, detailPreset, mapBounds, mapZoom, trafficDensity]);
 
   const vehicleScaleMultiplier = useMemo(() => {
     const baseZoomScale =

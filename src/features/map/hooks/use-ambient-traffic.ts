@@ -27,14 +27,15 @@ export type AmbientTrafficVehicle = {
 export type AmbientTrafficRoute = {
   coordinates: Position[];
   roadClass: AmbientRoadClass;
+  lengthMeters?: number;
 };
 
-type SeedVehicle = {
+type StreamVehicle = {
   id: string;
   routeIndex: number;
-  progress: number;
+  baseProgress: number;
   laneVariant: 0 | 1;
-  speed: number;
+  speedFactor: number;
   roadClass: AmbientRoadClass;
   direction: "forward" | "backward";
 };
@@ -49,6 +50,25 @@ type UseAmbientTrafficInput = {
 
 const MIN_ZOOM_TO_RENDER = 13;
 
+function hashNumber(seed: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function seededUnit(seed: string) {
+  return (hashNumber(seed) % 10000) / 10000;
+}
+
+function getClassSpeedRange(roadClass: AmbientRoadClass) {
+  if (roadClass === "major") return { min: 1, max: 1.25 };
+  if (roadClass === "medium") return { min: 0.9, max: 1.15 };
+  return { min: 0.75, max: 1 };
+}
+
 function getTargetVehicleCount(
   zoom: number,
   density: TrafficDensity,
@@ -56,15 +76,45 @@ function getTargetVehicleCount(
 ) {
   if (density === "off") return 0;
 
-  const byZoom = zoom >= 16.8 ? 180 : zoom >= 15 ? 130 : zoom >= 14 ? 80 : 24;
-  const densityFactor = density === "full" ? 1 : 0.58;
-  const detailFactor = detailPreset === "high" ? 1.06 : 1;
+  const byZoom = zoom >= 16.8 ? 280 : zoom >= 15.6 ? 200 : zoom >= 14.4 ? 120 : 42;
+  const densityFactor = density === "full" ? 1 : 0.62;
+  const detailFactor = detailPreset === "high" ? 1.12 : 1;
 
   return Math.max(12, Math.round(byZoom * densityFactor * detailFactor));
 }
 
 function getRoadLimitByZoom(zoom: number) {
-  return zoom >= 16.8 ? 60 : zoom >= 15 ? 44 : zoom >= 14 ? 30 : 18;
+  return zoom >= 16.8 ? 96 : zoom >= 15.6 ? 72 : zoom >= 14.4 ? 48 : 28;
+}
+
+function getBaseVehiclesPerDirection(roadClass: AmbientRoadClass, zoom: number) {
+  const zoomBoost = zoom >= 16.8 ? 2 : zoom >= 15.6 ? 1 : 0;
+  if (roadClass === "major") return 2 + zoomBoost;
+  if (roadClass === "medium") return 2 + (zoom >= 15.2 ? 1 : 0);
+  return zoom >= 16.2 ? 2 : 1;
+}
+
+function generateDirectionProgresses(count: number, seedRoot: string) {
+  const progresses: number[] = [];
+  let cursor = seededUnit(`${seedRoot}-start`);
+
+  for (let index = 0; index < count; index += 1) {
+    const random = seededUnit(`${seedRoot}-gap-${index}`);
+    const queueChance = seededUnit(`${seedRoot}-queue-${index}`);
+
+    let gap = 0.02 + random * 0.055;
+    if (queueChance < 0.28) {
+      gap *= 0.58; // compact micro-cluster
+    } else if (queueChance > 0.86) {
+      gap *= 1.55; // sparse pocket
+    }
+
+    gap = Math.max(0.012, Math.min(0.12, gap));
+    cursor = (cursor + gap) % 1;
+    progresses.push(cursor);
+  }
+
+  return progresses;
 }
 
 export function useAmbientTraffic({
@@ -74,7 +124,7 @@ export function useAmbientTraffic({
   density,
   detailPreset,
 }: UseAmbientTrafficInput) {
-  const [seedVehicles, setSeedVehicles] = useState<SeedVehicle[]>([]);
+  const [simulationClock, setSimulationClock] = useState(0);
 
   const shouldRender =
     enabled &&
@@ -87,68 +137,63 @@ export function useAmbientTraffic({
     [zoom, density, detailPreset],
   );
 
-  useEffect(() => {
-    if (!shouldRender || targetCount <= 0 || !routes.length) {
-      const frame = requestAnimationFrame(() =>
-        setSeedVehicles((prev) => (prev.length ? [] : prev)),
+  const streamVehicles = useMemo<StreamVehicle[]>(() => {
+    if (!shouldRender || targetCount <= 0 || !routes.length) return [];
+
+    const eligibleRoutes = routes
+      .map((route, index) => ({ route, index }))
+      .filter(({ route }) => route.coordinates.length > 3)
+      .slice(0, getRoadLimitByZoom(zoom));
+
+    const generated: StreamVehicle[] = [];
+
+    for (const { route, index: routeIndex } of eligibleRoutes) {
+      const basePerDirection = getBaseVehiclesPerDirection(route.roadClass, zoom);
+      const asymmetry = 0.78 + seededUnit(`flow-bias-${routeIndex}`) * 0.5;
+      const forwardCount = Math.max(1, Math.round(basePerDirection * asymmetry));
+      const backwardCount = Math.max(
+        1,
+        Math.round(basePerDirection * (2 - asymmetry)),
       );
-      return () => cancelAnimationFrame(frame);
+
+      for (const [direction, count] of [
+        ["forward", forwardCount],
+        ["backward", backwardCount],
+      ] as const) {
+        const progresses = generateDirectionProgresses(
+          count,
+          `${routeIndex}-${direction}`,
+        );
+
+        for (let slot = 0; slot < progresses.length; slot += 1) {
+          const speedRange = getClassSpeedRange(route.roadClass);
+          const speedBlend = seededUnit(`${routeIndex}-${direction}-speed-${slot}`);
+          const speedFactor =
+            speedRange.min + speedBlend * (speedRange.max - speedRange.min);
+          const laneVariant =
+            seededUnit(`${routeIndex}-${direction}-lane-${slot}`) > 0.62 ? 1 : 0;
+
+          generated.push({
+            id: `ambient-${routeIndex}-${direction}-${slot}`,
+            routeIndex,
+            baseProgress: progresses[slot] ?? 0,
+            laneVariant,
+            speedFactor,
+            roadClass: route.roadClass,
+            direction,
+          });
+          if (generated.length >= targetCount) {
+            return generated;
+          }
+        }
+      }
     }
 
-    const frame = requestAnimationFrame(() => {
-      const usableRouteEntries = routes
-        .map((route, index) => ({ route, index }))
-        .filter((item) => item.route.coordinates.length > 2)
-        .slice(0, getRoadLimitByZoom(zoom));
-
-      if (!usableRouteEntries.length) {
-        setSeedVehicles((prev) => (prev.length ? [] : prev));
-        return;
-      }
-
-      const perDirection = Math.max(
-        1,
-        Math.floor(targetCount / (usableRouteEntries.length * 2)),
-      );
-      const maxPerDirection = zoom >= 16 ? 4 : zoom >= 15 ? 3 : 2;
-      const vehiclesPerDirection = Math.min(maxPerDirection, perDirection);
-      const generated: SeedVehicle[] = [];
-
-      for (const { route, index: routeIndex } of usableRouteEntries) {
-        for (const direction of ["forward", "backward"] as const) {
-          let progressCursor = Math.random() * 0.12;
-          for (let laneVariant = 0 as 0 | 1; laneVariant < 2; laneVariant += 1) {
-            for (let slot = 0; slot < vehiclesPerDirection; slot += 1) {
-              const spacingMeters = 18 + Math.random() * 52;
-              const spacingProgress = spacingMeters / 2200;
-              progressCursor = (progressCursor + spacingProgress) % 1;
-
-              generated.push({
-                id: `ambient-${routeIndex}-${direction}-${laneVariant}-${slot}`,
-                routeIndex,
-                progress: progressCursor,
-                laneVariant,
-                speed: 0.0105 + Math.random() * 0.0045,
-                roadClass: route.roadClass,
-                direction,
-              });
-              if (generated.length >= targetCount) break;
-            }
-            if (generated.length >= targetCount) break;
-          }
-          if (generated.length >= targetCount) break;
-        }
-        if (generated.length >= targetCount) break;
-      }
-
-      setSeedVehicles(generated);
-    });
-
-    return () => cancelAnimationFrame(frame);
+    return generated;
   }, [routes, shouldRender, targetCount, zoom]);
 
   useEffect(() => {
-    if (!shouldRender || !seedVehicles.length) return;
+    if (!shouldRender || !streamVehicles.length) return;
 
     let frame = 0;
     let last = performance.now();
@@ -163,44 +208,23 @@ export function useAmbientTraffic({
       const dt = elapsed / 1000;
       last = now;
 
-      setSeedVehicles((prev) =>
-        prev.map((vehicle, index) => {
-          const directionSign = vehicle.direction === "forward" ? 1 : -1;
-          const speedMultiplier = 0.8 + (index % 9) * 0.05;
-          const nextProgress =
-            vehicle.progress +
-            vehicle.speed * dt * directionSign * speedMultiplier;
-
-          return {
-            ...vehicle,
-            progress: ((nextProgress % 1) + 1) % 1,
-          };
-        }),
-      );
+      setSimulationClock((prev) => prev + dt);
 
       frame = requestAnimationFrame(tick);
     };
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [shouldRender, seedVehicles.length]);
+  }, [shouldRender, streamVehicles.length]);
 
   const vehicles = useMemo<AmbientTrafficVehicle[]>(() => {
     if (!shouldRender) return [];
 
-    return seedVehicles
+    return streamVehicles
       .map((vehicle) => {
         const routeEntry = routes[vehicle.routeIndex] ?? routes[0];
         const route = routeEntry?.coordinates;
         if (!route || route.length < 2) return null;
-
-        const sample = sampleRouteAtProgress(route, vehicle.progress);
-        if (!sample) return null;
-
-        const directionalBearing =
-          vehicle.direction === "forward"
-            ? normalizeBearing(sample.bearing)
-            : normalizeBearing(sample.bearing + 180);
 
         const baseLaneOffset = getRoadClassLaneOffsetMeters(
           vehicle.roadClass,
@@ -216,8 +240,18 @@ export function useAmbientTraffic({
         const laneOffset =
           directionSign * baseLaneOffset +
           (vehicle.laneVariant === 1 ? directionSign * laneSpread : 0);
+        const baseSpeed = 0.0095;
+        const progressShift =
+          simulationClock * baseSpeed * vehicle.speedFactor * directionSign;
+        const progress = ((vehicle.baseProgress + progressShift) % 1 + 1) % 1;
+        const nextSample = sampleRouteAtProgress(route, progress);
+        if (!nextSample) return null;
+        const directionalBearing =
+          vehicle.direction === "forward"
+            ? normalizeBearing(nextSample.bearing)
+            : normalizeBearing(nextSample.bearing + 180);
         const shifted = offsetRouteSample(
-          { ...sample, bearing: directionalBearing },
+          { ...nextSample, bearing: directionalBearing },
           laneOffset,
         );
 
@@ -226,12 +260,12 @@ export function useAmbientTraffic({
           lng: shifted.lng,
           lat: shifted.lat,
           bearing: normalizeBearing(shifted.bearing),
-          speed: vehicle.speed,
+          speed: vehicle.speedFactor,
           direction: vehicle.direction,
         };
       })
       .filter((item): item is AmbientTrafficVehicle => Boolean(item));
-  }, [routes, seedVehicles, shouldRender, zoom]);
+  }, [routes, shouldRender, simulationClock, streamVehicles, zoom]);
 
   return { vehicles, minZoomToRender: MIN_ZOOM_TO_RENDER };
 }
