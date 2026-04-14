@@ -32,6 +32,8 @@ const MEDIUM_ROAD_RE = /(secondary|tertiary|collector)/i;
 const LOCAL_ROAD_RE = /(residential|service|living|unclassified|local)/i;
 const CASING_RE = /(casing|outline|border)/i;
 const RAIL_TRANSIT_HATCH_RE = /(rail|transit|hatching|hatch)/i;
+const NON_ROAD_OR_DECOR_RE =
+  /(path|pedestrian|footway|cycle|track|trail|steps|runway|taxiway|platform|ferry|hatching|hatch)/i;
 
 function setPaintSafe(
   map: maplibregl.Map,
@@ -57,75 +59,17 @@ function withOptionalFilter(
   return layerDef;
 }
 
-function getRoadWidthExpression(
-  kind: "major" | "medium" | "local" | "casing",
+function getCloseZoomRoadWidthPatch(
+  baseWidth: unknown,
+  kind: "major" | "medium" | "local",
 ): unknown {
-  switch (kind) {
-    case "major":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        2.2,
-        14,
-        4.5,
-        16,
-        9,
-        18,
-        16,
-        20,
-        26,
-      ];
-    case "medium":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        1.8,
-        14,
-        3.8,
-        16,
-        7.5,
-        18,
-        13,
-        20,
-        20,
-      ];
-    case "local":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        1.5,
-        14,
-        3.2,
-        16,
-        6.5,
-        18,
-        11,
-        20,
-        17,
-      ];
-    case "casing":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        2.5,
-        14,
-        4.8,
-        16,
-        8.8,
-        18,
-        14.5,
-        20,
-        21,
-      ];
-  }
+  const zoomMultiplier =
+    kind === "major"
+      ? ["interpolate", ["linear"], ["zoom"], 13, 1, 15, 1.04, 17, 1.13, 19, 1.26]
+      : kind === "medium"
+        ? ["interpolate", ["linear"], ["zoom"], 13, 1, 15, 1.02, 17, 1.09, 19, 1.2]
+        : ["interpolate", ["linear"], ["zoom"], 13, 1, 15, 1, 17, 1.05, 19, 1.12];
+  return ["*", baseWidth, zoomMultiplier];
 }
 
 export function applyF4InspiredMapStyle(
@@ -228,18 +172,15 @@ export function applyF4InspiredMapStyle(
     if (layer.type === "line" && ROAD_NAME_RE.test(id)) {
       const isCasing = CASING_RE.test(id);
       const isRailTransitHatch = RAIL_TRANSIT_HATCH_RE.test(id);
+      const isDecorativeTransport = NON_ROAD_OR_DECOR_RE.test(id);
       const isMajor = MAJOR_ROAD_RE.test(id);
       const isMedium = MEDIUM_ROAD_RE.test(id);
       const isLocal = LOCAL_ROAD_RE.test(id);
-      const widthKind: "major" | "medium" | "local" | "casing" = isCasing
-        ? "casing"
-        : isMajor
-          ? "major"
-          : isMedium
-            ? "medium"
-            : isLocal
-              ? "local"
-              : "local";
+      const shouldPatchRoadFamily =
+        !isRailTransitHatch &&
+        !isDecorativeTransport &&
+        (isMajor || isMedium || isLocal || isCasing);
+      if (!shouldPatchRoadFamily) continue;
 
       setPaintSafe(
         map,
@@ -255,38 +196,28 @@ export function applyF4InspiredMapStyle(
         map,
         layerId,
         "line-opacity",
-        isRailTransitHatch
-          ? 0.72
-          : isCasing
-            ? 0.92
-            : isMajor
-              ? 0.97
-              : isMedium
-                ? 0.94
-                : 0.9,
+        isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
       );
-      setPaintSafe(
-        map,
-        layerId,
-        "line-width",
-        isRailTransitHatch
-          ? [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12,
-              0.7,
-              14,
-              1.1,
-              16,
-              1.7,
-              18,
-              2.4,
-              20,
-              3,
-            ]
-          : getRoadWidthExpression(widthKind),
-      );
+
+      const layerPaint =
+        (layer as maplibregl.LayerSpecification & {
+          paint?: Record<string, unknown>;
+        }).paint ?? {};
+      const baseWidth = layerPaint["line-width"];
+      if (!baseWidth || isCasing) continue;
+      if (isMajor || isMedium || isLocal) {
+        const widthKind: "major" | "medium" | "local" = isMajor
+          ? "major"
+          : isMedium
+            ? "medium"
+            : "local";
+        setPaintSafe(
+          map,
+          layerId,
+          "line-width",
+          getCloseZoomRoadWidthPatch(baseWidth, widthKind),
+        );
+      }
       continue;
     }
 
