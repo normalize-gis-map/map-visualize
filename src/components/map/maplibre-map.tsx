@@ -8,12 +8,13 @@ import Map, { NavigationControl } from "react-map-gl/maplibre";
 import floodData from "@/data/geojson/flood-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
+import { useMapStylePolish } from "@/features/map/hooks/use-map-style-polish";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
-import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
 import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -54,8 +55,7 @@ export function MapLibreMap({
     toggleTrafficVisualization,
     notifyMapInteraction,
     setMapEngine,
-  } =
-    useMapStore();
+  } = useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
   const [mapBearing, setMapBearing] = useState(0);
@@ -65,7 +65,9 @@ export function MapLibreMap({
     east: number;
     north: number;
   } | null>(null);
-  const [cameraDistanceMeters, setCameraDistanceMeters] = useState<number | null>(null);
+  const [cameraDistanceMeters, setCameraDistanceMeters] = useState<
+    number | null
+  >(null);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -74,15 +76,16 @@ export function MapLibreMap({
     () => ({
       longitude: 106.73,
       latitude: 10.82,
-      zoom: 11.2,
-      pitch: 0,
-      bearing: 0,
+      zoom: 12.4,
+      pitch: 30,
+      bearing: -18,
     }),
     [],
   );
 
   useBuildingLayer(mapInstance, visibleLayers.buildings, buildingOpacity);
   useMapViewMode(mapInstance, mapMode);
+  useMapStylePolish(mapInstance);
   useMapFlyToPlace(mapInstance, selectedPlace);
 
   const { cursor, hovered, handleMouseMove, handleMouseLeave } = useMapCursor();
@@ -104,7 +107,9 @@ export function MapLibreMap({
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
   const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);
   const [driveTiltDeg, setDriveTiltDeg] = useState(78);
-  const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<Position[][]>([]);
+  const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<
+    Position[][]
+  >([]);
   const programmaticMoveRef = useRef(false);
   const zoomPitchStateRef = useRef<"far" | "near" | null>(null);
   const followTickRef = useRef(0);
@@ -184,7 +189,10 @@ export function MapLibreMap({
       const style = mapInstance.getStyle();
       const roadLayerIds =
         style.layers
-          ?.filter((layer) => layer.type === "line" && layer.id.toLowerCase().includes("road"))
+          ?.filter(
+            (layer) =>
+              layer.type === "line" && layer.id.toLowerCase().includes("road"),
+          )
           .map((layer) => layer.id) ?? [];
 
       if (!roadLayerIds.length) return;
@@ -210,8 +218,10 @@ export function MapLibreMap({
             prev[0]?.[0]?.[0] === collected[0]?.[0]?.[0] &&
             prev[0]?.[0]?.[1] === collected[0]?.[0]?.[1];
           const sameTail =
-            prev[prev.length - 1]?.[0]?.[0] === collected[collected.length - 1]?.[0]?.[0] &&
-            prev[prev.length - 1]?.[0]?.[1] === collected[collected.length - 1]?.[0]?.[1];
+            prev[prev.length - 1]?.[0]?.[0] ===
+              collected[collected.length - 1]?.[0]?.[0] &&
+            prev[prev.length - 1]?.[0]?.[1] ===
+              collected[collected.length - 1]?.[0]?.[1];
           if (sameHead && sameTail) return prev;
         }
         return collected;
@@ -276,14 +286,16 @@ export function MapLibreMap({
   const trafficCars = useMemo(() => {
     if (viewMode !== "drive3d" || !trafficVisualizationEnabled) return [];
 
-    const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
+    const maxVehicles =
+      mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
     return trafficSamples.slice(0, maxVehicles);
   }, [mapZoom, trafficSamples, trafficVisualizationEnabled, viewMode]);
   const ambientRoutes = useMemo(
     () =>
       ambientNetworkRoutes.length
         ? ambientNetworkRoutes
-        : routePayload?.routes.map((route) => route.geometry.coordinates) ?? [],
+        : (routePayload?.routes.map((route) => route.geometry.coordinates) ??
+          []),
     [ambientNetworkRoutes, routePayload],
   );
   const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
@@ -341,17 +353,24 @@ export function MapLibreMap({
     mapInstance.easeTo({
       center: navCoordinate,
       pitch:
-        mapMode === "2.5d"
-          ? viewMode === "drive3d"
-            ? driveTiltDeg
-            : 62
-          : 0,
+        mapMode === "2.5d" ? (viewMode === "drive3d" ? driveTiltDeg : 62) : 0,
       bearing: mapMode === "2.5d" ? navHeading : mapInstance.getBearing(),
-      zoom: viewMode === "drive3d" ? Math.max(mapInstance.getZoom(), 14.5) : undefined,
+      zoom:
+        viewMode === "drive3d"
+          ? Math.max(mapInstance.getZoom(), 14.5)
+          : undefined,
       duration: viewMode === "drive3d" ? 240 : 280,
       easing: (t) => t,
     });
-  }, [driveTiltDeg, mapInstance, navCoordinate, isNavigating, mapMode, navHeading, viewMode]);
+  }, [
+    driveTiltDeg,
+    mapInstance,
+    navCoordinate,
+    isNavigating,
+    mapMode,
+    navHeading,
+    viewMode,
+  ]);
 
   useEffect(() => {
     if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
@@ -421,7 +440,8 @@ export function MapLibreMap({
           const bounds = event.target.getBounds();
           const nextDistance = estimateBoundsWidthMeters(bounds);
           setCameraDistanceMeters((prev) => {
-            if (prev !== null && Math.abs(prev - nextDistance) < 10) return prev;
+            if (prev !== null && Math.abs(prev - nextDistance) < 10)
+              return prev;
             return nextDistance;
           });
           setMapBounds((prev) => {
@@ -457,7 +477,7 @@ export function MapLibreMap({
           });
         }}
       >
-        <NavigationControl position="bottom-right" />
+        <NavigationControl position="top-right" />
 
         <MapDataLayers
           visibleLayers={visibleLayers}
@@ -553,10 +573,10 @@ export function MapLibreMap({
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border border-white/70 bg-white/90 px-2.5 py-1 text-[11px] text-slate-600 shadow-sm">
-        Camera: {cameraDistanceMeters ? `${Math.round(cameraDistanceMeters)} m` : "--"}
+      <div className="pointer-events-none absolute top-4 right-4 z-20 rounded-lg border border-white/70 bg-white/90 px-2.5 py-1 text-[11px] text-slate-600 shadow-sm">
+        Camera:{" "}
+        {cameraDistanceMeters ? `${Math.round(cameraDistanceMeters)} m` : "--"}
       </div>
-
     </div>
   );
 }

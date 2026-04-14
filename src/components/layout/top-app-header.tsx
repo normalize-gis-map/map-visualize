@@ -11,10 +11,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { MapControlsMenu } from "@/components/map/map-controls-menu";
-import { SearchPanel } from "@/components/search/search-panel";
-import { RoutePlanner } from "@/components/search/route-planner";
 import { UserMenu } from "@/components/layout/user-menu";
+import { MapControlsMenu } from "@/components/map/map-controls-menu";
+import { RoutePlanner } from "@/components/search/route-planner";
+import { SearchPanel } from "@/components/search/search-panel";
 import type { PlaceItem } from "@/data/places";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
@@ -30,13 +30,15 @@ type TopAppHeaderProps = {
   ) => void;
 };
 
-export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProps) {
+export function TopAppHeader({
+  onSelectPlace,
+  onRoutesChange,
+}: TopAppHeaderProps) {
   const [mode, setMode] = useState<"view" | "route">("view");
   const [searchOpen, setSearchOpen] = useState(false);
   const [routePlannerCollapsed, setRoutePlannerCollapsed] = useState(false);
-  const [selectedPreviewPlace, setSelectedPreviewPlace] = useState<PlaceItem | null>(
-    null,
-  );
+  const [selectedPreviewPlace, setSelectedPreviewPlace] =
+    useState<PlaceItem | null>(null);
   const activeMode = mode;
 
   const handleSelectPlace = (place: PlaceItem) => {
@@ -46,8 +48,8 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
   };
 
   return (
-    <div className="pointer-events-auto absolute inset-x-0 top-0 z-30">
-      <div className="border-b border-slate-200/80 bg-white/92 px-3 py-3 shadow-lg backdrop-blur md:px-4">
+    <header className="pointer-events-auto sticky top-0 z-40">
+      <div className="border-b border-slate-200/70 bg-white/86 px-3 py-2.5 shadow-lg backdrop-blur-xl md:px-4">
         <div className="mx-auto max-w-[1600px]">
           <div className="flex items-center gap-2 md:gap-3">
             <button
@@ -97,7 +99,9 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
                   onClick={() => setRoutePlannerCollapsed((prev) => !prev)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600"
                 >
-                  {routePlannerCollapsed ? "Mở Route panel" : "Thu gọn Route panel"}
+                  {routePlannerCollapsed
+                    ? "Mở Route panel"
+                    : "Thu gọn Route panel"}
                 </button>
               </div>
               {!routePlannerCollapsed ? (
@@ -183,7 +187,11 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <SearchPanel onSelectPlace={handleSelectPlace} compact inlineResults />
+              <SearchPanel
+                onSelectPlace={handleSelectPlace}
+                compact
+                inlineResults
+              />
             </div>
           ) : (
             <button
@@ -197,6 +205,6 @@ export function TopAppHeader({ onSelectPlace, onRoutesChange }: TopAppHeaderProp
           )}
         </div>
       ) : null}
-    </div>
+    </header>
   );
 }

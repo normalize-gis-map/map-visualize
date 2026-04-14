@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import type maplibregl from "maplibre-gl";
+import { useEffect } from "react";
 
 type MapMode = "2d" | "2.5d" | "3d";
 
@@ -25,8 +25,8 @@ export function useMapViewMode(map: maplibregl.Map | null, mode: MapMode) {
     if (mode === "2.5d") {
       map.setProjection({ type: "mercator" });
       map.easeTo({
-        pitch: 48,
-        bearing: -10,
+        pitch: 32,
+        bearing: -14,
         duration: 900,
       });
 
