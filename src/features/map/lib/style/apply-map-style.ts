@@ -59,17 +59,75 @@ function withOptionalFilter(
   return layerDef;
 }
 
-function getCloseZoomRoadWidthPatch(
-  baseWidth: unknown,
-  kind: "major" | "medium" | "local",
+function getRoadWidthExpression(
+  kind: "major" | "medium" | "local" | "casing",
 ): unknown {
-  const zoomMultiplier =
-    kind === "major"
-      ? ["interpolate", ["linear"], ["zoom"], 13, 1, 15, 1.04, 17, 1.13, 19, 1.26]
-      : kind === "medium"
-        ? ["interpolate", ["linear"], ["zoom"], 13, 1, 15, 1.02, 17, 1.09, 19, 1.2]
-        : ["interpolate", ["linear"], ["zoom"], 13, 1, 15, 1, 17, 1.05, 19, 1.12];
-  return ["*", baseWidth, zoomMultiplier];
+  switch (kind) {
+    case "major":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        1.8,
+        14,
+        3.6,
+        16,
+        6.8,
+        18,
+        11.8,
+        20,
+        18.5,
+      ];
+    case "medium":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        1.45,
+        14,
+        2.9,
+        16,
+        5.2,
+        18,
+        8.9,
+        20,
+        13.8,
+      ];
+    case "local":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        1.05,
+        14,
+        2.0,
+        16,
+        3.5,
+        18,
+        5.8,
+        20,
+        8.6,
+      ];
+    case "casing":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        2.0,
+        14,
+        3.9,
+        16,
+        7.1,
+        18,
+        12.2,
+        20,
+        19.2,
+      ];
+  }
 }
 
 export function applyMapStyle(
@@ -199,25 +257,14 @@ export function applyMapStyle(
         isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
       );
 
-      const layerPaint =
-        (layer as maplibregl.LayerSpecification & {
-          paint?: Record<string, unknown>;
-        }).paint ?? {};
-      const baseWidth = layerPaint["line-width"];
-      if (!baseWidth || isCasing) continue;
-      if (isMajor || isMedium || isLocal) {
-        const widthKind: "major" | "medium" | "local" = isMajor
+      const widthKind: "major" | "medium" | "local" | "casing" = isCasing
+        ? "casing"
+        : isMajor
           ? "major"
           : isMedium
             ? "medium"
             : "local";
-        setPaintSafe(
-          map,
-          layerId,
-          "line-width",
-          getCloseZoomRoadWidthPatch(baseWidth, widthKind),
-        );
-      }
+      setPaintSafe(map, layerId, "line-width", getRoadWidthExpression(widthKind));
       continue;
     }
 

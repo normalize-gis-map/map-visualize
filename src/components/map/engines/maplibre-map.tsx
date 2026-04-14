@@ -174,6 +174,8 @@ export function MapLibreMap({
   const followTickRef = useRef(0);
   const lastFollowCenterRef = useRef<[number, number] | null>(null);
   const mapShellRef = useRef<HTMLDivElement | null>(null);
+  const mapPointerInsideRef = useRef(false);
+  const mapPointerDownRef = useRef(false);
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -1142,22 +1144,51 @@ export function MapLibreMap({
     if (!mapInstance) return;
 
     const container = mapInstance.getContainer();
-    container.style.touchAction = "none";
+    container.style.touchAction = "pan-x pan-y";
     container.style.overscrollBehaviorX = "contain";
     container.style.overscrollBehaviorY = "contain";
 
+    const markPointerEnter = () => {
+      mapPointerInsideRef.current = true;
+    };
+    const markPointerLeave = () => {
+      mapPointerInsideRef.current = false;
+      mapPointerDownRef.current = false;
+    };
+    const markPointerDown = () => {
+      mapPointerDownRef.current = true;
+    };
+    const markPointerUp = () => {
+      mapPointerDownRef.current = false;
+    };
+
     const preventHorizontalGesture = (event: WheelEvent) => {
       if (!event.cancelable) return;
-      if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.15) {
+      const mapOwnsInteraction =
+        mapPointerInsideRef.current || mapPointerDownRef.current;
+      if (
+        mapOwnsInteraction &&
+        Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.1
+      ) {
         event.preventDefault();
       }
     };
 
+    container.addEventListener("pointerenter", markPointerEnter);
+    container.addEventListener("pointerleave", markPointerLeave);
+    container.addEventListener("pointerdown", markPointerDown);
+    container.addEventListener("pointerup", markPointerUp);
+    container.addEventListener("pointercancel", markPointerUp);
     container.addEventListener("wheel", preventHorizontalGesture, {
       passive: false,
     });
 
     return () => {
+      container.removeEventListener("pointerenter", markPointerEnter);
+      container.removeEventListener("pointerleave", markPointerLeave);
+      container.removeEventListener("pointerdown", markPointerDown);
+      container.removeEventListener("pointerup", markPointerUp);
+      container.removeEventListener("pointercancel", markPointerUp);
       container.removeEventListener("wheel", preventHorizontalGesture);
     };
   }, [mapInstance]);
@@ -1229,7 +1260,11 @@ export function MapLibreMap({
     <div
       ref={mapShellRef}
       className="map-shell relative h-full w-full"
-      style={{ overscrollBehaviorX: "contain", touchAction: "none" }}
+      style={{
+        overscrollBehaviorX: "contain",
+        overscrollBehaviorY: "contain",
+        touchAction: "pan-x pan-y",
+      }}
     >
       <Map
         initialViewState={initialViewState}
@@ -1237,8 +1272,9 @@ export function MapLibreMap({
           width: "100%",
           height: "100%",
           cursor,
-          touchAction: "none",
+          touchAction: "pan-x pan-y",
           overscrollBehaviorX: "contain",
+          overscrollBehaviorY: "contain",
         }}
         mapStyle={mapMode === "2d" ? MAP_STYLE_2D : MAP_STYLE_25D}
         maxPitch={85}
