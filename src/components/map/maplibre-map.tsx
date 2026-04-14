@@ -1,6 +1,6 @@
 "use client";
 
-import type { FeatureCollection, Position } from "geojson";
+import type { FeatureCollection } from "geojson";
 import maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { NavigationControl } from "react-map-gl/maplibre";
@@ -13,6 +13,7 @@ import {
   MAP_DETAIL_ZOOM,
 } from "@/features/map/constants/map-detail.constants";
 import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
+import type { AmbientTrafficRoute } from "@/features/map/hooks/use-ambient-traffic";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
@@ -116,7 +117,7 @@ export function MapLibreMap({
   const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);
   const [driveTiltDeg, setDriveTiltDeg] = useState(78);
   const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<
-    Position[][]
+    AmbientTrafficRoute[]
   >([]);
   const programmaticMoveRef = useRef(false);
   const hasAppliedInitial25DCameraRef = useRef(false);
@@ -254,24 +255,47 @@ export function MapLibreMap({
       const collected = features
         .flatMap((feature) => {
           const geometry = feature.geometry;
+          const className = String(
+            (feature.properties?.class as string | undefined) ??
+              (feature.properties?.type as string | undefined) ??
+              "",
+          ).toLowerCase();
+
+          const roadClass =
+            className.includes("motorway") ||
+            className.includes("trunk") ||
+            className.includes("primary")
+              ? "major"
+              : className.includes("secondary") ||
+                  className.includes("collector")
+                ? "medium"
+                : "local";
+
           if (!geometry) return [];
-          if (geometry.type === "LineString") return [geometry.coordinates];
-          if (geometry.type === "MultiLineString") return geometry.coordinates;
+          if (geometry.type === "LineString") {
+            return [{ coordinates: geometry.coordinates, roadClass } satisfies AmbientTrafficRoute];
+          }
+          if (geometry.type === "MultiLineString") {
+            return geometry.coordinates.map(
+              (coordinates) =>
+                ({ coordinates, roadClass }) satisfies AmbientTrafficRoute,
+            );
+          }
           return [];
         })
-        .filter((coords) => coords.length > 3)
+        .filter((route) => route.coordinates.length > 3)
         .slice(0, AMBIENT_TRAFFIC_ROUTE_SCAN.maxRoutes);
 
       setAmbientNetworkRoutes((prev) => {
         if (prev.length === collected.length) {
           const sameHead =
-            prev[0]?.[0]?.[0] === collected[0]?.[0]?.[0] &&
-            prev[0]?.[0]?.[1] === collected[0]?.[0]?.[1];
+            prev[0]?.coordinates?.[0]?.[0] === collected[0]?.coordinates?.[0]?.[0] &&
+            prev[0]?.coordinates?.[0]?.[1] === collected[0]?.coordinates?.[0]?.[1];
           const sameTail =
-            prev[prev.length - 1]?.[0]?.[0] ===
-              collected[collected.length - 1]?.[0]?.[0] &&
-            prev[prev.length - 1]?.[0]?.[1] ===
-              collected[collected.length - 1]?.[0]?.[1];
+            prev[prev.length - 1]?.coordinates?.[0]?.[0] ===
+              collected[collected.length - 1]?.coordinates?.[0]?.[0] &&
+            prev[prev.length - 1]?.coordinates?.[0]?.[1] ===
+              collected[collected.length - 1]?.coordinates?.[0]?.[1];
           if (sameHead && sameTail) return prev;
         }
         return collected;
@@ -344,7 +368,10 @@ export function MapLibreMap({
     () =>
       ambientNetworkRoutes.length
         ? ambientNetworkRoutes
-        : (routePayload?.routes.map((route) => route.geometry.coordinates) ??
+        : (routePayload?.routes.map((route) => ({
+            coordinates: route.geometry.coordinates,
+            roadClass: "medium" as const,
+          })) ??
           []),
     [ambientNetworkRoutes, routePayload],
   );
