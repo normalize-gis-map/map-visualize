@@ -28,6 +28,7 @@ type CesiumMapProps = {
     routes: RouteAlternative[];
     activeIndex: number;
   } | null;
+  onRouteClear: () => void;
 };
 
 type CesiumBasemap = "satelliteLabel" | "satellite" | "road";
@@ -108,7 +109,7 @@ const BIKE_MODEL_URL =
 const WALK_MODEL_URL =
   "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb";
 
-export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
+export function CesiumMap({ selectedPlace, routePayload, onRouteClear }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
@@ -533,6 +534,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
           onReset={() => {
             pause();
             reset();
+            onRouteClear();
           }}
           className="absolute right-3 bottom-3 z-30 w-[min(92vw,420px)] rounded-2xl border border-white/20 bg-slate-900/80 p-3 text-white backdrop-blur"
         />

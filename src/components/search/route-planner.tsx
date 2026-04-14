@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Bike, Car, Footprints, Loader2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bike, Car, Footprints, Loader2, LocateFixed, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { PLACES, type PlaceItem } from "@/data/places";
@@ -47,11 +47,16 @@ export function RoutePlanner({
   const [activeRoute, setActiveRoute] = useState(0);
   const [mode, setMode] = useState<TransportMode>("car");
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [error, setError] = useState("");
+  const [myLocation, setMyLocation] = useState<PlaceItem | null>(null);
 
   const fromPlace = useMemo(
-    () => PLACES.find((item) => item.label === fromLabel) ?? null,
-    [fromLabel],
+    () => {
+      if (myLocation && fromLabel === myLocation.label) return myLocation;
+      return PLACES.find((item) => item.label === fromLabel) ?? null;
+    },
+    [fromLabel, myLocation],
   );
   const toPlace = useMemo(
     () => PLACES.find((item) => item.label === toLabel) ?? null,
@@ -99,7 +104,36 @@ export function RoutePlanner({
     setRoutes([]);
     setActiveRoute(0);
     setError("");
+    setMyLocation(null);
     onRoutesChange(null);
+  };
+
+  const handleUseMyLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setError("Trình duyệt không hỗ trợ định vị.");
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const currentPlace: PlaceItem = {
+          key: "my-current-location",
+          label: "Vị trí của tôi",
+          center: [position.coords.longitude, position.coords.latitude],
+          zoom: 14.5,
+        };
+        setMyLocation(currentPlace);
+        setFromLabel(currentPlace.label);
+        setError("");
+        setLocating(false);
+      },
+      () => {
+        setError("Không lấy được vị trí hiện tại. Hãy bật quyền định vị.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+    );
   };
 
   const handleSelectRoute = (index: number) => {
@@ -141,7 +175,7 @@ export function RoutePlanner({
         })}
       </div>
 
-      <div className="grid gap-2 md:grid-cols-[auto_minmax(180px,1fr)_minmax(180px,1fr)_auto_auto]">
+      <div className="grid gap-2 md:grid-cols-[auto_minmax(160px,1fr)_auto_minmax(160px,1fr)_auto_auto]">
         {onBackToSearch ? (
           <button
             type="button"
@@ -164,6 +198,16 @@ export function RoutePlanner({
             className="w-full bg-transparent text-sm outline-none"
           />
         </label>
+        <button
+          type="button"
+          onClick={handleUseMyLocation}
+          disabled={locating}
+          className="inline-flex h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+          title="Dùng vị trí hiện tại cho điểm đi"
+        >
+          {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+          Vị trí tôi
+        </button>
 
         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/90 px-3 py-2">
           <span className="text-[11px] font-semibold text-slate-500 uppercase">

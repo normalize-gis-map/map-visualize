@@ -37,12 +37,14 @@ type Props = {
     routes: RouteAlternative[];
     activeIndex: number;
   } | null;
+  onRouteClear: () => void;
 };
 
 export function MapLibreMap({
   selectedPlace,
   floodData: serverFloodData,
   routePayload,
+  onRouteClear,
 }: Props) {
   const {
     mapMode,
@@ -56,6 +58,7 @@ export function MapLibreMap({
     useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
+  const [mapBearing, setMapBearing] = useState(0);
   const [mapBounds, setMapBounds] = useState<{
     west: number;
     south: number;
@@ -391,6 +394,7 @@ export function MapLibreMap({
         }}
         onMove={(event) => {
           setMapZoom(event.viewState.zoom);
+          setMapBearing(event.viewState.bearing);
           const bounds = event.target.getBounds();
           setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
           setMapBounds({
@@ -403,6 +407,7 @@ export function MapLibreMap({
         onLoad={(e) => {
           setMapInstance(e.target);
           setMapZoom(e.target.getZoom());
+          setMapBearing(e.target.getBearing());
           const bounds = e.target.getBounds();
           setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
           setMapBounds({
@@ -485,15 +490,9 @@ export function MapLibreMap({
         onReset={() => {
           pause();
           reset();
-          if (mapInstance && activeRoute) {
-            const start = activeRoute.geometry.coordinates[0];
-            mapInstance.flyTo({
-              center: [start[0], start[1]],
-              zoom: Math.max(mapInstance.getZoom(), 13),
-              pitch: mapMode === "2.5d" ? 62 : 0,
-              duration: 700,
-            });
-          }
+          setRoutePanelOpen(false);
+          setDrawerMinimalMode(false);
+          onRouteClear();
         }}
         cameraTiltDeg={driveTiltDeg}
         onCameraTiltChange={setDriveTiltDeg}
@@ -501,10 +500,12 @@ export function MapLibreMap({
           if (!mapInstance || !navCoordinate) return;
           mapInstance.easeTo({
             center: navCoordinate,
+            bearing: 0,
             duration: 320,
           });
         }}
         onToggleTraffic={toggleTrafficVisualization}
+        mapBearing={mapBearing}
       />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (

@@ -52,6 +52,7 @@ type Props = {
   onCameraTiltChange: (value: number) => void;
   onFocusVehicle: () => void;
   onToggleTraffic: () => void;
+  mapBearing: number;
 };
 
 export function NavigationHud({
@@ -87,6 +88,7 @@ export function NavigationHud({
   onCameraTiltChange,
   onFocusVehicle,
   onToggleTraffic,
+  mapBearing,
 }: Props) {
   const [muted, setMuted] = useState(false);
 
@@ -161,8 +163,9 @@ export function NavigationHud({
               onClick={onFocusVehicle}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/90 text-slate-700 shadow-lg backdrop-blur"
               aria-label="Focus current vehicle"
+              title="Đưa bản đồ về Bắc-up và focus xe"
             >
-              <Compass className="h-4.5 w-4.5" />
+              <Compass className="h-4.5 w-4.5 transition-transform" style={{ transform: `rotate(${-mapBearing}deg)` }} />
             </button>
             <button
               type="button"

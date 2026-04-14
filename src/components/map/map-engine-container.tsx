@@ -22,12 +22,14 @@ type MapEngineContainerProps = {
     routes: RouteAlternative[];
     activeIndex: number;
   } | null;
+  onRouteClear: () => void;
 };
 
 export function MapEngineContainer({
   selectedPlace,
   floodData,
   routePayload,
+  onRouteClear,
 }: MapEngineContainerProps) {
   const { mapEngine, hasHydrated } = useFloodStore();
   const safeMapEngine = hasHydrated ? mapEngine : "maplibre";
@@ -38,6 +40,7 @@ export function MapEngineContainer({
         selectedPlace={selectedPlace}
         floodData={floodData}
         routePayload={routePayload}
+        onRouteClear={onRouteClear}
       />
     );
   }
@@ -47,6 +50,7 @@ export function MapEngineContainer({
       selectedPlace={selectedPlace}
       floodData={floodData}
       routePayload={routePayload}
+      onRouteClear={onRouteClear}
     />
   );
 }

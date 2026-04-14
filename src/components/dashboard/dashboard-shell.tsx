@@ -43,6 +43,7 @@ export function DashboardShell() {
             selectedPlace={selectedPlace}
             floodData={data}
             routePayload={routePayload}
+            onRouteClear={() => setRoutePayload(null)}
           />
         )}
       </div>
