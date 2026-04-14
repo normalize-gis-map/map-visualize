@@ -159,9 +159,6 @@ export function applyF4InspiredMapStyle(
   const roadLayers = style.layers.filter(
     (layer) => layer.type === "line" && ROAD_NAME_RE.test(layer.id),
   ) as Array<any>;
-  const firstWaterFillLayer = style.layers.find(
-    (layer) => layer.type === "fill" && /(water|ocean|river|lake)/i.test(layer.id),
-  ) as any;
   const firstParkFillLayer = style.layers.find(
     (layer) => layer.type === "fill" && /(park|green|grass)/i.test(layer.id),
   ) as any;
@@ -283,45 +280,6 @@ export function applyF4InspiredMapStyle(
     }
   }
 
-  if (firstWaterFillLayer && !map.getLayer("f4-water-shimmer")) {
-    try {
-      const layerDef = withOptionalFilter(
-        {
-          id: "f4-water-shimmer",
-          type: "line",
-          source: firstWaterFillLayer.source,
-          "source-layer":
-            "source-layer" in firstWaterFillLayer
-              ? firstWaterFillLayer["source-layer"]
-              : undefined,
-          paint: {
-            "line-color": "#dbeafe",
-            "line-opacity": 0.16,
-            "line-width": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              11,
-              0.25,
-              14,
-              0.5,
-              17,
-              0.85,
-              20,
-              1.2,
-            ],
-            "line-dasharray": [1.2, 1.8],
-          },
-        } as any,
-        firstWaterFillLayer.filter,
-      );
-      map.addLayer(
-        layerDef as any,
-        firstWaterFillLayer.id,
-      );
-    } catch {}
-  }
-
   if (firstParkFillLayer && !map.getLayer("f4-park-grass")) {
     try {
       const layerDef = withOptionalFilter(
@@ -372,150 +330,6 @@ export function applyF4InspiredMapStyle(
               20,
               0.9,
             ],
-          },
-        } as any,
-        firstParkFillLayer.filter,
-      );
-      map.addLayer(
-        layerDef as any,
-        firstParkFillLayer.id,
-      );
-    } catch {}
-  }
-
-  if (firstParkFillLayer && !map.getLayer("f4-park-tree-shadow")) {
-    try {
-      const layerDef = withOptionalFilter(
-        {
-          id: "f4-park-tree-shadow",
-          type: "symbol",
-          source: firstParkFillLayer.source,
-          "source-layer":
-            "source-layer" in firstParkFillLayer
-              ? firstParkFillLayer["source-layer"]
-              : undefined,
-          minzoom: 14,
-          layout: {
-            "text-field": "●",
-            "text-size": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              14,
-              7,
-              18,
-              11,
-            ],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-            "symbol-spacing": 150,
-          },
-          paint: {
-            "text-color": "#2f4a28",
-            "text-opacity": 0.22,
-            "text-translate": [1.3, 1.5],
-          },
-        } as any,
-        firstParkFillLayer.filter,
-      );
-      map.addLayer(
-        layerDef as any,
-        firstParkFillLayer.id,
-      );
-    } catch {}
-  }
-
-  if (firstParkFillLayer && !map.getLayer("f4-park-trees-tall")) {
-    try {
-      const layerDef = withOptionalFilter(
-        {
-          id: "f4-park-trees-tall",
-          type: "symbol",
-          source: firstParkFillLayer.source,
-          "source-layer":
-            "source-layer" in firstParkFillLayer
-              ? firstParkFillLayer["source-layer"]
-              : undefined,
-          minzoom: 14,
-          layout: {
-            "text-field": "▴",
-            "text-size": ["interpolate", ["linear"], ["zoom"], 14, 8, 18, 13],
-            "text-allow-overlap": false,
-            "symbol-spacing": 220,
-          },
-          paint: {
-            "text-color": "#4f7c3a",
-            "text-opacity": 0.32,
-            "text-halo-color": "#e5f5d6",
-            "text-halo-width": 0.3,
-          },
-        } as any,
-        firstParkFillLayer.filter,
-      );
-      map.addLayer(
-        layerDef as any,
-        firstParkFillLayer.id,
-      );
-    } catch {}
-  }
-
-  if (firstParkFillLayer && !map.getLayer("f4-park-trees-compact")) {
-    try {
-      const layerDef = withOptionalFilter(
-        {
-          id: "f4-park-trees-compact",
-          type: "symbol",
-          source: firstParkFillLayer.source,
-          "source-layer":
-            "source-layer" in firstParkFillLayer
-              ? firstParkFillLayer["source-layer"]
-              : undefined,
-          minzoom: 15,
-          layout: {
-            "text-field": "●",
-            "text-size": ["interpolate", ["linear"], ["zoom"], 15, 7, 18, 10],
-            "text-allow-overlap": false,
-            "symbol-spacing": 130,
-          },
-          paint: {
-            "text-color": "#5b8e45",
-            "text-opacity": 0.3,
-            "text-halo-color": "#d8edc5",
-            "text-halo-width": 0.25,
-          },
-        } as any,
-        firstParkFillLayer.filter,
-      );
-      map.addLayer(
-        layerDef as any,
-        firstParkFillLayer.id,
-      );
-    } catch {}
-  }
-
-  if (firstParkFillLayer && !map.getLayer("f4-park-trees-ornamental")) {
-    try {
-      const layerDef = withOptionalFilter(
-        {
-          id: "f4-park-trees-ornamental",
-          type: "symbol",
-          source: firstParkFillLayer.source,
-          "source-layer":
-            "source-layer" in firstParkFillLayer
-              ? firstParkFillLayer["source-layer"]
-              : undefined,
-          minzoom: 16,
-          layout: {
-            "text-field": "◆",
-            "text-size": ["interpolate", ["linear"], ["zoom"], 16, 6, 19, 9],
-            "text-allow-overlap": false,
-            "symbol-spacing": 260,
-          },
-          paint: {
-            "text-color": "#6fa55a",
-            "text-opacity": 0.28,
-            "text-halo-color": "#ebf6df",
-            "text-halo-width": 0.2,
           },
         } as any,
         firstParkFillLayer.filter,

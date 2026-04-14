@@ -21,6 +21,8 @@ import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
 import { applyF4InspiredMapStyle } from "@/features/map/lib/apply-f4-inspired-map-style";
 import { buildAmbientTrafficSource } from "@/features/map/lib/build-ambient-traffic-source";
+import { buildViewportVegetation } from "@/features/map/lib/build-viewport-vegetation";
+import { buildViewportWaterEffect } from "@/features/map/lib/build-viewport-water-effect";
 import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -156,6 +158,9 @@ export function MapLibreMap({
   const ambientTrafficBodyLayerId = "ambient-traffic-body-3d";
   const ambientTrafficRoofLayerId = "ambient-traffic-roof-3d";
   const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
+  const waterViewportSourceId = "f4-water-viewport-source";
+  const waterViewportBaseLayerId = "f4-water-viewport-shimmer-base";
+  const waterViewportDetailLayerId = "f4-water-viewport-shimmer-detail";
   const parkTreeSourceId = "f4-park-tree-points";
   const parkTreeShadowLayerId = "f4-park-tree-shadow-circles";
   const parkTreeCanopyLayerId = "f4-park-tree-canopy-circles";
@@ -703,49 +708,56 @@ export function MapLibreMap({
 
   useEffect(() => {
     if (!mapInstance) return;
-    let frame = 0;
-    let last = performance.now();
-    let phase = 0;
+    let lastRefresh = 0;
 
-    const tick = (now: number) => {
-      const elapsed = now - last;
-      if (elapsed < 120) {
-        frame = requestAnimationFrame(tick);
-        return;
-      }
-      last = now;
-      phase += elapsed * 0.0012;
-
-      if (mapInstance.getLayer("f4-water-shimmer")) {
-        const shimmerOpacity = 0.12 + Math.sin(phase) * 0.05;
-        try {
-          mapInstance.setPaintProperty(
-            "f4-water-shimmer",
-            "line-opacity",
-            shimmerOpacity,
-          );
-        } catch {}
-      }
-
-      frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [mapInstance]);
-
-  useEffect(() => {
-    if (!mapInstance) return;
-
-    const seededType = (lng: number, lat: number) => {
-      const hash = Math.abs(Math.floor((lng * 9973 + lat * 7919) * 10000)) % 10;
-      if (hash < 2) return "tall";
-      if (hash < 7) return "compact";
-      return "ornamental";
-    };
-
-    const refreshTrees = () => {
+    const refreshEnvironmentViewport = () => {
+      const now = performance.now();
+      if (now - lastRefresh < 180) return;
+      lastRefresh = now;
       const style = mapInstance.getStyle();
+      if (!style?.layers?.length) return;
+
+      const canvas = mapInstance.getCanvas();
+      const screenPad = 88;
+      const queryBox: [[number, number], [number, number]] = [
+        [-screenPad, -screenPad],
+        [canvas.width + screenPad, canvas.height + screenPad],
+      ];
+      const viewportBounds = mapInstance.getBounds();
+      const bufferedBounds = {
+        west: viewportBounds.getWest() - 0.01,
+        south: viewportBounds.getSouth() - 0.01,
+        east: viewportBounds.getEast() + 0.01,
+        north: viewportBounds.getNorth() + 0.01,
+      };
+
+      const waterLayerIds =
+        style.layers
+          ?.filter(
+            (layer) =>
+              layer.type === "fill" && /(water|ocean|river|lake)/i.test(layer.id),
+          )
+          .map((layer) => layer.id)
+          .slice(0, 4) ?? [];
+
+      if (waterLayerIds.length) {
+        const waterFeatures = mapInstance.queryRenderedFeatures(queryBox, {
+          layers: waterLayerIds,
+        });
+        const waterData = buildViewportWaterEffect(waterFeatures);
+        const waterSource = mapInstance.getSource(waterViewportSourceId) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+        if (!waterSource) {
+          mapInstance.addSource(waterViewportSourceId, {
+            type: "geojson",
+            data: waterData,
+          });
+        } else {
+          waterSource.setData(waterData);
+        }
+      }
+
       const parkLayerIds =
         style?.layers
           ?.filter(
@@ -753,61 +765,16 @@ export function MapLibreMap({
               layer.type === "fill" && /(park|green|grass)/i.test(layer.id),
           )
           .map((layer) => layer.id) ?? [];
-      if (!parkLayerIds.length) return;
-
-      const features = mapInstance.queryRenderedFeatures(undefined, {
-        layers: parkLayerIds.slice(0, 3),
-      });
-
-      const maxTrees =
-        mapZoom >= 17
-          ? detailPreset === "high"
-            ? 300
-            : 220
-          : mapZoom >= 15
-            ? detailPreset === "high"
-              ? 180
-              : 130
-            : 80;
-      const step = mapZoom >= 17 ? 5 : mapZoom >= 15 ? 7 : 10;
-
-      const points: Array<{
-        type: "Feature";
-        geometry: { type: "Point"; coordinates: [number, number] };
-        properties: { treeType: "tall" | "compact" | "ornamental" };
-      }> = [];
-
-      for (const feature of features) {
-        const geometry = feature.geometry;
-        const rings =
-          geometry?.type === "Polygon"
-            ? geometry.coordinates
-            : geometry?.type === "MultiPolygon"
-              ? geometry.coordinates.flat()
-              : [];
-
-        for (const ring of rings) {
-          for (let index = 0; index < ring.length; index += step) {
-            const point = ring[index];
-            if (!point) continue;
-            points.push({
-              type: "Feature",
-              geometry: { type: "Point", coordinates: [point[0], point[1]] },
-              properties: {
-                treeType: seededType(point[0], point[1]),
-              },
-            });
-            if (points.length >= maxTrees) break;
-          }
-          if (points.length >= maxTrees) break;
-        }
-        if (points.length >= maxTrees) break;
-      }
-
-      const treeData: FeatureCollection = {
-        type: "FeatureCollection",
-        features: points,
-      };
+      const treeData: FeatureCollection = parkLayerIds.length
+        ? buildViewportVegetation({
+            features: mapInstance.queryRenderedFeatures(queryBox, {
+              layers: parkLayerIds.slice(0, 3),
+            }),
+            viewportBounds: bufferedBounds,
+            detailPreset,
+            mapZoom,
+          })
+        : { type: "FeatureCollection", features: [] };
 
       const source = mapInstance.getSource(parkTreeSourceId) as
         | maplibregl.GeoJSONSource
@@ -823,8 +790,69 @@ export function MapLibreMap({
 
       const addLayerIfMissing = (layer: maplibregl.LayerSpecification) => {
         if (mapInstance.getLayer(layer.id)) return;
-        mapInstance.addLayer(layer);
+        try {
+          mapInstance.addLayer(layer);
+        } catch {}
       };
+
+      if (mapInstance.getSource(waterViewportSourceId)) {
+        addLayerIfMissing({
+          id: waterViewportBaseLayerId,
+          type: "line",
+          source: waterViewportSourceId,
+          paint: {
+            "line-color": "#dbeafe",
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              detailPreset === "high" ? 0.14 : 0.1,
+              14,
+              detailPreset === "high" ? 0.2 : 0.14,
+              18,
+              detailPreset === "high" ? 0.24 : 0.18,
+            ],
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.3,
+              14,
+              0.65,
+              17,
+              1.0,
+              20,
+              1.3,
+            ],
+            "line-dasharray": [1.2, 1.8],
+          },
+        });
+
+        addLayerIfMissing({
+          id: waterViewportDetailLayerId,
+          type: "line",
+          source: waterViewportSourceId,
+          minzoom: 14.5,
+          paint: {
+            "line-color": "#eef6ff",
+            "line-opacity": detailPreset === "high" ? 0.14 : 0.08,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              15,
+              0.35,
+              18,
+              0.8,
+              20,
+              1.1,
+            ],
+            "line-dasharray": [0.6, 1.2],
+          },
+        });
+      }
 
       addLayerIfMissing({
         id: parkTreeShadowLayerId,
@@ -896,13 +924,13 @@ export function MapLibreMap({
       });
     };
 
-    refreshTrees();
-    mapInstance.on("moveend", refreshTrees);
-    mapInstance.on("style.load", refreshTrees);
+    refreshEnvironmentViewport();
+    mapInstance.on("moveend", refreshEnvironmentViewport);
+    mapInstance.on("style.load", refreshEnvironmentViewport);
 
     return () => {
-      mapInstance.off("moveend", refreshTrees);
-      mapInstance.off("style.load", refreshTrees);
+      mapInstance.off("moveend", refreshEnvironmentViewport);
+      mapInstance.off("style.load", refreshEnvironmentViewport);
     };
   }, [detailPreset, mapInstance, mapZoom]);
 
