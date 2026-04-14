@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 import { FeaturePopup } from "@/components/map/feature-popup";
 import { RouteMarkers } from "@/components/map/navigation/route-markers";
 import type { SelectedFeature } from "@/features/map/hooks/use-selected-features";
@@ -39,7 +41,7 @@ type Props = {
   mapZoom: number;
 };
 
-export function MapFeatureOverlays({
+function MapFeatureOverlaysImpl({
   selectedFlood,
   selectedBuilding,
   selectedDrainage,
@@ -101,7 +103,9 @@ export function MapFeatureOverlays({
             },
             {
               label: "Base",
-              value: formatMeters(selectedBuilding.properties.render_min_height),
+              value: formatMeters(
+                selectedBuilding.properties.render_min_height,
+              ),
             },
           ]}
         />
@@ -160,3 +164,5 @@ export function MapFeatureOverlays({
     </>
   );
 }
+
+export const MapFeatureOverlays = memo(MapFeatureOverlaysImpl);

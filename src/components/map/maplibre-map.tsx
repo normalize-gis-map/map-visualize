@@ -21,8 +21,6 @@ import type { RouteAlternative } from "@/features/map/types/route.types";
 import {
   MAP_25D_DEFAULT_BEARING,
   MAP_25D_DEFAULT_PITCH,
-  MAP_25D_FAR_PITCH,
-  MAP_25D_NEAR_PITCH,
   MAP_GLYPHS_FALLBACK,
   MAP_STYLE_2D,
   MAP_STYLE_25D,
@@ -106,7 +104,6 @@ export function MapLibreMap({
 
   const hoveredId = hovered?.id ?? "";
   const selectedId = selectedFlood?.id ?? "";
-  const patchedGlyphUrlRef = useRef<string | null>(null);
   const [routePanelOpen, setRoutePanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
@@ -116,7 +113,9 @@ export function MapLibreMap({
     Position[][]
   >([]);
   const programmaticMoveRef = useRef(false);
-  const cameraPitchBucketRef = useRef<string | null>(null);
+  const hasAppliedInitial25DCameraRef = useRef(false);
+  const patchedStyleSignatureRef = useRef<string | null>(null);
+  const roadRefreshTickRef = useRef(0);
   const followTickRef = useRef(0);
   const lastFollowCenterRef = useRef<[number, number] | null>(null);
 
@@ -154,57 +153,68 @@ export function MapLibreMap({
   useEffect(() => {
     if (!mapInstance) return;
 
-    const patchStyleGlyphs = () => {
+    const applyStyleOncePerSignature = () => {
       const style = mapInstance.getStyle();
-      if (!style?.glyphs || style.glyphs === MAP_GLYPHS_FALLBACK) return;
-      if (patchedGlyphUrlRef.current === style.glyphs) return;
+      if (!style) return;
 
-      patchedGlyphUrlRef.current = style.glyphs;
-      const patchedLayers = style.layers?.map((layer) => {
-        if (
-          layer.type !== "symbol" ||
-          !layer.layout ||
-          !("text-font" in layer.layout)
-        ) {
-          return layer;
-        }
+      const signature = `${style.sprite ?? ""}|${style.glyphs ?? ""}|${style.layers?.length ?? 0}|${style.layers?.[0]?.id ?? ""}|${style.layers?.[style.layers.length - 1]?.id ?? ""}`;
+      if (patchedStyleSignatureRef.current === signature) return;
+      patchedStyleSignatureRef.current = signature;
 
-        return {
-          ...layer,
-          layout: {
-            ...layer.layout,
-            "text-font": ["Open Sans Regular"],
+      if (style.glyphs && style.glyphs !== MAP_GLYPHS_FALLBACK) {
+        const patchedLayers = style.layers?.map((layer) => {
+          if (
+            layer.type !== "symbol" ||
+            !layer.layout ||
+            !("text-font" in layer.layout)
+          ) {
+            return layer;
+          }
+
+          return {
+            ...layer,
+            layout: {
+              ...layer.layout,
+              "text-font": ["Open Sans Regular"],
+            },
+          };
+        });
+
+        mapInstance.setStyle(
+          {
+            ...style,
+            layers: patchedLayers,
+            glyphs: MAP_GLYPHS_FALLBACK,
           },
-        };
-      });
+          { diff: true },
+        );
+        return;
+      }
 
-      mapInstance.setStyle(
-        {
-          ...style,
-          layers: patchedLayers,
-          glyphs: MAP_GLYPHS_FALLBACK,
-        },
-        { diff: true },
-      );
-    };
-
-    const refreshPremiumStyle = () => {
-      patchStyleGlyphs();
       applyMapVisualStyle(mapInstance);
     };
 
-    refreshPremiumStyle();
-    mapInstance.on("styledata", refreshPremiumStyle);
+    applyStyleOncePerSignature();
+    mapInstance.on("style.load", applyStyleOncePerSignature);
 
     return () => {
-      mapInstance.off("styledata", refreshPremiumStyle);
+      mapInstance.off("style.load", applyStyleOncePerSignature);
     };
-  }, [applyMapVisualStyle, mapInstance, mapMode]);
+  }, [applyMapVisualStyle, mapInstance]);
 
   useEffect(() => {
     if (!mapInstance || !trafficVisualizationEnabled) return;
 
     const refreshRoadNetwork = () => {
+      const now = performance.now();
+      if (now - roadRefreshTickRef.current < 700) return;
+      roadRefreshTickRef.current = now;
+
+      if (mapInstance.getZoom() < 13) {
+        setAmbientNetworkRoutes((prev) => (prev.length ? [] : prev));
+        return;
+      }
+
       const style = mapInstance.getStyle();
       const roadLayerIds =
         style.layers
@@ -217,7 +227,7 @@ export function MapLibreMap({
       if (!roadLayerIds.length) return;
 
       const features = mapInstance.queryRenderedFeatures(undefined, {
-        layers: roadLayerIds.slice(0, 12),
+        layers: roadLayerIds.slice(0, 6),
       });
 
       const collected = features
@@ -229,7 +239,7 @@ export function MapLibreMap({
           return [];
         })
         .filter((coords) => coords.length > 3)
-        .slice(0, 220);
+        .slice(0, 80);
 
       setAmbientNetworkRoutes((prev) => {
         if (prev.length === collected.length) {
@@ -373,6 +383,22 @@ export function MapLibreMap({
     return 1;
   }, [mapZoom]);
 
+  useEffect(() => {
+    if (
+      !mapInstance ||
+      mapMode !== "2.5d" ||
+      hasAppliedInitial25DCameraRef.current
+    )
+      return;
+
+    hasAppliedInitial25DCameraRef.current = true;
+    mapInstance.easeTo({
+      pitch: MAP_25D_DEFAULT_PITCH,
+      bearing: MAP_25D_DEFAULT_BEARING,
+      duration: 120,
+    });
+  }, [mapInstance, mapMode]);
+
   const resetRouteRuntime = () => {
     pause();
     reset();
@@ -431,43 +457,6 @@ export function MapLibreMap({
     viewMode,
   ]);
 
-  useEffect(() => {
-    if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
-
-    const distance = cameraDistanceMeters ?? 1800;
-    const nearDistance = 380;
-    const farDistance = 3400;
-    const progress = Math.min(
-      1,
-      Math.max(0, (distance - nearDistance) / (farDistance - nearDistance)),
-    );
-
-    const targetPitch =
-      MAP_25D_NEAR_PITCH - (MAP_25D_NEAR_PITCH - MAP_25D_FAR_PITCH) * progress;
-    const targetBearing = MAP_25D_DEFAULT_BEARING * (1 - progress);
-
-    const currentPitch = mapInstance.getPitch();
-    const currentBearing = mapInstance.getBearing();
-
-    if (
-      Math.abs(currentPitch - targetPitch) < 0.45 &&
-      Math.abs(currentBearing - targetBearing) < 0.6
-    ) {
-      return;
-    }
-
-    const bucket = `${Math.round(targetPitch * 2) / 2}:${Math.round(targetBearing * 2) / 2}`;
-    if (cameraPitchBucketRef.current === bucket) return;
-    cameraPitchBucketRef.current = bucket;
-
-    mapInstance.easeTo({
-      pitch: targetPitch,
-      bearing: targetBearing,
-      duration: 460,
-      easing: (t) => 1 - Math.pow(1 - t, 2.4),
-    });
-  }, [cameraDistanceMeters, mapInstance, mapMode, viewMode]);
-
   return (
     <div className="map-shell relative h-full w-full">
       <Map
@@ -499,13 +488,15 @@ export function MapLibreMap({
           if (Math.abs(event.viewState.zoom - mapZoom) > 0.01) {
             setMapZoom(event.viewState.zoom);
           }
-          setMapBearing(event.viewState.bearing);
+          if (Math.abs(event.viewState.bearing - mapBearing) > 0.9) {
+            setMapBearing(event.viewState.bearing);
+          }
         }}
         onMoveEnd={(event) => {
           const bounds = event.target.getBounds();
           const nextDistance = estimateBoundsWidthMeters(bounds);
           setCameraDistanceMeters((prev) => {
-            if (prev !== null && Math.abs(prev - nextDistance) < 10)
+            if (prev !== null && Math.abs(prev - nextDistance) < 45)
               return prev;
             return nextDistance;
           });
@@ -518,10 +509,10 @@ export function MapLibreMap({
             };
             if (
               prev &&
-              Math.abs(prev.west - next.west) < 0.0001 &&
-              Math.abs(prev.south - next.south) < 0.0001 &&
-              Math.abs(prev.east - next.east) < 0.0001 &&
-              Math.abs(prev.north - next.north) < 0.0001
+              Math.abs(prev.west - next.west) < 0.0007 &&
+              Math.abs(prev.south - next.south) < 0.0007 &&
+              Math.abs(prev.east - next.east) < 0.0007 &&
+              Math.abs(prev.north - next.north) < 0.0007
             ) {
               return prev;
             }
@@ -537,11 +528,12 @@ export function MapLibreMap({
 
           applyMapVisualStyle(loadedMap);
 
-          if (mapMode === "2.5d") {
+          if (mapMode === "2.5d" && !hasAppliedInitial25DCameraRef.current) {
+            hasAppliedInitial25DCameraRef.current = true;
             loadedMap.easeTo({
               pitch: MAP_25D_DEFAULT_PITCH,
               bearing: MAP_25D_DEFAULT_BEARING,
-              duration: 80,
+              duration: 120,
             });
           }
 
