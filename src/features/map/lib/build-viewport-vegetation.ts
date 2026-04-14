@@ -135,11 +135,18 @@ function getTreeBudget(
   detailPreset: "balanced" | "high",
   mode: GreenAreaRenderMode,
 ): number {
-  if (zoom < 16) {
-    const midBase = detailPreset === "high" ? 44 : 32;
-    if (mode === "dense_wooded") return Math.floor(midBase * 1.12);
-    if (mode === "park_trees") return midBase;
+  if (zoom < 15) {
+    const sparseBase = detailPreset === "high" ? 24 : 16;
+    if (mode === "dense_wooded") return Math.floor(sparseBase * 1.18);
+    if (mode === "park_trees") return sparseBase;
     return 0;
+  }
+
+  if (zoom < 17) {
+    const midBase = detailPreset === "high" ? 84 : 62;
+    if (mode === "dense_wooded") return Math.floor(midBase * 1.18);
+    if (mode === "park_trees") return midBase;
+    return detailPreset === "high" ? 10 : 7;
   }
 
   const base =
@@ -162,10 +169,9 @@ function getGlobalTreeBudget(
   zoom: number,
   detailPreset: "balanced" | "high",
 ): number {
-  if (zoom < 16) return detailPreset === "high" ? 56 : 40;
-  if (zoom >= 17) return detailPreset === "high" ? 320 : 240;
-  if (zoom >= 15) return detailPreset === "high" ? 200 : 150;
-  return 90;
+  if (zoom < 15) return detailPreset === "high" ? 46 : 32;
+  if (zoom < 17) return detailPreset === "high" ? 140 : 102;
+  return detailPreset === "high" ? 320 : 240;
 }
 
 function readSemanticText(properties?: GeoJsonProperties): string {
@@ -322,10 +328,10 @@ export function buildViewportVegetation(params: {
         properties: feature.properties,
         outerRing,
       });
-      if (mapZoom < 16 && mode === "grass_first") continue;
-      if (mapZoom < 16 && mode === "park_trees") {
+      if (mapZoom < 15 && mode === "grass_first") continue;
+      if (mapZoom < 15 && mode === "park_trees") {
         const semanticBoost = isStrongTreeAreaSignal(feature.properties);
-        if (!semanticBoost && unitFromStableHash(featureSeed, "midzoom-filter") < 0.55)
+        if (!semanticBoost && unitFromStableHash(featureSeed, "midzoom-filter") < 0.72)
           continue;
       }
       const perPolygonBudget = getTreeBudget(mapZoom, detailPreset, mode);
