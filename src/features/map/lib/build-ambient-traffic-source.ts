@@ -1,6 +1,7 @@
 import type { FeatureCollection, Polygon } from "geojson";
 
 import type { AmbientTrafficVehicle } from "@/features/map/hooks/use-ambient-traffic";
+import { getRoadTrafficEnvelope } from "@/features/map/lib/get-road-traffic-envelope";
 
 function metersToLatitudeDegrees(meters: number) {
   return meters / 111320;
@@ -60,14 +61,14 @@ function orientedBoxPolygon(
 
 export function buildAmbientTrafficSource(
   vehicles: AmbientTrafficVehicle[],
+  zoom: number,
 ): FeatureCollection<Polygon> {
   return {
     type: "FeatureCollection",
     features: vehicles.flatMap((vehicle) => {
-      const bodyLength =
-        vehicle.roadClass === "major" ? 6.2 : vehicle.roadClass === "medium" ? 5.2 : 4.4;
-      const bodyWidth =
-        vehicle.roadClass === "major" ? 2.1 : vehicle.roadClass === "medium" ? 1.8 : 1.5;
+      const envelope = getRoadTrafficEnvelope(vehicle.roadClass, zoom);
+      const bodyLength = envelope.vehicleLength;
+      const bodyWidth = envelope.vehicleWidth;
       const roofLength = bodyLength * 0.52;
       const roofWidth = bodyWidth * 0.72;
       const windshieldLength = bodyLength * 0.2;

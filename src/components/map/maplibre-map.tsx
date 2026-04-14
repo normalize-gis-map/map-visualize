@@ -550,7 +550,7 @@ export function MapLibreMap({
       )?.id;
       if (!beforeLayerId) return;
 
-      const sourceData = buildAmbientTrafficSource(visibleAmbientTraffic);
+      const sourceData = buildAmbientTrafficSource(visibleAmbientTraffic, mapZoom);
       const source = mapInstance.getSource(
         ambientTrafficSourceId,
       ) as maplibregl.GeoJSONSource | null;
@@ -652,7 +652,7 @@ export function MapLibreMap({
     return () => {
       mapInstance.off("style.load", ensureAmbientTrafficLayers);
     };
-  }, [mapInstance, visibleAmbientTraffic]);
+  }, [mapInstance, mapZoom, visibleAmbientTraffic]);
 
   const vehicleScaleMultiplier = useMemo(() => {
     const baseZoomScale =
@@ -696,6 +696,39 @@ export function MapLibreMap({
       duration: 120,
     });
   }, [mapInstance, mapMode]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+    let frame = 0;
+    let last = performance.now();
+    let phase = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - last;
+      if (elapsed < 120) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      last = now;
+      phase += elapsed * 0.0012;
+
+      if (mapInstance.getLayer("f4-water-shimmer")) {
+        const shimmerOpacity = 0.12 + Math.sin(phase) * 0.05;
+        try {
+          mapInstance.setPaintProperty(
+            "f4-water-shimmer",
+            "line-opacity",
+            shimmerOpacity,
+          );
+        } catch {}
+      }
+
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [mapInstance]);
 
   const resetRouteRuntime = () => {
     pause();

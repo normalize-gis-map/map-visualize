@@ -149,6 +149,12 @@ export function applyF4InspiredMapStyle(
   const roadLayers = style.layers.filter(
     (layer) => layer.type === "line" && ROAD_NAME_RE.test(layer.id),
   ) as Array<any>;
+  const firstWaterFillLayer = style.layers.find(
+    (layer) => layer.type === "fill" && /(water|ocean|river|lake)/i.test(layer.id),
+  ) as any;
+  const firstParkFillLayer = style.layers.find(
+    (layer) => layer.type === "fill" && /(park|green|grass)/i.test(layer.id),
+  ) as any;
 
   for (const layer of style.layers) {
     const layerId = layer.id;
@@ -157,6 +163,16 @@ export function applyF4InspiredMapStyle(
     if (layer.type === "fill-extrusion" && /building/i.test(id)) {
       setPaintSafe(map, layerId, "fill-extrusion-opacity", 0.88);
       setPaintSafe(map, layerId, "fill-extrusion-vertical-gradient", true);
+      continue;
+    }
+
+    if (layer.type === "fill" && /(water|ocean|river|lake)/i.test(id)) {
+      setPaintSafe(map, layerId, "fill-opacity", 0.9);
+      continue;
+    }
+
+    if (layer.type === "fill" && /(park|green|grass)/i.test(id)) {
+      setPaintSafe(map, layerId, "fill-opacity", 0.92);
       continue;
     }
 
@@ -234,6 +250,103 @@ export function applyF4InspiredMapStyle(
       setPaintSafe(map, layerId, "text-halo-width", 0.9);
       setPaintSafe(map, layerId, "text-opacity", 0.78);
     }
+  }
+
+  if (firstWaterFillLayer && !map.getLayer("f4-water-shimmer")) {
+    try {
+      map.addLayer(
+        {
+          id: "f4-water-shimmer",
+          type: "line",
+          source: firstWaterFillLayer.source,
+          "source-layer":
+            "source-layer" in firstWaterFillLayer
+              ? firstWaterFillLayer["source-layer"]
+              : undefined,
+          filter: firstWaterFillLayer.filter,
+          paint: {
+            "line-color": "#dbeafe",
+            "line-opacity": 0.16,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              11,
+              0.25,
+              14,
+              0.5,
+              17,
+              0.85,
+              20,
+              1.2,
+            ],
+            "line-dasharray": [1.2, 1.8],
+          },
+        } as any,
+        firstWaterFillLayer.id,
+      );
+    } catch {}
+  }
+
+  if (firstParkFillLayer && !map.getLayer("f4-park-grass")) {
+    try {
+      map.addLayer(
+        {
+          id: "f4-park-grass",
+          type: "fill",
+          source: firstParkFillLayer.source,
+          "source-layer":
+            "source-layer" in firstParkFillLayer
+              ? firstParkFillLayer["source-layer"]
+              : undefined,
+          filter: firstParkFillLayer.filter,
+          paint: {
+            "fill-color": "#78a95f",
+            "fill-opacity": 0.11,
+          },
+        } as any,
+        firstParkFillLayer.id,
+      );
+    } catch {}
+  }
+
+  if (firstParkFillLayer && !map.getLayer("f4-park-trees")) {
+    try {
+      map.addLayer(
+        {
+          id: "f4-park-trees",
+          type: "symbol",
+          source: firstParkFillLayer.source,
+          "source-layer":
+            "source-layer" in firstParkFillLayer
+              ? firstParkFillLayer["source-layer"]
+              : undefined,
+          filter: firstParkFillLayer.filter,
+          minzoom: 14,
+          layout: {
+            "text-field": "▲",
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              14,
+              8,
+              18,
+              12,
+            ],
+            "text-allow-overlap": false,
+            "symbol-spacing": 180,
+          },
+          paint: {
+            "text-color": "#4f7c3a",
+            "text-opacity": 0.34,
+            "text-halo-color": "#e5f5d6",
+            "text-halo-width": 0.4,
+          },
+        } as any,
+        firstParkFillLayer.id,
+      );
+    } catch {}
   }
 
   const laneDetailEnabled = options?.laneDetailEnabled ?? true;

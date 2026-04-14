@@ -256,7 +256,11 @@ export function useAmbientTraffic({
     return streamVehicles
       .map((vehicle) => {
         const routeEntry = routes[vehicle.routeIndex] ?? routes[0];
-        const route = routeEntry?.coordinates;
+        const baseRoute = routeEntry?.coordinates;
+        const route =
+          vehicle.direction === "backward" && baseRoute
+            ? [...baseRoute].reverse()
+            : baseRoute;
         if (!route || route.length < 2) return null;
 
         const baseLaneOffset = getClampedLaneOffsetMeters(vehicle.roadClass, zoom);
@@ -273,15 +277,11 @@ export function useAmbientTraffic({
           directionSign * baseLaneOffset +
           (vehicle.laneVariant === 1 ? directionSign * laneSpread : 0);
         const baseSpeed = 0.0095;
-        const progressShift =
-          simulationClock * baseSpeed * vehicle.speedFactor * directionSign;
+        const progressShift = simulationClock * baseSpeed * vehicle.speedFactor;
         const progress = ((vehicle.baseProgress + progressShift) % 1 + 1) % 1;
         const nextSample = sampleRouteAtProgress(route, progress);
         if (!nextSample) return null;
-        const directionalBearing =
-          vehicle.direction === "forward"
-            ? normalizeBearing(nextSample.bearing)
-            : normalizeBearing(nextSample.bearing + 180);
+        const directionalBearing = normalizeBearing(nextSample.bearing);
         const shifted = offsetRouteSample(
           { ...nextSample, bearing: directionalBearing },
           laneOffset,
