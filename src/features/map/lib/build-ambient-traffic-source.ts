@@ -16,33 +16,64 @@ export function buildAmbientTrafficSource(
 ): FeatureCollection<LineString> {
   return {
     type: "FeatureCollection",
-    features: vehicles.map((vehicle) => {
-      const lengthMeters =
+    features: vehicles.flatMap((vehicle) => {
+      const bodyLength =
         vehicle.roadClass === "major" ? 6.4 : vehicle.roadClass === "medium" ? 5.4 : 4.6;
+      const roofLength = bodyLength * 0.54;
+      const windshieldLength = bodyLength * 0.2;
       const headingRad = (vehicle.bearing * Math.PI) / 180;
-      const half = lengthMeters / 2;
-      const dx = Math.sin(headingRad) * half;
-      const dy = Math.cos(headingRad) * half;
+      const ux = Math.sin(headingRad);
+      const uy = Math.cos(headingRad);
+      const toCoordinate = (distance: number): [number, number] => [
+        vehicle.lng + metersToLongitudeDegrees(ux * distance, vehicle.lat),
+        vehicle.lat + metersToLatitudeDegrees(uy * distance),
+      ];
 
-      const tailLng = vehicle.lng - metersToLongitudeDegrees(dx, vehicle.lat);
-      const tailLat = vehicle.lat - metersToLatitudeDegrees(dy);
-      const headLng = vehicle.lng + metersToLongitudeDegrees(dx, vehicle.lat);
-      const headLat = vehicle.lat + metersToLatitudeDegrees(dy);
+      const bodyTail = toCoordinate(-bodyLength * 0.5);
+      const bodyHead = toCoordinate(bodyLength * 0.5);
+      const roofTail = toCoordinate(-roofLength * 0.42);
+      const roofHead = toCoordinate(roofLength * 0.58);
+      const windshieldTail = toCoordinate(bodyLength * 0.2);
+      const windshieldHead = toCoordinate(bodyLength * 0.2 + windshieldLength);
 
-      return {
-        type: "Feature",
-        geometry: {
-          type: "LineString",
-          coordinates: [
-            [tailLng, tailLat],
-            [headLng, headLat],
-          ],
+      return [
+        {
+          type: "Feature" as const,
+          geometry: {
+            type: "LineString" as const,
+            coordinates: [bodyTail, bodyHead],
+          },
+          properties: {
+            id: `${vehicle.id}-body`,
+            roadClass: vehicle.roadClass,
+            part: "body",
+          },
         },
-        properties: {
-          id: vehicle.id,
-          roadClass: vehicle.roadClass,
+        {
+          type: "Feature" as const,
+          geometry: {
+            type: "LineString" as const,
+            coordinates: [roofTail, roofHead],
+          },
+          properties: {
+            id: `${vehicle.id}-roof`,
+            roadClass: vehicle.roadClass,
+            part: "roof",
+          },
         },
-      };
+        {
+          type: "Feature" as const,
+          geometry: {
+            type: "LineString" as const,
+            coordinates: [windshieldTail, windshieldHead],
+          },
+          properties: {
+            id: `${vehicle.id}-windshield`,
+            roadClass: vehicle.roadClass,
+            part: "windshield",
+          },
+        },
+      ];
     }),
   };
 }

@@ -154,6 +154,8 @@ export function MapLibreMap({
   const ambientTrafficSourceId = "ambient-traffic-source";
   const ambientTrafficShadowLayerId = "ambient-traffic-shadow";
   const ambientTrafficBodyLayerId = "ambient-traffic-body";
+  const ambientTrafficRoofLayerId = "ambient-traffic-roof";
+  const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield";
   const programmaticMoveRef = useRef(false);
   const hasAppliedInitial25DCameraRef = useRef(false);
   const patchedStyleSignatureRef = useRef<string | null>(null);
@@ -556,27 +558,28 @@ export function MapLibreMap({
           id: ambientTrafficShadowLayerId,
           type: "line",
           source: ambientTrafficSourceId,
+          filter: ["==", ["get", "part"], "body"],
           layout: {
             "line-cap": "round",
             "line-join": "round",
           },
           paint: {
             "line-color": "#0f172a",
-            "line-opacity": 0.2,
+            "line-opacity": 0.18,
             "line-width": [
               "interpolate",
               ["linear"],
               ["zoom"],
               12,
-              1.2,
+              1,
               14,
-              1.6,
+              1.35,
               16,
-              2.1,
+              1.8,
               18,
-              2.8,
+              2.3,
               20,
-              3.3,
+              2.8,
             ],
           },
         },
@@ -590,6 +593,7 @@ export function MapLibreMap({
           id: ambientTrafficBodyLayerId,
           type: "line",
           source: ambientTrafficSourceId,
+          filter: ["==", ["get", "part"], "body"],
           layout: {
             "line-cap": "round",
             "line-join": "round",
@@ -602,23 +606,93 @@ export function MapLibreMap({
               "#f8fafc",
               "medium",
               "#e2e8f0",
-              "#cbd5e1",
+              "#d1d5db",
             ],
+            "line-opacity": 0.95,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              0.6,
+              14,
+              0.8,
+              16,
+              1.05,
+              18,
+              1.35,
+              20,
+              1.7,
+            ],
+          },
+        },
+        beforeLayerId,
+      );
+    }
+
+    if (!mapInstance.getLayer(ambientTrafficRoofLayerId)) {
+      mapInstance.addLayer(
+        {
+          id: ambientTrafficRoofLayerId,
+          type: "line",
+          source: ambientTrafficSourceId,
+          filter: ["==", ["get", "part"], "roof"],
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#f8fafc",
             "line-opacity": 0.92,
             "line-width": [
               "interpolate",
               ["linear"],
               ["zoom"],
               12,
-              0.75,
+              0.38,
               14,
-              1,
+              0.52,
               16,
-              1.35,
+              0.68,
               18,
-              1.8,
+              0.9,
               20,
-              2.2,
+              1.1,
+            ],
+          },
+        },
+        beforeLayerId,
+      );
+    }
+
+    if (!mapInstance.getLayer(ambientTrafficWindshieldLayerId)) {
+      mapInstance.addLayer(
+        {
+          id: ambientTrafficWindshieldLayerId,
+          type: "line",
+          source: ambientTrafficSourceId,
+          filter: ["==", ["get", "part"], "windshield"],
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#94a3b8",
+            "line-opacity": 0.88,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              0.2,
+              14,
+              0.28,
+              16,
+              0.36,
+              18,
+              0.5,
+              20,
+              0.64,
             ],
           },
         },
