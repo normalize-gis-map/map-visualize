@@ -8,11 +8,13 @@ import { PLACES, type PlaceItem } from "@/data/places";
 type SearchPanelProps = {
   onSelectPlace: (place: PlaceItem) => void;
   compact?: boolean;
+  inlineResults?: boolean;
 };
 
 export function SearchPanel({
   onSelectPlace,
   compact = false,
+  inlineResults = false,
 }: SearchPanelProps) {
   const [query, setQuery] = useState("");
 
@@ -52,7 +54,11 @@ export function SearchPanel({
       </div>
 
       {results.length > 0 && (
-        <div className="absolute top-[calc(100%+8px)] right-0 left-0 z-50 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+        <div
+          className={`right-0 left-0 z-50 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl ${
+            inlineResults ? "mt-2 max-h-72 overflow-y-auto" : "absolute top-[calc(100%+8px)]"
+          }`}
+        >
           <div className="space-y-2">
             {results.map((place) => (
               <button

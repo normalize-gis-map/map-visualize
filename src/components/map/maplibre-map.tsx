@@ -1,41 +1,32 @@
 "use client";
 
-import { Menu } from "lucide-react";
-import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
+import type { FeatureCollection, Position } from "geojson";
 import maplibregl from "maplibre-gl";
-import type { FeatureCollection } from "geojson";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Map, { NavigationControl } from "react-map-gl/maplibre";
 
-import drainageData from "@/data/geojson/drainage-sample.json";
 import floodData from "@/data/geojson/flood-sample.json";
-import riskZonesData from "@/data/geojson/risk-zones-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
-import type { RouteAlternative } from "@/features/map/types/route.types";
-import { useMapStore } from "@/features/map/store/map.store";
-import {
-  MAP_GLYPHS_FALLBACK,
-  MAP_STYLE_2D,
-  MAP_STYLE_25D,
-} from "@/lib/constants/map.constants";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
+import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
 import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
+import { useMapStore } from "@/features/map/store/map.store";
+import type { RouteAlternative } from "@/features/map/types/route.types";
 import {
-  formatMeters,
-  formatScore,
-  formatSeverityTone,
-  formatStatusTone,
-  formatLevelTone,
-} from "@/utils/formatters";
+  MAP_GLYPHS_FALLBACK,
+  MAP_STYLE_2D,
+  MAP_STYLE_25D,
+} from "@/lib/constants/map.constants";
 
-import { FeaturePopup } from "./feature-popup";
-import { MapLegend } from "./map-legend";
-import { RouteDrawer } from "./navigation/route-drawer";
-import { RouteMarkers } from "./navigation/route-markers";
+import { MapDataLayers } from "./map-data-layers";
+import { MapFeatureOverlays } from "./map-feature-overlays";
+import { NavigationHud } from "./navigation/navigation-hud";
+import { RouteVisualLayers } from "./navigation/route-visual-layers";
 
 type Props = {
   selectedPlace: PlaceItem | null;
@@ -46,22 +37,35 @@ type Props = {
     routes: RouteAlternative[];
     activeIndex: number;
   } | null;
+  onRouteClear: () => void;
 };
 
 export function MapLibreMap({
   selectedPlace,
   floodData: serverFloodData,
   routePayload,
+  onRouteClear,
 }: Props) {
   const {
     mapMode,
     visibleLayers,
     buildingOpacity,
+    trafficVisualizationEnabled,
+    toggleTrafficVisualization,
     notifyMapInteraction,
     setMapEngine,
   } =
     useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
+  const [mapZoom, setMapZoom] = useState(11.2);
+  const [mapBearing, setMapBearing] = useState(0);
+  const [mapBounds, setMapBounds] = useState<{
+    west: number;
+    south: number;
+    east: number;
+    north: number;
+  } | null>(null);
+  const [cameraDistanceMeters, setCameraDistanceMeters] = useState<number | null>(null);
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -98,7 +102,22 @@ export function MapLibreMap({
   const [routePanelOpen, setRoutePanelOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
   const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
+  const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);
+  const [driveTiltDeg, setDriveTiltDeg] = useState(78);
+  const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<Position[][]>([]);
   const programmaticMoveRef = useRef(false);
+  const zoomPitchStateRef = useRef<"far" | "near" | null>(null);
+  const followTickRef = useRef(0);
+  const lastFollowCenterRef = useRef<[number, number] | null>(null);
+
+  const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+    const lat = (bounds.getNorth() + bounds.getSouth()) / 2;
+    const deltaLng = Math.abs(east - west);
+    const metersPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
+    return Math.max(0, deltaLng * metersPerDegLng);
+  };
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
@@ -156,11 +175,56 @@ export function MapLibreMap({
     };
 
     patchStyleGlyphs();
-    mapInstance.on("styledata", patchStyleGlyphs);
-    return () => {
-      mapInstance.off("styledata", patchStyleGlyphs);
-    };
   }, [mapInstance, mapMode]);
+
+  useEffect(() => {
+    if (!mapInstance || !trafficVisualizationEnabled) return;
+
+    const refreshRoadNetwork = () => {
+      const style = mapInstance.getStyle();
+      const roadLayerIds =
+        style.layers
+          ?.filter((layer) => layer.type === "line" && layer.id.toLowerCase().includes("road"))
+          .map((layer) => layer.id) ?? [];
+
+      if (!roadLayerIds.length) return;
+
+      const features = mapInstance.queryRenderedFeatures(undefined, {
+        layers: roadLayerIds.slice(0, 12),
+      });
+
+      const collected = features
+        .flatMap((feature) => {
+          const geometry = feature.geometry;
+          if (!geometry) return [];
+          if (geometry.type === "LineString") return [geometry.coordinates];
+          if (geometry.type === "MultiLineString") return geometry.coordinates;
+          return [];
+        })
+        .filter((coords) => coords.length > 3)
+        .slice(0, 220);
+
+      setAmbientNetworkRoutes((prev) => {
+        if (prev.length === collected.length) {
+          const sameHead =
+            prev[0]?.[0]?.[0] === collected[0]?.[0]?.[0] &&
+            prev[0]?.[0]?.[1] === collected[0]?.[0]?.[1];
+          const sameTail =
+            prev[prev.length - 1]?.[0]?.[0] === collected[collected.length - 1]?.[0]?.[0] &&
+            prev[prev.length - 1]?.[0]?.[1] === collected[collected.length - 1]?.[0]?.[1];
+          if (sameHead && sameTail) return prev;
+        }
+        return collected;
+      });
+    };
+
+    refreshRoadNetwork();
+    mapInstance.on("moveend", refreshRoadNetwork);
+
+    return () => {
+      mapInstance.off("moveend", refreshRoadNetwork);
+    };
+  }, [mapInstance, trafficVisualizationEnabled]);
 
   const routeCollection: FeatureCollection | null = routePayload
     ? {
@@ -188,7 +252,10 @@ export function MapLibreMap({
     togglePlayback,
     pause,
     reset,
-    setProgress,
+    seek,
+    speedMultiplier,
+    availableSpeedMultipliers,
+    setSpeedMultiplier,
   } = useNavigationPlayback({
     geometry: activeRoute?.geometry ?? null,
     steps: activeRoute?.steps ?? [],
@@ -202,26 +269,120 @@ export function MapLibreMap({
   const distanceKm = activeRoute
     ? (activeRoute.distanceMeters / 1000).toFixed(1)
     : "0.0";
-  const trafficCars = useMemo(
-    () => (viewMode === "drive3d" ? trafficSamples : []),
-    [trafficSamples, viewMode],
-  );
+  const normalizedProgress = Number.isFinite(navProgress) ? navProgress : 0;
+  const safeProgress = Math.min(0.998, Math.max(0, normalizedProgress));
+  const progressFadeStart = Math.min(0.999, safeProgress + 0.0005);
+  const remainingProgressEnd = Math.min(0.9995, progressFadeStart + 0.018);
+  const trafficCars = useMemo(() => {
+    if (viewMode !== "drive3d" || !trafficVisualizationEnabled) return [];
 
+    const maxVehicles = mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
+    return trafficSamples.slice(0, maxVehicles);
+  }, [mapZoom, trafficSamples, trafficVisualizationEnabled, viewMode]);
+  const ambientRoutes = useMemo(
+    () =>
+      ambientNetworkRoutes.length
+        ? ambientNetworkRoutes
+        : routePayload?.routes.map((route) => route.geometry.coordinates) ?? [],
+    [ambientNetworkRoutes, routePayload],
+  );
+  const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
+    routes: ambientRoutes,
+    zoom: mapZoom,
+    enabled: trafficVisualizationEnabled,
+  });
+  const visibleAmbientTraffic = useMemo(() => {
+    if (!mapBounds) return ambientTraffic;
+    return ambientTraffic.filter(
+      (vehicle) =>
+        vehicle.lng >= mapBounds.west &&
+        vehicle.lng <= mapBounds.east &&
+        vehicle.lat >= mapBounds.south &&
+        vehicle.lat <= mapBounds.north,
+    );
+  }, [ambientTraffic, mapBounds]);
+
+  const resetRouteRuntime = () => {
+    pause();
+    reset();
+    setRoutePanelOpen(false);
+    setDrawerMinimalMode(false);
+    setMapLibreCar3D(false);
+  };
+
+  const handleToggleViewMode = (mode: "map" | "drive3d") => {
+    setViewMode(mode);
+  };
+
+  const handleSwitchToCesium = () => {
+    resetRouteRuntime();
+    setViewMode("map");
+    setMapEngine("cesium");
+  };
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
+    const now = performance.now();
+    const minFollowInterval = viewMode === "drive3d" ? 140 : 220;
+    if (now - followTickRef.current < minFollowInterval) return;
+
+    const prevCenter = lastFollowCenterRef.current;
+    if (prevCenter) {
+      const deltaLng = Math.abs(prevCenter[0] - navCoordinate[0]);
+      const deltaLat = Math.abs(prevCenter[1] - navCoordinate[1]);
+      if (deltaLng < 0.00001 && deltaLat < 0.00001) return;
+    }
+
+    followTickRef.current = now;
+    lastFollowCenterRef.current = navCoordinate;
     programmaticMoveRef.current = true;
     mapInstance.once("moveend", () => {
       programmaticMoveRef.current = false;
     });
     mapInstance.easeTo({
       center: navCoordinate,
-      pitch: mapMode === "2.5d" ? (viewMode === "drive3d" ? 78 : 62) : 0,
+      pitch:
+        mapMode === "2.5d"
+          ? viewMode === "drive3d"
+            ? driveTiltDeg
+            : 62
+          : 0,
       bearing: mapMode === "2.5d" ? navHeading : mapInstance.getBearing(),
       zoom: viewMode === "drive3d" ? Math.max(mapInstance.getZoom(), 14.5) : undefined,
       duration: viewMode === "drive3d" ? 240 : 280,
       easing: (t) => t,
     });
-  }, [mapInstance, navCoordinate, isNavigating, mapMode, navHeading, viewMode]);
+  }, [driveTiltDeg, mapInstance, navCoordinate, isNavigating, mapMode, navHeading, viewMode]);
+
+  useEffect(() => {
+    if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
+
+    const currentState = zoomPitchStateRef.current ?? "far";
+    let thresholdState: "far" | "near" = currentState;
+    if (cameraDistanceMeters !== null) {
+      if (cameraDistanceMeters <= 450) thresholdState = "near";
+      if (cameraDistanceMeters >= 550) thresholdState = "far";
+    }
+    if (zoomPitchStateRef.current === thresholdState) return;
+    zoomPitchStateRef.current = thresholdState;
+
+    if (thresholdState === "far") {
+      mapInstance.easeTo({
+        pitch: 0,
+        bearing: 0,
+        duration: 420,
+      });
+      return;
+    }
+
+    const currentPitch = mapInstance.getPitch();
+    if (currentPitch < 25) {
+      mapInstance.easeTo({
+        pitch: 52,
+        bearing: -10,
+        duration: 520,
+      });
+    }
+  }, [mapInstance, mapMode, viewMode, cameraDistanceMeters]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -250,396 +411,152 @@ export function MapLibreMap({
         onDragStart={() => {
           if (!programmaticMoveRef.current) notifyMapInteraction();
         }}
-        onLoad={(e) => setMapInstance(e.target)}
+        onMove={(event) => {
+          if (Math.abs(event.viewState.zoom - mapZoom) > 0.01) {
+            setMapZoom(event.viewState.zoom);
+          }
+          setMapBearing(event.viewState.bearing);
+        }}
+        onMoveEnd={(event) => {
+          const bounds = event.target.getBounds();
+          const nextDistance = estimateBoundsWidthMeters(bounds);
+          setCameraDistanceMeters((prev) => {
+            if (prev !== null && Math.abs(prev - nextDistance) < 10) return prev;
+            return nextDistance;
+          });
+          setMapBounds((prev) => {
+            const next = {
+              west: bounds.getWest(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              north: bounds.getNorth(),
+            };
+            if (
+              prev &&
+              Math.abs(prev.west - next.west) < 0.0001 &&
+              Math.abs(prev.south - next.south) < 0.0001 &&
+              Math.abs(prev.east - next.east) < 0.0001 &&
+              Math.abs(prev.north - next.north) < 0.0001
+            ) {
+              return prev;
+            }
+            return next;
+          });
+        }}
+        onLoad={(e) => {
+          setMapInstance(e.target);
+          setMapZoom(e.target.getZoom());
+          setMapBearing(e.target.getBearing());
+          const bounds = e.target.getBounds();
+          setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
+          setMapBounds({
+            west: bounds.getWest(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            north: bounds.getNorth(),
+          });
+        }}
       >
         <NavigationControl position="bottom-right" />
 
-        {visibleLayers.riskZones && (
-          <Source
-            id="risk-zones"
-            type="geojson"
-            data={riskZonesData as FeatureCollection}
-          >
-            <Layer
-              id="risk-zones-fill"
-              type="fill"
-              paint={{
-                "fill-color": [
-                  "match",
-                  ["get", "level"],
-                  "high",
-                  "#ef4444",
-                  "medium",
-                  "#f59e0b",
-                  "low",
-                  "#60a5fa",
-                  "#94a3b8",
-                ],
-                "fill-opacity": 0.18,
-              }}
-            />
-          </Source>
-        )}
+        <MapDataLayers
+          visibleLayers={visibleLayers}
+          activeFloodData={activeFloodData}
+          mapMode={mapMode}
+          selectedId={selectedId}
+          hoveredId={hoveredId}
+        />
 
-        {visibleLayers.drainage && (
-          <Source
-            id="drainage"
-            type="geojson"
-            data={drainageData as FeatureCollection}
-          >
-          <Layer
-            id="drainage-line"
-            type="line"
-            layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{
-              "line-color": "#0ea5e9",
-              "line-width": [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                9,
-                1.6,
-                15,
-                4.5,
-              ],
-              "line-opacity": 0.8,
-              "line-blur": 0.25,
-              "line-dasharray": [1, 0],
-            }}
-          />
-          </Source>
-        )}
+        <RouteVisualLayers
+          routeCollection={routeCollection}
+          viewMode={viewMode}
+          safeProgress={safeProgress}
+          progressFadeStart={progressFadeStart}
+          remainingProgressEnd={remainingProgressEnd}
+        />
 
-        {visibleLayers.flood && (
-          <Source
-            id="flood"
-            type="geojson"
-            data={activeFloodData}
-          >
-            {mapMode === "2.5d" ? (
-              <Layer
-                id="flood-extrusion"
-                type="fill-extrusion"
-                paint={{
-                  "fill-extrusion-color": [
-                    "match",
-                    ["get", "severity"],
-                    "low",
-                    "#60a5fa",
-                    "medium",
-                    "#f59e0b",
-                    "high",
-                    "#ef4444",
-                    "#60a5fa",
-                  ],
-                  "fill-extrusion-height": [
-                    "interpolate",
-                    ["linear"],
-                    ["get", "depth"],
-                    0,
-                    0,
-                    2,
-                    1200,
-                  ],
-                  "fill-extrusion-opacity": [
-                    "case",
-                    ["==", ["get", "id"], selectedId],
-                    1,
-                    ["==", ["get", "id"], hoveredId],
-                    0.95,
-                    0.8,
-                  ],
-                }}
-              />
-            ) : (
-              <Layer
-                id="flood-fill"
-                type="fill"
-                paint={{
-                  "fill-color": [
-                    "match",
-                    ["get", "severity"],
-                    "low",
-                    "#60a5fa",
-                    "medium",
-                    "#f59e0b",
-                    "high",
-                    "#ef4444",
-                    "#60a5fa",
-                  ],
-                "fill-opacity": [
-                  "case",
-                  ["==", ["get", "id"], selectedId],
-                  0.68,
-                  ["==", ["get", "id"], hoveredId],
-                  0.58,
-                  0.42,
-                ],
-              }}
-            />
-            )}
-
-            <Layer
-              id="flood-outline"
-              type="line"
-              paint={{
-                "line-color": "#1e293b",
-                "line-width": 1.5,
-              }}
-            />
-          </Source>
-        )}
-
-        {routeCollection ? (
-          <Source id="routes" type="geojson" data={routeCollection} lineMetrics>
-            <Layer
-              id="route-casing"
-              type="line"
-              paint={{
-                "line-color": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  "#0f172a",
-                  "#475569",
-                ],
-                "line-width": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  12,
-                  8,
-                ],
-                "line-opacity": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  0.32,
-                  0.12,
-                ],
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-alternatives"
-              type="line"
-              paint={{
-                "line-color": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  "#1d4ed8",
-                  "#93c5fd",
-                ],
-                "line-width": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  9,
-                  5,
-                ],
-                "line-opacity": [
-                  "case",
-                  ["==", ["get", "isPrimary"], 1],
-                  0.95,
-                  0.45,
-                ],
-              }}
-              layout={{ "line-cap": "round", "line-join": "round" }}
-            />
-            <Layer
-              id="route-direction-arrows"
-              type="symbol"
-              filter={["==", ["get", "isPrimary"], 1]}
-              layout={{
-                "symbol-placement": "line",
-                "symbol-spacing": 55,
-                "text-field": "▶",
-                "text-size": 12,
-                "text-keep-upright": false,
-                "text-allow-overlap": true,
-                "text-ignore-placement": true,
-              }}
-              paint={{
-                "text-color": "#1e40af",
-                "text-halo-color": "#ffffff",
-                "text-halo-width": 1,
-                "text-opacity": 0.95,
-              }}
-            />
-          </Source>
-        ) : null}
-
-        {selectedFlood && (
-          <FeaturePopup
-            longitude={selectedFlood.lngLat.lng}
-            latitude={selectedFlood.lngLat.lat}
-            title={selectedFlood.properties.areaName}
-            subtitle={selectedFlood.properties.district}
-            variant="flood"
-            onClose={resetSelections}
-            anchor={selectedFlood.anchor}
-            fields={[
-              {
-                label: "Depth",
-                value: formatMeters(selectedFlood.properties.depth),
-                tone: "info",
-              },
-              {
-                label: "Severity",
-                value: selectedFlood.properties.severity,
-                tone: formatSeverityTone(selectedFlood.properties.severity),
-              },
-              {
-                label: "Risk score",
-                value: formatScore(selectedFlood.properties.riskScore),
-              },
-            ]}
-          />
-        )}
-
-        {selectedBuilding && (
-          <FeaturePopup
-            longitude={selectedBuilding.lngLat.lng}
-            latitude={selectedBuilding.lngLat.lat}
-            title="Building"
-            subtitle="3D extrusion"
-            variant="building"
-            onClose={resetSelections}
-            anchor={selectedBuilding.anchor}
-            fields={[
-              {
-                label: "Height",
-                value: formatMeters(selectedBuilding.properties.render_height),
-                tone: "info",
-              },
-              {
-                label: "Base",
-                value: formatMeters(
-                  selectedBuilding.properties.render_min_height,
-                ),
-              },
-            ]}
-          />
-        )}
-
-        {selectedDrainage && (
-          <FeaturePopup
-            longitude={selectedDrainage.lngLat.lng}
-            latitude={selectedDrainage.lngLat.lat}
-            title="Drainage"
-            subtitle="Water channel"
-            variant="drainage"
-            onClose={resetSelections}
-            anchor={selectedDrainage.anchor}
-            fields={[
-              {
-                label: "Status",
-                value: selectedDrainage.properties.status,
-                tone: formatStatusTone(selectedDrainage.properties.status),
-              },
-            ]}
-          />
-        )}
-
-        {selectedRiskZone && (
-          <FeaturePopup
-            longitude={selectedRiskZone.lngLat.lng}
-            latitude={selectedRiskZone.lngLat.lat}
-            title={selectedRiskZone.properties.label}
-            subtitle="Flood risk"
-            variant="risk"
-            onClose={resetSelections}
-            anchor={selectedRiskZone.anchor}
-            fields={[
-              {
-                label: "Level",
-                value: selectedRiskZone.properties.level,
-                tone: formatLevelTone(selectedRiskZone.properties.level),
-              },
-            ]}
-          />
-        )}
-
-        {activeRoute ? (
-          <RouteMarkers
-            coordinates={activeRoute.geometry.coordinates}
-            navCoordinate={navCoordinate}
-            navHeading={navHeading}
-            navMode={navMode}
-            mapLibreCar3D={mapLibreCar3D}
-            trafficCars={trafficCars}
-          />
-        ) : null}
+        <MapFeatureOverlays
+          selectedFlood={selectedFlood}
+          selectedBuilding={selectedBuilding}
+          selectedDrainage={selectedDrainage}
+          selectedRiskZone={selectedRiskZone}
+          resetSelections={resetSelections}
+          activeRoute={activeRoute}
+          navCoordinate={navCoordinate}
+          navHeading={navHeading}
+          navMode={navMode}
+          mapLibreCar3D={mapLibreCar3D}
+          trafficCars={trafficCars}
+          ambientTraffic={visibleAmbientTraffic}
+          mapZoom={mapZoom}
+        />
       </Map>
 
-      {activeRoute && routePayload ? (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-20 hidden w-[min(92vw,520px)] -translate-x-1/2 rounded-2xl border border-white/60 bg-white/90 px-4 py-3 shadow-xl backdrop-blur md:block">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
-                Navigation
-              </div>
-              <div className="mt-1 text-sm font-semibold text-slate-900">
-                {routePayload.from.label} → {routePayload.to.label}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-semibold text-blue-700">
-                {etaMinutes} min
-              </div>
-              <div className="text-xs text-slate-500">{distanceKm} km</div>
-            </div>
-          </div>
+      <NavigationHud
+        activeRoute={activeRoute}
+        routePayload={routePayload}
+        mapZoom={mapZoom}
+        visibleFloodLegend={visibleLayers.flood}
+        routePanelOpen={routePanelOpen}
+        setRoutePanelOpen={setRoutePanelOpen}
+        navProgress={navProgress}
+        navMode={navMode}
+        viewMode={viewMode}
+        mapLibreCar3D={mapLibreCar3D}
+        routeFromLabel={routeFromLabel}
+        routeToLabel={routeToLabel}
+        etaMinutes={etaMinutes}
+        distanceKm={distanceKm}
+        activeStepIndex={activeStepIndex}
+        isNavigating={isNavigating}
+        speedMultiplier={speedMultiplier}
+        availableSpeedMultipliers={availableSpeedMultipliers}
+        drawerMinimalMode={drawerMinimalMode}
+        navCoordinate={navCoordinate}
+        onToggleViewMode={handleToggleViewMode}
+        onToggleMapLibreCar3D={() => {
+          setMapLibreCar3D((prev) => !prev);
+          setViewMode("drive3d");
+        }}
+        onSwitchToCesium={handleSwitchToCesium}
+        onTogglePlayback={() => {
+          if (navProgress >= 1) seek(0);
+          togglePlayback();
+        }}
+        onSeek={seek}
+        onSetSpeed={setSpeedMultiplier}
+        onToggleMinimalMode={() => setDrawerMinimalMode((prev) => !prev)}
+        onReset={() => {
+          pause();
+          reset();
+          setRoutePanelOpen(false);
+          setDrawerMinimalMode(false);
+          onRouteClear();
+        }}
+        cameraTiltDeg={driveTiltDeg}
+        onCameraTiltChange={setDriveTiltDeg}
+        onFocusVehicle={() => {
+          if (!mapInstance || !navCoordinate) return;
+          mapInstance.easeTo({
+            center: navCoordinate,
+            bearing: 0,
+            duration: 320,
+          });
+        }}
+        onToggleTraffic={toggleTrafficVisualization}
+        mapBearing={mapBearing}
+      />
+
+      {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
+        <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">
+          Zoom ≥ {minZoomToRender} để hiện traffic thành phố
         </div>
       ) : null}
 
-      {activeRoute ? (
-        <>
-          <button
-            type="button"
-            onClick={() => setRoutePanelOpen((prev) => !prev)}
-            className="absolute bottom-24 left-1/2 z-30 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl md:bottom-4"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+      <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border border-white/70 bg-white/90 px-2.5 py-1 text-[11px] text-slate-600 shadow-sm">
+        Camera: {cameraDistanceMeters ? `${Math.round(cameraDistanceMeters)} m` : "--"}
+      </div>
 
-          <RouteDrawer
-            routePanelOpen={routePanelOpen}
-            navProgress={navProgress}
-            navMode={navMode}
-            viewMode={viewMode}
-            mapLibreCar3D={mapLibreCar3D}
-            routeFromLabel={routeFromLabel}
-            routeToLabel={routeToLabel}
-            etaMinutes={etaMinutes}
-            distanceKm={distanceKm}
-            steps={activeRoute.steps}
-            activeStepIndex={activeStepIndex}
-            isNavigating={isNavigating}
-            onToggleViewMode={setViewMode}
-            onToggleMapLibreCar3D={() => {
-              setMapLibreCar3D((prev) => !prev);
-              setViewMode("drive3d");
-            }}
-            onSwitchToCesium={() => setMapEngine("cesium")}
-            onTogglePlayback={() => {
-              if (navProgress >= 1) setProgress(0);
-              togglePlayback();
-            }}
-            onReset={() => {
-              pause();
-              reset();
-              if (mapInstance) {
-                const start = activeRoute.geometry.coordinates[0];
-                mapInstance.flyTo({
-                  center: [start[0], start[1]],
-                  zoom: Math.max(mapInstance.getZoom(), 13),
-                  pitch: mapMode === "2.5d" ? 62 : 0,
-                  duration: 700,
-                });
-              }
-            }}
-          />
-        </>
-      ) : null}
-
-      {visibleLayers.flood && <MapLegend />}
     </div>
   );
 }

@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
 import { Globe, Map, Satellite } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
+import { FeaturePopupCard } from "@/components/map/feature-popup";
+import { ControlBoard } from "@/components/map/navigation/control-board";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import { useCesiumChaseCamera } from "@/features/map/hooks/use-cesium-chase-camera";
 import { sampleRouteAtProgress } from "@/features/map/navigation/route-sampling";
-import type { RouteAlternative } from "@/features/map/types/route.types";
+import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
-import { FeaturePopupCard } from "@/components/map/feature-popup";
+import type { RouteAlternative } from "@/features/map/types/route.types";
 import {
   DEFAULT_MAP_CURSOR,
   INSPECT_FEATURE_CURSOR,
@@ -25,6 +28,7 @@ type CesiumMapProps = {
     routes: RouteAlternative[];
     activeIndex: number;
   } | null;
+  onRouteClear: () => void;
 };
 
 type CesiumBasemap = "satelliteLabel" | "satellite" | "road";
@@ -100,17 +104,58 @@ function getFeatureProperty(
 
 const CAR_MODEL_URL =
   "https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb";
+const BIKE_MODEL_URL =
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/VC/glTF-Binary/VC.glb";
+const WALK_MODEL_URL =
+  "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF-Binary/CesiumMan.glb";
 
-export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
+export function CesiumMap({ selectedPlace, routePayload, onRouteClear }: CesiumMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
   const routeTickCleanupRef = useRef<(() => void) | null>(null);
   const viewerDestroyedRef = useRef(false);
-  const { visibleLayers, buildingOpacity, notifyMapInteraction } = useMapStore();
+  const {
+    visibleLayers,
+    buildingOpacity,
+    trafficVisualizationEnabled,
+    notifyMapInteraction,
+  } = useMapStore();
   const [selectedBuilding, setSelectedBuilding] =
     useState<SelectedBuildingInfo | null>(null);
   const [basemap, setBasemap] = useState<CesiumBasemap>("satelliteLabel");
+  const { updateChaseCamera, resetChaseCamera } = useCesiumChaseCamera();
+  const activeRoute = routePayload?.routes[routePayload.activeIndex] ?? null;
+  const navMode = activeRoute?.mode ?? "car";
+  const {
+    isPlaying: isNavigating,
+    progress: navProgress,
+    seek,
+    togglePlayback,
+    pause,
+    reset,
+    speedMultiplier,
+    availableSpeedMultipliers,
+    setSpeedMultiplier,
+    trafficSamples,
+  } = useNavigationPlayback({
+    geometry: activeRoute?.geometry ?? null,
+    steps: activeRoute?.steps ?? [],
+    mode: navMode,
+  });
+  const navProgressRef = useRef(navProgress);
+  const isNavigatingRef = useRef(isNavigating);
+  const speedMultiplierRef = useRef(speedMultiplier);
+  const trafficSamplesRef = useRef(trafficSamples);
+  const trafficVisualizationEnabledRef = useRef(trafficVisualizationEnabled);
+
+  useEffect(() => {
+    navProgressRef.current = navProgress;
+    isNavigatingRef.current = isNavigating;
+    speedMultiplierRef.current = speedMultiplier;
+    trafficSamplesRef.current = trafficSamples;
+    trafficVisualizationEnabledRef.current = trafficVisualizationEnabled;
+  }, [isNavigating, navProgress, speedMultiplier, trafficSamples, trafficVisualizationEnabled]);
 
   const resolveImageryStyle = (mode: CesiumBasemap) => {
     if (mode === "road") return Cesium.IonWorldImageryStyle.ROAD;
@@ -239,16 +284,18 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
     if (!viewer) return;
 
     viewer.entities.removeById("route-main");
+    viewer.entities.removeById("route-main-glow");
+    viewer.entities.removeById("route-remaining");
     viewer.entities.removeById("route-car");
-    viewer.entities.removeById("route-traffic-1");
-    viewer.entities.removeById("route-traffic-2");
-    viewer.entities.removeById("route-traffic-3");
+    Array.from({ length: 8 }, (_, index) => {
+      viewer.entities.removeById(`route-traffic-${index + 1}`);
+    });
     routeTickCleanupRef.current?.();
     routeTickCleanupRef.current = null;
+    resetChaseCamera();
 
     if (!routePayload) return;
-    const activeRoute = routePayload.routes[routePayload.activeIndex];
-    const coordinates = activeRoute.geometry.coordinates;
+    const coordinates = routePayload.routes[routePayload.activeIndex].geometry.coordinates;
     if (!coordinates.length) return;
 
     const cartesianPath = coordinates.map((coord) =>
@@ -258,8 +305,32 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       id: "route-main",
       polyline: {
         positions: cartesianPath,
-        width: 5,
-        material: Cesium.Color.fromCssColorString("#2563eb").withAlpha(0.9),
+        width: 8,
+        material: Cesium.Color.fromCssColorString("#1d4ed8").withAlpha(0.35),
+        clampToGround: true,
+      },
+    });
+    const routeGlow = viewer.entities.add({
+      id: "route-main-glow",
+      polyline: {
+        positions: cartesianPath,
+        width: 14,
+        material: Cesium.Color.fromCssColorString("#38bdf8").withAlpha(0.15),
+        clampToGround: true,
+      },
+    });
+    const routeRemaining = viewer.entities.add({
+      id: "route-remaining",
+      polyline: {
+        positions: new Cesium.CallbackProperty(() => {
+          const startIndex = Math.min(
+            cartesianPath.length - 1,
+            Math.floor(navProgressRef.current * (cartesianPath.length - 1)),
+          );
+          return cartesianPath.slice(startIndex);
+        }, false),
+        width: 7,
+        material: Cesium.Color.fromCssColorString("#38bdf8").withAlpha(0.95),
         clampToGround: true,
       },
     });
@@ -270,55 +341,78 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       return Cesium.Cartesian3.fromDegrees(sample.lng, sample.lat, 3);
     };
 
-    const createCarEntity = (id: string, progress: number, scale = 12) =>
+    const createVehicleEntity = (
+      id: string,
+      progress: number,
+      variant: "car" | "bike" | "walk" = "car",
+      scale = 12,
+    ) =>
       viewer.entities.add({
         id,
         position: sampleAt(progress),
+        orientation: Cesium.Transforms.headingPitchRollQuaternion(
+          sampleAt(progress),
+          new Cesium.HeadingPitchRoll(0, 0, 0),
+        ),
         model: {
-          uri: CAR_MODEL_URL,
+          uri:
+            variant === "bike"
+              ? BIKE_MODEL_URL
+              : variant === "walk"
+                ? WALK_MODEL_URL
+                : CAR_MODEL_URL,
           minimumPixelSize: 26,
           maximumScale: scale,
-          scale: 1.6,
+          scale: variant === "walk" ? 1.2 : variant === "bike" ? 1.1 : 1.6,
         },
       });
 
-    const mainCar = createCarEntity("route-car", 0.001, 15);
-    const traffic1 = createCarEntity("route-traffic-1", 0.16);
-    const traffic2 = createCarEntity("route-traffic-2", 0.31);
-    const traffic3 = createCarEntity("route-traffic-3", 0.49);
+    const mainVehicleVariant = navMode === "walk" ? "walk" : navMode === "bike" ? "bike" : "car";
+    const mainCar = createVehicleEntity("route-car", 0.001, mainVehicleVariant, 15);
+    const trafficEntities = Array.from({ length: 8 }, (_, index) =>
+      createVehicleEntity(`route-traffic-${index + 1}`, (0.15 + index * 0.1) % 1),
+    );
 
-    let progress = 0;
     const tick = () => {
-      progress = (progress + 0.0008) % 1;
-      const positions = [
-        sampleAt(progress),
-        sampleAt((progress + 0.18) % 1),
-        sampleAt((progress + 0.35) % 1),
-        sampleAt((progress + 0.52) % 1),
-      ];
-      mainCar.position = new Cesium.ConstantPositionProperty(positions[0]);
-      traffic1.position = new Cesium.ConstantPositionProperty(positions[1]);
-      traffic2.position = new Cesium.ConstantPositionProperty(positions[2]);
-      traffic3.position = new Cesium.ConstantPositionProperty(positions[3]);
-
-      const focus = sampleRouteAtProgress(coordinates, progress);
-      const ahead = sampleRouteAtProgress(
-        coordinates,
-        Math.min(1, progress + 0.015),
-      );
-      if (focus && ahead && !viewerDestroyedRef.current) {
-        const heading = Math.atan2(ahead.lng - focus.lng, ahead.lat - focus.lat);
-        viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(
-            focus.lng,
-            focus.lat,
-            180,
+      const mainSample = sampleRouteAtProgress(coordinates, navProgressRef.current);
+      const mainPosition = sampleAt(navProgressRef.current);
+      mainCar.position = new Cesium.ConstantPositionProperty(mainPosition);
+      const toOrientation = (position: Cesium.Cartesian3, bearing?: number) =>
+        Cesium.Transforms.headingPitchRollQuaternion(
+          position,
+          new Cesium.HeadingPitchRoll(
+            Cesium.Math.toRadians((bearing ?? 0) - 90),
+            0,
+            0,
           ),
-          orientation: {
-            heading,
-            pitch: Cesium.Math.toRadians(-24),
-            roll: 0,
-          },
+        );
+      mainCar.orientation = new Cesium.ConstantProperty(
+        toOrientation(mainPosition, mainSample?.bearing),
+      );
+
+      const trafficActive = trafficVisualizationEnabledRef.current;
+      const trafficNow = trafficActive ? trafficSamplesRef.current.slice(0, trafficEntities.length) : [];
+      trafficEntities.forEach((entity, index) => {
+        const sample = trafficNow[index];
+        if (!sample) {
+          entity.show = false;
+          return;
+        }
+        entity.show = true;
+        const position = Cesium.Cartesian3.fromDegrees(sample.lng, sample.lat, 2.8);
+        entity.position = new Cesium.ConstantPositionProperty(position);
+        entity.orientation = new Cesium.ConstantProperty(
+          toOrientation(position, sample.bearing),
+        );
+      });
+
+      if (!viewerDestroyedRef.current && isNavigatingRef.current) {
+        updateChaseCamera(viewer, coordinates, navProgressRef.current, {
+          altitude: 180,
+          pitchDegrees: -22,
+          lookAheadProgress: 0.015,
+          damping: 0.2,
+          speedFactor: speedMultiplierRef.current,
         });
       }
       viewer.scene.requestRender();
@@ -326,15 +420,13 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
 
     const clock = viewer.clock;
     clock?.onTick.addEventListener(tick);
-    if (clock) {
-      clock.shouldAnimate = true;
-    }
+    if (clock) clock.shouldAnimate = true;
     routeTickCleanupRef.current = () => {
       if (viewerDestroyedRef.current) return;
       clock?.onTick.removeEventListener(tick);
     };
 
-    viewer.flyTo([routeLine, mainCar], {
+    viewer.flyTo([routeLine, routeGlow, routeRemaining, mainCar], {
       duration: 1.4,
       offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-28), 1800),
     });
@@ -343,7 +435,7 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
       routeTickCleanupRef.current?.();
       routeTickCleanupRef.current = null;
     };
-  }, [routePayload]);
+  }, [resetChaseCamera, routePayload, updateChaseCamera]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -426,6 +518,27 @@ export function CesiumMap({ selectedPlace, routePayload }: CesiumMapProps) {
           <Map className="h-4 w-4" />
         </button>
       </div>
+
+      {activeRoute ? (
+        <ControlBoard
+          progress={navProgress}
+          isPlaying={isNavigating}
+          speedMultiplier={speedMultiplier}
+          availableSpeedMultipliers={availableSpeedMultipliers}
+          onSeek={seek}
+          onSetSpeed={setSpeedMultiplier}
+          onTogglePlayback={() => {
+            if (navProgress >= 1) seek(0);
+            togglePlayback();
+          }}
+          onReset={() => {
+            pause();
+            reset();
+            onRouteClear();
+          }}
+          className="absolute right-3 bottom-3 z-30 w-[min(92vw,420px)] rounded-2xl border border-white/20 bg-slate-900/80 p-3 text-white backdrop-blur"
+        />
+      ) : null}
 
       {selectedBuilding && visibleLayers.buildings && (
         <div

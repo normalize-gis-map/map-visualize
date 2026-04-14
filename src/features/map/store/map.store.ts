@@ -17,10 +17,12 @@ type MapUiStore = {
   mapEngine: MapEngine;
   visibleLayers: VisibleLayers;
   buildingOpacity: number;
+  trafficVisualizationEnabled: boolean;
   setMapMode: (mode: MapMode) => void;
   setMapEngine: (engine: MapEngine) => void;
   toggleLayer: (layer: LayerKey) => void;
   setBuildingOpacity: (value: number) => void;
+  toggleTrafficVisualization: () => void;
   mapInteractionTick: number;
   notifyMapInteraction: () => void;
   hasHydrated: boolean;
@@ -30,7 +32,7 @@ type MapUiStore = {
 export const useMapStore = create<MapUiStore>()(
   persist(
     (set) => ({
-      mapMode: "2d",
+      mapMode: "2.5d",
       mapEngine: "maplibre",
       visibleLayers: {
         flood: false,
@@ -40,6 +42,7 @@ export const useMapStore = create<MapUiStore>()(
         riskZones: false,
       },
       buildingOpacity: 0.9,
+      trafficVisualizationEnabled: true,
       mapInteractionTick: 0,
       hasHydrated: false,
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -53,6 +56,10 @@ export const useMapStore = create<MapUiStore>()(
           },
         })),
       setBuildingOpacity: (buildingOpacity) => set({ buildingOpacity }),
+      toggleTrafficVisualization: () =>
+        set((state) => ({
+          trafficVisualizationEnabled: !state.trafficVisualizationEnabled,
+        })),
       notifyMapInteraction: () =>
         set((state) => ({ mapInteractionTick: state.mapInteractionTick + 1 })),
     }),
@@ -64,8 +71,12 @@ export const useMapStore = create<MapUiStore>()(
         mapEngine: state.mapEngine,
         visibleLayers: state.visibleLayers,
         buildingOpacity: state.buildingOpacity,
+        trafficVisualizationEnabled: state.trafficVisualizationEnabled,
       }),
       onRehydrateStorage: () => (state) => {
+        if (state?.mapMode === "2d") {
+          state.setMapMode("2.5d");
+        }
         state?.setHasHydrated(true);
       },
     },
