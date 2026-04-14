@@ -922,6 +922,7 @@ export function MapLibreMap({
         id: parkTreeShadowLayerId,
         type: "circle",
         source: parkTreeSourceId,
+        minzoom: 14,
         paint: {
           "circle-color": "#23311f",
           "circle-opacity": [
@@ -954,15 +955,20 @@ export function MapLibreMap({
         id: parkTreeCanopyLayerId,
         type: "circle",
         source: parkTreeSourceId,
+        minzoom: 14,
         paint: {
           "circle-color": [
             "match",
-            ["get", "treeType"],
-            "tall",
-            "#4f7c3a",
-            "compact",
-            "#5d8e47",
-            "#6ea45a",
+            ["get", "treeArchetype"],
+            "pine",
+            "#4d7a3b",
+            "broadleaf",
+            "#5c8f4a",
+            "ornamental",
+            "#6ea55f",
+            "waterside",
+            "#5f9c70",
+            "#5b8e45",
           ],
           "circle-opacity": [
             "match",
@@ -995,6 +1001,7 @@ export function MapLibreMap({
         id: parkTreeHighlightLayerId,
         type: "circle",
         source: parkTreeSourceId,
+        minzoom: 14.5,
         paint: {
           "circle-color": "#cde8b7",
           "circle-opacity": [

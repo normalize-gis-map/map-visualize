@@ -12,6 +12,7 @@ import {
 } from "@/features/map/lib/get-stable-seed-points";
 
 type TreeType = "tall" | "compact" | "ornamental";
+type TreeArchetype = "pine" | "broadleaf" | "ornamental" | "waterside";
 
 type GreenFeature = {
   id?: string | number;
@@ -85,6 +86,25 @@ function getTreeType(seed: number, lng: number, lat: number): TreeType {
   if (typeRoll < 0.2) return "tall";
   if (typeRoll < 0.77) return "compact";
   return "ornamental";
+}
+
+function getTreeArchetype(
+  seed: number,
+  lng: number,
+  lat: number,
+  mode: GreenAreaRenderMode,
+): TreeArchetype {
+  if (mode === "dense_wooded") {
+    return unitFromStableHash(seed, lng, lat, "archetype") < 0.45
+      ? "pine"
+      : "broadleaf";
+  }
+
+  const roll = unitFromStableHash(seed, Math.round(lng * 1e4), Math.round(lat * 1e4), "archetype");
+  if (roll < 0.2) return "ornamental";
+  if (roll < 0.5) return "pine";
+  if (roll < 0.8) return "broadleaf";
+  return "waterside";
 }
 
 function minDistanceToRing(lng: number, lat: number, ring: Position[]): number {
@@ -256,6 +276,9 @@ export function buildViewportVegetation(params: {
   detailPreset: "balanced" | "high";
 }): FeatureCollection {
   const { features, viewportBounds, mapZoom, detailPreset } = params;
+  if (mapZoom < 14) {
+    return { type: "FeatureCollection", features: [] };
+  }
   const points: FeatureCollection["features"] = [];
   const usedCells = new Set<string>();
   const globalBudget = getGlobalTreeBudget(mapZoom, detailPreset);
@@ -344,6 +367,7 @@ export function buildViewportVegetation(params: {
             geometry: { type: "Point", coordinates: [lng, lat] },
             properties: {
               treeType: getTreeType(featureSeed, lng, lat),
+              treeArchetype: getTreeArchetype(featureSeed, lng, lat, mode),
               greenMode: mode,
               treeScale:
                 mode === "grass_first"
