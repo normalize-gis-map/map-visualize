@@ -77,21 +77,21 @@ function getTargetVehicleCount(
 ) {
   if (density === "off") return 0;
 
-  const byZoom = zoom >= 16.8 ? 280 : zoom >= 15.6 ? 200 : zoom >= 14.4 ? 120 : 42;
-  const densityFactor = density === "full" ? 1 : 0.62;
+  const byZoom = zoom >= 16.8 ? 320 : zoom >= 15.6 ? 236 : zoom >= 14.4 ? 138 : 44;
+  const densityFactor = density === "full" ? 1 : 0.66;
   const detailFactor = detailPreset === "high" ? 1.12 : 1;
 
   return Math.max(12, Math.round(byZoom * densityFactor * detailFactor));
 }
 
 function getRoadLimitByZoom(zoom: number) {
-  return zoom >= 16.8 ? 96 : zoom >= 15.6 ? 72 : zoom >= 14.4 ? 48 : 28;
+  return zoom >= 16.8 ? 108 : zoom >= 15.6 ? 82 : zoom >= 14.4 ? 56 : 30;
 }
 
 function getBaseVehiclesPerDirection(roadClass: AmbientRoadClass, zoom: number) {
   const zoomBoost = zoom >= 16.8 ? 2 : zoom >= 15.6 ? 1 : 0;
-  if (roadClass === "major") return 2 + zoomBoost;
-  if (roadClass === "medium") return 2 + (zoom >= 15.2 ? 1 : 0);
+  if (roadClass === "major") return 2 + zoomBoost + (zoom >= 15.2 ? 1 : 0);
+  if (roadClass === "medium") return 2 + (zoom >= 14.8 ? 1 : 0);
   return zoom >= 16.2 ? 2 : 1;
 }
 
@@ -120,9 +120,9 @@ function generateDirectionProgresses(count: number, seedRoot: string) {
 
 function allocateByClass(total: number) {
   return {
-    major: Math.max(1, Math.round(total * 0.4)),
-    medium: Math.max(1, Math.round(total * 0.35)),
-    local: Math.max(1, Math.round(total * 0.25)),
+    major: Math.max(1, Math.round(total * 0.44)),
+    medium: Math.max(1, Math.round(total * 0.36)),
+    local: Math.max(1, Math.round(total * 0.2)),
   };
 }
 

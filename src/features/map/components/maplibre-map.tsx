@@ -531,20 +531,20 @@ export function MapLibreMap({
       mapZoom >= MAP_DETAIL_ZOOM.CLOSE
         ? trafficDensity === "full"
           ? detailPreset === "high"
-            ? 96
-            : 78
+            ? 112
+            : 90
           : detailPreset === "high"
-            ? 66
-            : 52
+            ? 78
+            : 60
         : mapZoom >= MAP_DETAIL_ZOOM.MID
           ? trafficDensity === "full"
             ? detailPreset === "high"
-              ? 54
-              : 42
+              ? 64
+              : 50
             : detailPreset === "high"
-              ? 34
-              : 24
-          : 14;
+              ? 42
+              : 30
+          : 16;
 
     return Array.from(deduped.values()).slice(0, cap);
   }, [ambientTraffic, detailPreset, mapBounds, mapZoom, trafficDensity]);
