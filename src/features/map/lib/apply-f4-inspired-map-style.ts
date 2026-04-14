@@ -101,10 +101,12 @@ const LANE_MARKING_WIDTH = [
 ];
 
 const ROAD_NAME_RE =
-  /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|local)/i;
+  /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|living|unclassified|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
 const MEDIUM_ROAD_RE = /(secondary|collector)/i;
-const LOCAL_ROAD_RE = /(tertiary|residential|service|living|local)/i;
+const LOCAL_RESIDENTIAL_TERTIARY_RE = /(residential|tertiary)/i;
+const LOCAL_SERVICE_LIVING_UNCLASSIFIED_RE =
+  /(service|living|unclassified)/i;
 const CASING_RE = /(casing|outline|border)/i;
 
 function setPaintSafe(
@@ -119,6 +121,169 @@ function setPaintSafe(
   } catch {
     // ignore unsupported paint properties per layer type
   }
+}
+
+const LOCAL_RESIDENTIAL_TERTIARY_WIDTH = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  12,
+  1.4,
+  14,
+  2.8,
+  16,
+  5.5,
+  18,
+  9,
+  20,
+  14,
+];
+
+const LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  12,
+  1.1,
+  14,
+  2,
+  16,
+  4,
+  18,
+  6.5,
+  20,
+  10,
+];
+
+const LOCAL_RESIDENTIAL_TERTIARY_CASING = [
+  "+",
+  LOCAL_RESIDENTIAL_TERTIARY_WIDTH,
+  [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    12,
+    1.2,
+    14,
+    1.4,
+    16,
+    1.9,
+    18,
+    2.4,
+    20,
+    2.8,
+  ],
+];
+
+const LOCAL_SERVICE_LIVING_UNCLASSIFIED_CASING = [
+  "+",
+  LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH,
+  [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    12,
+    1.2,
+    14,
+    1.4,
+    16,
+    1.8,
+    18,
+    2.2,
+    20,
+    2.6,
+  ],
+];
+
+function getRoadWidthExpression(layerId: string, isCasing: boolean): unknown {
+  const layerName = layerId.toLowerCase();
+  const fallbackWidth = MAJOR_ROAD_RE.test(layerName)
+    ? MAJOR_ROAD_WIDTH
+    : MEDIUM_ROAD_RE.test(layerName)
+      ? MEDIUM_ROAD_WIDTH
+      : LOCAL_SERVICE_LIVING_UNCLASSIFIED_RE.test(layerName)
+        ? LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH
+        : LOCAL_RESIDENTIAL_TERTIARY_RE.test(layerName)
+          ? LOCAL_RESIDENTIAL_TERTIARY_WIDTH
+          : LOCAL_ROAD_WIDTH;
+
+  const fallbackCasing = MAJOR_ROAD_RE.test(layerName)
+    ? CASING_WIDTH
+    : MEDIUM_ROAD_RE.test(layerName)
+      ? CASING_WIDTH
+      : LOCAL_SERVICE_LIVING_UNCLASSIFIED_RE.test(layerName)
+        ? LOCAL_SERVICE_LIVING_UNCLASSIFIED_CASING
+        : LOCAL_RESIDENTIAL_TERTIARY_RE.test(layerName)
+          ? LOCAL_RESIDENTIAL_TERTIARY_CASING
+          : [
+              "+",
+              fallbackWidth,
+              [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                12,
+                1.2,
+                14,
+                1.4,
+                16,
+                1.9,
+                18,
+                2.3,
+                20,
+                2.6,
+              ],
+            ];
+
+  const classBasedWidth = [
+    "case",
+    [
+      "in",
+      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
+      ["literal", ["motorway", "trunk", "primary"]],
+    ],
+    MAJOR_ROAD_WIDTH,
+    [
+      "in",
+      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
+      ["literal", ["secondary", "collector"]],
+    ],
+    MEDIUM_ROAD_WIDTH,
+    [
+      "in",
+      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
+      ["literal", ["residential", "tertiary"]],
+    ],
+    LOCAL_RESIDENTIAL_TERTIARY_WIDTH,
+    [
+      "in",
+      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
+      ["literal", ["service", "living_street", "unclassified"]],
+    ],
+    LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH,
+    fallbackWidth,
+  ];
+
+  if (!isCasing) {
+    return classBasedWidth;
+  }
+
+  return [
+    "case",
+    [
+      "in",
+      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
+      ["literal", ["residential", "tertiary"]],
+    ],
+    LOCAL_RESIDENTIAL_TERTIARY_CASING,
+    [
+      "in",
+      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
+      ["literal", ["service", "living_street", "unclassified"]],
+    ],
+    LOCAL_SERVICE_LIVING_UNCLASSIFIED_CASING,
+    fallbackCasing,
+  ];
 }
 
 export function applyF4InspiredMapStyle(
@@ -184,7 +349,6 @@ export function applyF4InspiredMapStyle(
       const isCasing = CASING_RE.test(id);
       const isMajor = MAJOR_ROAD_RE.test(id);
       const isMedium = MEDIUM_ROAD_RE.test(id);
-      const isLocal = LOCAL_ROAD_RE.test(id);
 
       setPaintSafe(
         map,
@@ -206,15 +370,7 @@ export function applyF4InspiredMapStyle(
         map,
         layerId,
         "line-width",
-        isCasing
-          ? CASING_WIDTH
-          : isMajor
-            ? MAJOR_ROAD_WIDTH
-            : isMedium
-              ? MEDIUM_ROAD_WIDTH
-              : isLocal
-                ? LOCAL_ROAD_WIDTH
-                : LOCAL_ROAD_WIDTH,
+        getRoadWidthExpression(layerId, isCasing),
       );
       continue;
     }
