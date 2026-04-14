@@ -173,6 +173,7 @@ export function MapLibreMap({
   const roadRefreshTickRef = useRef(0);
   const followTickRef = useRef(0);
   const lastFollowCenterRef = useRef<[number, number] | null>(null);
+  const mapShellRef = useRef<HTMLDivElement | null>(null);
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -934,13 +935,17 @@ export function MapLibreMap({
           ],
           "circle-translate": [1.4, 1.7],
           "circle-radius": [
-            "match",
-            ["get", "treeType"],
-            "tall",
-            2.9,
-            "compact",
-            2.4,
-            2.05,
+            "*",
+            [
+              "match",
+              ["get", "treeType"],
+              "tall",
+              2.9,
+              "compact",
+              2.4,
+              2.05,
+            ],
+            ["coalesce", ["get", "treeScale"], 1],
           ],
         },
       });
@@ -969,13 +974,17 @@ export function MapLibreMap({
             0.78,
           ],
           "circle-radius": [
-            "match",
-            ["get", "treeType"],
-            "tall",
-            2.6,
-            "compact",
-            2.1,
-            1.8,
+            "*",
+            [
+              "match",
+              ["get", "treeType"],
+              "tall",
+              2.6,
+              "compact",
+              2.1,
+              1.8,
+            ],
+            ["coalesce", ["get", "treeScale"], 1],
           ],
           "circle-stroke-color": "#3e6430",
           "circle-stroke-width": 0.6,
@@ -999,13 +1008,17 @@ export function MapLibreMap({
           ],
           "circle-translate": [-0.6, -0.6],
           "circle-radius": [
-            "match",
-            ["get", "treeType"],
-            "tall",
-            1.1,
-            "compact",
-            0.9,
-            0.7,
+            "*",
+            [
+              "match",
+              ["get", "treeType"],
+              "tall",
+              1.1,
+              "compact",
+              0.9,
+              0.7,
+            ],
+            ["coalesce", ["get", "treeScale"], 1],
           ],
         },
       });
@@ -1087,6 +1100,30 @@ export function MapLibreMap({
     waterViewportShoreLayerId,
   ]);
 
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const container = mapInstance.getContainer();
+    container.style.touchAction = "none";
+    container.style.overscrollBehaviorX = "contain";
+    container.style.overscrollBehaviorY = "contain";
+
+    const preventHorizontalGesture = (event: WheelEvent) => {
+      if (!event.cancelable) return;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.15) {
+        event.preventDefault();
+      }
+    };
+
+    container.addEventListener("wheel", preventHorizontalGesture, {
+      passive: false,
+    });
+
+    return () => {
+      container.removeEventListener("wheel", preventHorizontalGesture);
+    };
+  }, [mapInstance]);
+
   const resetRouteRuntime = () => {
     pause();
     reset();
@@ -1151,10 +1188,20 @@ export function MapLibreMap({
   ]);
 
   return (
-    <div className="map-shell relative h-full w-full">
+    <div
+      ref={mapShellRef}
+      className="map-shell relative h-full w-full"
+      style={{ overscrollBehaviorX: "contain", touchAction: "none" }}
+    >
       <Map
         initialViewState={initialViewState}
-        style={{ width: "100%", height: "100%", cursor }}
+        style={{
+          width: "100%",
+          height: "100%",
+          cursor,
+          touchAction: "none",
+          overscrollBehaviorX: "contain",
+        }}
         mapStyle={mapMode === "2d" ? MAP_STYLE_2D : MAP_STYLE_25D}
         maxPitch={85}
         dragRotate={mapMode !== "2d"}

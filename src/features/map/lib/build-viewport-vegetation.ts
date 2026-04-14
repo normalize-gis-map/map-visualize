@@ -286,10 +286,14 @@ export function buildViewportVegetation(params: {
       const spacing = getSpacingDeg(mapZoom, mode);
       const clusterCenters = buildClusterCenters(featureSeed, clipped, rings, mode);
       const clearingCenters = buildClearingCenters(featureSeed, clipped, rings, mode);
-      const minX = Math.floor(clipped.west / spacing.lng);
-      const maxX = Math.ceil(clipped.east / spacing.lng);
-      const minY = Math.floor(clipped.south / spacing.lat);
-      const maxY = Math.ceil(clipped.north / spacing.lat);
+      const gridOffsetLng =
+        (unitFromStableHash(featureSeed, "grid-offset-lng") - 0.5) * spacing.lng * 1.8;
+      const gridOffsetLat =
+        (unitFromStableHash(featureSeed, "grid-offset-lat") - 0.5) * spacing.lat * 1.8;
+      const minX = Math.floor((clipped.west - gridOffsetLng) / spacing.lng);
+      const maxX = Math.ceil((clipped.east - gridOffsetLng) / spacing.lng);
+      const minY = Math.floor((clipped.south - gridOffsetLat) / spacing.lat);
+      const maxY = Math.ceil((clipped.north - gridOffsetLat) / spacing.lat);
 
       for (let cellX = minX; cellX <= maxX; cellX += 1) {
         for (let cellY = minY; cellY <= maxY; cellY += 1) {
@@ -298,13 +302,15 @@ export function buildViewportVegetation(params: {
           const cellKey = `${mode}:${cellX}:${cellY}`;
           if (usedCells.has(cellKey)) continue;
 
-          const [lng, lat] = createSeededPoint(
+          const [baseLng, baseLat] = createSeededPoint(
             cellX,
             cellY,
             spacing.lng,
             spacing.lat,
             featureSeed,
           );
+          const lng = baseLng + gridOffsetLng;
+          const lat = baseLat + gridOffsetLat;
           if (
             lng < clipped.west ||
             lng > clipped.east ||
@@ -339,6 +345,12 @@ export function buildViewportVegetation(params: {
             properties: {
               treeType: getTreeType(featureSeed, lng, lat),
               greenMode: mode,
+              treeScale:
+                mode === "grass_first"
+                  ? 0.86 + unitFromStableHash(featureSeed, cellX, cellY, "scale") * 0.24
+                  : mode === "dense_wooded"
+                    ? 0.9 + unitFromStableHash(featureSeed, cellX, cellY, "scale") * 0.5
+                    : 0.88 + unitFromStableHash(featureSeed, cellX, cellY, "scale") * 0.4,
             },
           });
           polygonTreeCount += 1;
