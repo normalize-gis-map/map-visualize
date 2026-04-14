@@ -10,78 +10,6 @@ import {
   WATER_BASE_COLOR,
 } from "@/lib/constants/map.constants";
 
-const MAJOR_ROAD_WIDTH = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  10,
-  1.2,
-  12,
-  2,
-  14,
-  4,
-  16,
-  8,
-  18,
-  14,
-  20,
-  22,
-];
-
-const MEDIUM_ROAD_WIDTH = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  10,
-  1,
-  12,
-  1.5,
-  14,
-  3,
-  16,
-  6,
-  18,
-  10,
-  20,
-  16,
-];
-
-const LOCAL_ROAD_WIDTH = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  10,
-  0.9,
-  12,
-  1.2,
-  14,
-  2.5,
-  16,
-  5,
-  18,
-  8,
-  20,
-  12,
-];
-
-const CASING_WIDTH = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  10,
-  1.5,
-  12,
-  2.4,
-  14,
-  4.7,
-  16,
-  9.2,
-  18,
-  15.8,
-  20,
-  24,
-];
-
 const LANE_MARKING_WIDTH = [
   "interpolate",
   ["linear"],
@@ -104,9 +32,7 @@ const ROAD_NAME_RE =
   /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|living|unclassified|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
 const MEDIUM_ROAD_RE = /(secondary|collector)/i;
-const LOCAL_RESIDENTIAL_TERTIARY_RE = /(residential|tertiary)/i;
-const LOCAL_SERVICE_LIVING_UNCLASSIFIED_RE =
-  /(service|living|unclassified)/i;
+const LOCAL_ROAD_RE = /(residential|tertiary|service|living|unclassified|local)/i;
 const CASING_RE = /(casing|outline|border)/i;
 
 function setPaintSafe(
@@ -123,167 +49,75 @@ function setPaintSafe(
   }
 }
 
-const LOCAL_RESIDENTIAL_TERTIARY_WIDTH = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  12,
-  1.4,
-  14,
-  2.8,
-  16,
-  5.5,
-  18,
-  9,
-  20,
-  14,
-];
-
-const LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  12,
-  1.1,
-  14,
-  2,
-  16,
-  4,
-  18,
-  6.5,
-  20,
-  10,
-];
-
-const LOCAL_RESIDENTIAL_TERTIARY_CASING = [
-  "+",
-  LOCAL_RESIDENTIAL_TERTIARY_WIDTH,
-  [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    12,
-    1.2,
-    14,
-    1.4,
-    16,
-    1.9,
-    18,
-    2.4,
-    20,
-    2.8,
-  ],
-];
-
-const LOCAL_SERVICE_LIVING_UNCLASSIFIED_CASING = [
-  "+",
-  LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH,
-  [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
-    12,
-    1.2,
-    14,
-    1.4,
-    16,
-    1.8,
-    18,
-    2.2,
-    20,
-    2.6,
-  ],
-];
-
-function getRoadWidthExpression(layerId: string, isCasing: boolean): unknown {
-  const layerName = layerId.toLowerCase();
-  const fallbackWidth = MAJOR_ROAD_RE.test(layerName)
-    ? MAJOR_ROAD_WIDTH
-    : MEDIUM_ROAD_RE.test(layerName)
-      ? MEDIUM_ROAD_WIDTH
-      : LOCAL_SERVICE_LIVING_UNCLASSIFIED_RE.test(layerName)
-        ? LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH
-        : LOCAL_RESIDENTIAL_TERTIARY_RE.test(layerName)
-          ? LOCAL_RESIDENTIAL_TERTIARY_WIDTH
-          : LOCAL_ROAD_WIDTH;
-
-  const fallbackCasing = MAJOR_ROAD_RE.test(layerName)
-    ? CASING_WIDTH
-    : MEDIUM_ROAD_RE.test(layerName)
-      ? CASING_WIDTH
-      : LOCAL_SERVICE_LIVING_UNCLASSIFIED_RE.test(layerName)
-        ? LOCAL_SERVICE_LIVING_UNCLASSIFIED_CASING
-        : LOCAL_RESIDENTIAL_TERTIARY_RE.test(layerName)
-          ? LOCAL_RESIDENTIAL_TERTIARY_CASING
-          : [
-              "+",
-              fallbackWidth,
-              [
-                "interpolate",
-                ["linear"],
-                ["zoom"],
-                12,
-                1.2,
-                14,
-                1.4,
-                16,
-                1.9,
-                18,
-                2.3,
-                20,
-                2.6,
-              ],
-            ];
-
-  const classBasedWidth = [
-    "case",
-    [
-      "in",
-      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
-      ["literal", ["motorway", "trunk", "primary"]],
-    ],
-    MAJOR_ROAD_WIDTH,
-    [
-      "in",
-      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
-      ["literal", ["secondary", "collector"]],
-    ],
-    MEDIUM_ROAD_WIDTH,
-    [
-      "in",
-      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
-      ["literal", ["residential", "tertiary"]],
-    ],
-    LOCAL_RESIDENTIAL_TERTIARY_WIDTH,
-    [
-      "in",
-      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
-      ["literal", ["service", "living_street", "unclassified"]],
-    ],
-    LOCAL_SERVICE_LIVING_UNCLASSIFIED_WIDTH,
-    fallbackWidth,
-  ];
-
-  if (!isCasing) {
-    return classBasedWidth;
+function getRoadWidthExpression(
+  kind: "major" | "medium" | "local" | "casing",
+): unknown {
+  switch (kind) {
+    case "major":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        2,
+        14,
+        4,
+        16,
+        8,
+        18,
+        14,
+        20,
+        22,
+      ];
+    case "medium":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        1.5,
+        14,
+        3,
+        16,
+        6,
+        18,
+        10,
+        20,
+        16,
+      ];
+    case "local":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        1.4,
+        14,
+        2.8,
+        16,
+        5.5,
+        18,
+        9,
+        20,
+        14,
+      ];
+    case "casing":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        2.2,
+        14,
+        4.2,
+        16,
+        7.2,
+        18,
+        11.5,
+        20,
+        16.5,
+      ];
   }
-
-  return [
-    "case",
-    [
-      "in",
-      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
-      ["literal", ["residential", "tertiary"]],
-    ],
-    LOCAL_RESIDENTIAL_TERTIARY_CASING,
-    [
-      "in",
-      ["downcase", ["coalesce", ["get", "class"], ["get", "type"], ""]],
-      ["literal", ["service", "living_street", "unclassified"]],
-    ],
-    LOCAL_SERVICE_LIVING_UNCLASSIFIED_CASING,
-    fallbackCasing,
-  ];
 }
 
 export function applyF4InspiredMapStyle(
@@ -349,6 +183,16 @@ export function applyF4InspiredMapStyle(
       const isCasing = CASING_RE.test(id);
       const isMajor = MAJOR_ROAD_RE.test(id);
       const isMedium = MEDIUM_ROAD_RE.test(id);
+      const isLocal = LOCAL_ROAD_RE.test(id);
+      const widthKind: "major" | "medium" | "local" | "casing" = isCasing
+        ? "casing"
+        : isMajor
+          ? "major"
+          : isMedium
+            ? "medium"
+            : isLocal
+              ? "local"
+              : "local";
 
       setPaintSafe(
         map,
@@ -370,7 +214,7 @@ export function applyF4InspiredMapStyle(
         map,
         layerId,
         "line-width",
-        getRoadWidthExpression(layerId, isCasing),
+        getRoadWidthExpression(widthKind),
       );
       continue;
     }
