@@ -2,7 +2,7 @@
 
 import type { FeatureCollection, Position } from "geojson";
 import maplibregl from "maplibre-gl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { NavigationControl } from "react-map-gl/maplibre";
 
 import floodData from "@/data/geojson/flood-sample.json";
@@ -12,16 +12,22 @@ import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
 import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
-import { useMapStylePolish } from "@/features/map/hooks/use-map-style-polish";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
+import { applyF4InspiredMapStyle } from "@/features/map/lib/apply-f4-inspired-map-style";
 import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import {
+  MAP_25D_DEFAULT_BEARING,
+  MAP_25D_DEFAULT_PITCH,
+  MAP_25D_FAR_PITCH,
+  MAP_25D_NEAR_PITCH,
   MAP_GLYPHS_FALLBACK,
   MAP_STYLE_2D,
   MAP_STYLE_25D,
+  TRAFFIC_MAX_SCALE,
+  TRAFFIC_MIN_SCALE,
 } from "@/lib/constants/map.constants";
 
 import { MapDataLayers } from "./map-data-layers";
@@ -76,16 +82,15 @@ export function MapLibreMap({
     () => ({
       longitude: 106.73,
       latitude: 10.82,
-      zoom: 12.4,
-      pitch: 30,
-      bearing: -18,
+      zoom: 11.8,
+      pitch: 0,
+      bearing: 0,
     }),
     [],
   );
 
   useBuildingLayer(mapInstance, visibleLayers.buildings, buildingOpacity);
   useMapViewMode(mapInstance, mapMode);
-  useMapStylePolish(mapInstance);
   useMapFlyToPlace(mapInstance, selectedPlace);
 
   const { cursor, hovered, handleMouseMove, handleMouseLeave } = useMapCursor();
@@ -111,7 +116,7 @@ export function MapLibreMap({
     Position[][]
   >([]);
   const programmaticMoveRef = useRef(false);
-  const zoomPitchStateRef = useRef<"far" | "near" | null>(null);
+  const cameraPitchBucketRef = useRef<string | null>(null);
   const followTickRef = useRef(0);
   const lastFollowCenterRef = useRef<[number, number] | null>(null);
 
@@ -123,6 +128,10 @@ export function MapLibreMap({
     const metersPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
     return Math.max(0, deltaLng * metersPerDegLng);
   };
+
+  const applyMapVisualStyle = useCallback((map: maplibregl.Map) => {
+    applyF4InspiredMapStyle(map);
+  }, []);
 
   useEffect(() => {
     if (!mapInstance || !routePayload) return;
@@ -179,8 +188,18 @@ export function MapLibreMap({
       );
     };
 
-    patchStyleGlyphs();
-  }, [mapInstance, mapMode]);
+    const refreshPremiumStyle = () => {
+      patchStyleGlyphs();
+      applyMapVisualStyle(mapInstance);
+    };
+
+    refreshPremiumStyle();
+    mapInstance.on("styledata", refreshPremiumStyle);
+
+    return () => {
+      mapInstance.off("styledata", refreshPremiumStyle);
+    };
+  }, [applyMapVisualStyle, mapInstance, mapMode]);
 
   useEffect(() => {
     if (!mapInstance || !trafficVisualizationEnabled) return;
@@ -314,6 +333,31 @@ export function MapLibreMap({
     );
   }, [ambientTraffic, mapBounds]);
 
+  const vehicleScale = useMemo(() => {
+    const points: Array<[number, number]> = [
+      [11, TRAFFIC_MIN_SCALE],
+      [13, 1],
+      [15, 1.22],
+      [17, 1.42],
+      [19, TRAFFIC_MAX_SCALE],
+    ];
+
+    if (mapZoom <= points[0][0]) return points[0][1];
+    if (mapZoom >= points[points.length - 1][0])
+      return points[points.length - 1][1];
+
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const [z1, s1] = points[index];
+      const [z2, s2] = points[index + 1];
+      if (mapZoom < z1 || mapZoom > z2) continue;
+
+      const ratio = (mapZoom - z1) / (z2 - z1);
+      return s1 + (s2 - s1) * ratio;
+    }
+
+    return 1;
+  }, [mapZoom]);
+
   const resetRouteRuntime = () => {
     pause();
     reset();
@@ -375,33 +419,29 @@ export function MapLibreMap({
   useEffect(() => {
     if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
 
-    const currentState = zoomPitchStateRef.current ?? "far";
-    let thresholdState: "far" | "near" = currentState;
-    if (cameraDistanceMeters !== null) {
-      if (cameraDistanceMeters <= 450) thresholdState = "near";
-      if (cameraDistanceMeters >= 550) thresholdState = "far";
-    }
-    if (zoomPitchStateRef.current === thresholdState) return;
-    zoomPitchStateRef.current = thresholdState;
+    const distance = cameraDistanceMeters ?? 1800;
+    const nearDistance = 420;
+    const farDistance = 3000;
+    const progress = Math.min(
+      1,
+      Math.max(0, (distance - nearDistance) / (farDistance - nearDistance)),
+    );
 
-    if (thresholdState === "far") {
-      mapInstance.easeTo({
-        pitch: 0,
-        bearing: 0,
-        duration: 420,
-      });
-      return;
-    }
+    const targetPitch =
+      MAP_25D_NEAR_PITCH - (MAP_25D_NEAR_PITCH - MAP_25D_FAR_PITCH) * progress;
+    const targetBearing = MAP_25D_DEFAULT_BEARING * (1 - progress);
 
-    const currentPitch = mapInstance.getPitch();
-    if (currentPitch < 25) {
-      mapInstance.easeTo({
-        pitch: 52,
-        bearing: -10,
-        duration: 520,
-      });
-    }
-  }, [mapInstance, mapMode, viewMode, cameraDistanceMeters]);
+    const bucket = `${Math.round(targetPitch)}:${Math.round(targetBearing * 2)}`;
+    if (cameraPitchBucketRef.current === bucket) return;
+    cameraPitchBucketRef.current = bucket;
+
+    mapInstance.easeTo({
+      pitch: targetPitch,
+      bearing: targetBearing,
+      duration: 360,
+      easing: (t) => 1 - (1 - t) * (1 - t),
+    });
+  }, [cameraDistanceMeters, mapInstance, mapMode, viewMode]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -464,10 +504,23 @@ export function MapLibreMap({
           });
         }}
         onLoad={(e) => {
-          setMapInstance(e.target);
-          setMapZoom(e.target.getZoom());
-          setMapBearing(e.target.getBearing());
-          const bounds = e.target.getBounds();
+          const loadedMap = e.target;
+
+          setMapInstance(loadedMap);
+          setMapZoom(loadedMap.getZoom());
+          setMapBearing(loadedMap.getBearing());
+
+          applyMapVisualStyle(loadedMap);
+
+          if (mapMode === "2.5d") {
+            loadedMap.easeTo({
+              pitch: MAP_25D_DEFAULT_PITCH,
+              bearing: MAP_25D_DEFAULT_BEARING,
+              duration: 80,
+            });
+          }
+
+          const bounds = loadedMap.getBounds();
           setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
           setMapBounds({
             west: bounds.getWest(),
@@ -508,7 +561,7 @@ export function MapLibreMap({
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
           ambientTraffic={visibleAmbientTraffic}
-          mapZoom={mapZoom}
+          mapZoom={mapZoom + (vehicleScale - 1) * 4.6}
         />
       </Map>
 
