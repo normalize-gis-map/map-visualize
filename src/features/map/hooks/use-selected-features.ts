@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type maplibregl from "maplibre-gl";
-import type { PopupAnchor } from "@/components/map/feature-popup";
+import type { PopupAnchor } from "@/features/map/components/feature-popup";
 
 import {
   normalizeProperties,

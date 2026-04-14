@@ -4,8 +4,8 @@ import * as Cesium from "cesium";
 import { Globe, Map, Satellite } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { FeaturePopupCard } from "@/components/map/feature-popup";
-import { ControlBoard } from "@/components/map/navigation/control-board";
+import { FeaturePopupCard } from "@/features/map/components/feature-popup";
+import { ControlBoard } from "@/features/map/components/navigation/control-board";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { useCesiumChaseCamera } from "@/features/map/hooks/use-cesium-chase-camera";

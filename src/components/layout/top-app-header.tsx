@@ -11,9 +11,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { AlertDrawer } from "@/components/flood/alert-drawer";
+import { AlertDrawer } from "@/features/flood/components/alert-drawer";
 import { UserMenu } from "@/components/layout/user-menu";
-import { MapControlsMenu } from "@/components/map/map-controls-menu";
+import { MapControlsMenu } from "@/features/map/components/map-controls-menu";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { SearchPanel } from "@/components/search/search-panel";
 import type { PlaceItem } from "@/data/places";

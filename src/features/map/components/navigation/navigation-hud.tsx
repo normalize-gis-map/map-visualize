@@ -9,9 +9,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { MapLegend } from "@/components/map/map-legend";
-import { NavigationMiniMapInset } from "@/components/map/navigation/navigation-mini-map-inset";
-import { RouteDrawer } from "@/components/map/navigation/route-drawer";
+import { MapLegend } from "@/features/map/components/map-legend";
+import { NavigationMiniMapInset } from "@/features/map/components/navigation/navigation-mini-map-inset";
+import { RouteDrawer } from "@/features/map/components/navigation/route-drawer";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type Props = {

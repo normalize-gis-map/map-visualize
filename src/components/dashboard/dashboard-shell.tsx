@@ -7,7 +7,7 @@ import { DashboardOverlay } from "@/components/dashboard/dashboard-overlay";
 import { DashboardRightInspector } from "@/components/dashboard/dashboard-right-inspector";
 import { LayerCatalog } from "@/components/layout/layer-catalog";
 import { TopAppHeader } from "@/components/layout/top-app-header";
-import { MapEngineContainer } from "@/components/map/map-engine-container";
+import { MapEngineContainer } from "@/features/map/components/map-engine-container";
 import type { PlaceItem } from "@/data/places";
 import { useFloodData } from "@/features/flood/hooks/use-flood-data";
 import type { RouteAlternative } from "@/features/map/types/route.types";

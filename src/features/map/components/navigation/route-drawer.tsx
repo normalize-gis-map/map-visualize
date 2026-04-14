@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { ControlBoard } from "@/components/map/navigation/control-board";
+import { ControlBoard } from "@/features/map/components/navigation/control-board";
 import type { RouteStep } from "@/features/map/types/route.types";
 
 type Props = {
