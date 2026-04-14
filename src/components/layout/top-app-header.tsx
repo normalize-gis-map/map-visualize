@@ -11,11 +11,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { AlertDrawer } from "@/components/flood/alert-drawer";
 import { UserMenu } from "@/components/layout/user-menu";
 import { MapControlsMenu } from "@/components/map/map-controls-menu";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { SearchPanel } from "@/components/search/search-panel";
 import type { PlaceItem } from "@/data/places";
+import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type TopAppHeaderProps = {
@@ -28,11 +30,17 @@ type TopAppHeaderProps = {
       activeIndex: number;
     } | null,
   ) => void;
+  alertOpen: boolean;
+  onToggleAlert: () => void;
+  floodData: FloodGeoJson | null;
 };
 
 export function TopAppHeader({
   onSelectPlace,
   onRoutesChange,
+  alertOpen,
+  onToggleAlert,
+  floodData,
 }: TopAppHeaderProps) {
   const [mode, setMode] = useState<"view" | "route">("view");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -87,6 +95,12 @@ export function TopAppHeader({
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {activeMode === "view" ? <MapControlsMenu /> : null}
+              <AlertDrawer
+                open={alertOpen}
+                onToggle={onToggleAlert}
+                data={floodData}
+                mode="popover"
+              />
               <UserMenu />
             </div>
           </div>

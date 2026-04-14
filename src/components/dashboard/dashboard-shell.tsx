@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 
-import { DashboardBottomPanel } from "@/components/dashboard/dashboard-bottom-panel";
-import { DashboardBottomShell } from "@/components/dashboard/dashboard-bottom-shell";
 import { DashboardLeftRail } from "@/components/dashboard/dashboard-left-rail";
 import { DashboardOverlay } from "@/components/dashboard/dashboard-overlay";
 import { DashboardRightInspector } from "@/components/dashboard/dashboard-right-inspector";
-import { AlertDrawer } from "@/components/flood/alert-drawer";
 import { LayerCatalog } from "@/components/layout/layer-catalog";
 import { TopAppHeader } from "@/components/layout/top-app-header";
 import { MapEngineContainer } from "@/components/map/map-engine-container";
@@ -57,6 +54,9 @@ export function DashboardShell() {
         <TopAppHeader
           onSelectPlace={setSelectedPlace}
           onRoutesChange={setRoutePayload}
+          alertOpen={alertOpen}
+          onToggleAlert={() => setAlertOpen((prev) => !prev)}
+          floodData={data}
         />
 
         <DashboardLeftRail>
@@ -65,18 +65,6 @@ export function DashboardShell() {
             onToggle={() => setCatalogOpen((prev) => !prev)}
           />
         </DashboardLeftRail>
-
-        <DashboardBottomPanel>
-          <div className={catalogOpen ? "hidden md:block" : "block"}>
-            <DashboardBottomShell>
-              <AlertDrawer
-                open={alertOpen}
-                onToggle={() => setAlertOpen((prev) => !prev)}
-                data={data}
-              />
-            </DashboardBottomShell>
-          </div>
-        </DashboardBottomPanel>
 
         <DashboardRightInspector selected={false} />
       </DashboardOverlay>
