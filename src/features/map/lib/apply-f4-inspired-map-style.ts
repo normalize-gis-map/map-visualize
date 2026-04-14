@@ -15,73 +15,96 @@ const MAJOR_ROAD_WIDTH = [
   ["linear"],
   ["zoom"],
   10,
-  1,
+  1.15,
   12,
-  1.8,
+  2.4,
   14,
-  3.8,
+  4.8,
   16,
-  7.2,
+  8.8,
   18,
-  12.8,
+  14.8,
   20,
-  18,
+  22,
 ];
-const MINOR_ROAD_WIDTH = [
+
+const MEDIUM_ROAD_WIDTH = [
   "interpolate",
   ["linear"],
   ["zoom"],
   10,
-  0.75,
+  0.95,
   12,
-  1.2,
+  1.8,
   14,
-  2.3,
+  3.6,
   16,
-  4.2,
+  6.3,
   18,
-  7.4,
+  10,
   20,
-  10.5,
+  14,
 ];
+
+const LOCAL_ROAD_WIDTH = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  10,
+  0.72,
+  12,
+  1.25,
+  14,
+  2.45,
+  16,
+  4.4,
+  18,
+  7,
+  20,
+  9.6,
+];
+
 const CASING_WIDTH = [
   "interpolate",
   ["linear"],
   ["zoom"],
   10,
-  1.8,
+  1.9,
   12,
-  2.8,
+  3.25,
   14,
-  5.2,
+  5.9,
   16,
-  9.4,
+  10.4,
   18,
-  15.5,
+  17,
   20,
-  22,
+  24,
 ];
+
 const LANE_MARKING_WIDTH = [
   "interpolate",
   ["linear"],
   ["zoom"],
   10,
-  0.3,
+  0.32,
   12,
-  0.45,
+  0.5,
   14,
-  0.85,
+  0.94,
   16,
-  1.6,
+  1.85,
   18,
-  2.8,
+  3.1,
   20,
-  4,
+  4.4,
 ];
 
 const ROAD_NAME_RE =
-  /(road|street|highway|transport|motorway|primary|trunk|arterial)/i;
+  /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
+const MEDIUM_ROAD_RE = /(secondary|collector)/i;
+const LOCAL_ROAD_RE = /(tertiary|residential|service|living|local)/i;
 const CASING_RE = /(casing|outline|border)/i;
 
 function setPaintSafe(
@@ -157,6 +180,8 @@ export function applyF4InspiredMapStyle(map: maplibregl.Map): void {
     if (layer.type === "line" && ROAD_NAME_RE.test(id)) {
       const isCasing = CASING_RE.test(id);
       const isMajor = MAJOR_ROAD_RE.test(id);
+      const isMedium = MEDIUM_ROAD_RE.test(id);
+      const isLocal = LOCAL_ROAD_RE.test(id);
 
       setPaintSafe(
         map,
@@ -172,13 +197,21 @@ export function applyF4InspiredMapStyle(map: maplibregl.Map): void {
         map,
         layerId,
         "line-opacity",
-        isCasing ? 0.9 : isMajor ? 0.96 : 0.9,
+        isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
       );
       setPaintSafe(
         map,
         layerId,
         "line-width",
-        isCasing ? CASING_WIDTH : isMajor ? MAJOR_ROAD_WIDTH : MINOR_ROAD_WIDTH,
+        isCasing
+          ? CASING_WIDTH
+          : isMajor
+            ? MAJOR_ROAD_WIDTH
+            : isMedium
+              ? MEDIUM_ROAD_WIDTH
+              : isLocal
+                ? LOCAL_ROAD_WIDTH
+                : LOCAL_ROAD_WIDTH,
       );
       continue;
     }

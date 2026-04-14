@@ -324,14 +324,29 @@ export function MapLibreMap({
   });
   const visibleAmbientTraffic = useMemo(() => {
     if (!mapBounds) return ambientTraffic;
-    return ambientTraffic.filter(
-      (vehicle) =>
-        vehicle.lng >= mapBounds.west &&
-        vehicle.lng <= mapBounds.east &&
-        vehicle.lat >= mapBounds.south &&
-        vehicle.lat <= mapBounds.north,
-    );
-  }, [ambientTraffic, mapBounds]);
+
+    const precision = mapZoom >= 16 ? 4 : mapZoom >= 14 ? 3 : 2;
+    const deduped = new globalThis.Map<
+      string,
+      (typeof ambientTraffic)[number]
+    >();
+
+    for (const vehicle of ambientTraffic) {
+      if (
+        vehicle.lng < mapBounds.west ||
+        vehicle.lng > mapBounds.east ||
+        vehicle.lat < mapBounds.south ||
+        vehicle.lat > mapBounds.north
+      ) {
+        continue;
+      }
+
+      const key = `${vehicle.lng.toFixed(precision)}:${vehicle.lat.toFixed(precision)}`;
+      if (!deduped.has(key)) deduped.set(key, vehicle);
+    }
+
+    return Array.from(deduped.values());
+  }, [ambientTraffic, mapBounds, mapZoom]);
 
   const vehicleScale = useMemo(() => {
     const points: Array<[number, number]> = [
@@ -403,8 +418,8 @@ export function MapLibreMap({
         viewMode === "drive3d"
           ? Math.max(mapInstance.getZoom(), 14.5)
           : undefined,
-      duration: viewMode === "drive3d" ? 240 : 280,
-      easing: (t) => t,
+      duration: viewMode === "drive3d" ? 280 : 320,
+      easing: (t) => 1 - Math.pow(1 - t, 2.2),
     });
   }, [
     driveTiltDeg,
@@ -420,8 +435,8 @@ export function MapLibreMap({
     if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
 
     const distance = cameraDistanceMeters ?? 1800;
-    const nearDistance = 420;
-    const farDistance = 3000;
+    const nearDistance = 380;
+    const farDistance = 3400;
     const progress = Math.min(
       1,
       Math.max(0, (distance - nearDistance) / (farDistance - nearDistance)),
@@ -431,15 +446,25 @@ export function MapLibreMap({
       MAP_25D_NEAR_PITCH - (MAP_25D_NEAR_PITCH - MAP_25D_FAR_PITCH) * progress;
     const targetBearing = MAP_25D_DEFAULT_BEARING * (1 - progress);
 
-    const bucket = `${Math.round(targetPitch)}:${Math.round(targetBearing * 2)}`;
+    const currentPitch = mapInstance.getPitch();
+    const currentBearing = mapInstance.getBearing();
+
+    if (
+      Math.abs(currentPitch - targetPitch) < 0.45 &&
+      Math.abs(currentBearing - targetBearing) < 0.6
+    ) {
+      return;
+    }
+
+    const bucket = `${Math.round(targetPitch * 2) / 2}:${Math.round(targetBearing * 2) / 2}`;
     if (cameraPitchBucketRef.current === bucket) return;
     cameraPitchBucketRef.current = bucket;
 
     mapInstance.easeTo({
       pitch: targetPitch,
       bearing: targetBearing,
-      duration: 360,
-      easing: (t) => 1 - (1 - t) * (1 - t),
+      duration: 460,
+      easing: (t) => 1 - Math.pow(1 - t, 2.4),
     });
   }, [cameraDistanceMeters, mapInstance, mapMode, viewMode]);
 

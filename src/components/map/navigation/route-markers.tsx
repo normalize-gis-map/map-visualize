@@ -30,34 +30,26 @@ type Props = {
 
 function Vehicle3D({
   compact = false,
-  simplified = false,
+  ghost = false,
 }: {
   compact?: boolean;
-  simplified?: boolean;
+  ghost?: boolean;
 }) {
-  const sizeClass = compact ? "h-3.5 w-2.4" : "h-4.5 w-3";
-  if (simplified) {
-    return (
-      <div
-        className={`rounded-full border border-slate-500/85 bg-slate-400/95 ${compact ? "h-2.5 w-1.6" : "h-3.5 w-2"} shadow-[0_1px_2px_rgba(15,23,42,0.28)]`}
-      />
-    );
-  }
+  const bodyClass = compact ? "h-[18px] w-[11px]" : "h-[24px] w-[14px]";
 
   return (
-    <div
-      className={`relative ${sizeClass} [transform-style:preserve-3d]`}
-      style={{ transform: "rotateX(56deg)" }}
-    >
-      <div className="absolute inset-0 rounded-[7px] bg-gradient-to-b from-slate-400 to-slate-600 shadow-[0_8px_10px_rgba(2,6,23,0.32)]" />
+    <div className={`relative ${bodyClass} [transform-style:preserve-3d]`}>
       <div
-        className="absolute top-[10%] left-[14%] right-[14%] h-[40%] rounded-[5px] bg-gradient-to-b from-slate-200 to-slate-300 opacity-95"
+        className={`absolute inset-0 rounded-[7px] border border-slate-300/90 bg-gradient-to-b from-slate-100 via-slate-200 to-slate-300 shadow-[0_5px_9px_rgba(15,23,42,0.3)] ${ghost ? "opacity-70" : "opacity-100"}`}
       />
       <div
-        className="absolute -right-[12%] top-[8%] bottom-[8%] w-[18%] rounded-r-[6px] bg-gradient-to-b from-slate-500 to-slate-700 opacity-90"
+        className={`absolute top-[10%] right-[15%] left-[15%] h-[36%] rounded-[5px] border border-slate-200/85 bg-gradient-to-b from-white to-slate-100 ${ghost ? "opacity-65" : "opacity-95"}`}
       />
-      <div className="absolute -top-[6%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-slate-200/95" />
-      <div className="absolute -bottom-[5%] left-1/2 h-1 w-1.5 -translate-x-1/2 rounded-full bg-slate-800/95" />
+      <div
+        className={`absolute top-[52%] right-[14%] left-[14%] h-[34%] rounded-[5px] bg-gradient-to-b from-slate-300 to-slate-400 ${ghost ? "opacity-68" : "opacity-88"}`}
+      />
+      <div className="absolute inset-x-[23%] -top-[4%] h-[2px] rounded-full bg-slate-100/85" />
+      <div className="absolute inset-x-[25%] -bottom-[4%] h-[2px] rounded-full bg-slate-600/90" />
     </div>
   );
 }
@@ -76,8 +68,8 @@ export function RouteMarkers({
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
-  const zoomScale = Math.min(2.3, Math.max(0.55, (mapZoom - 11) * 0.28));
-  const simplifiedTraffic = mapZoom < 14.3;
+  const zoomScale = Math.min(2.6, Math.max(0.78, 0.8 + (mapZoom - 11) * 0.24));
+  const simplifiedTraffic = mapZoom < 13.6;
 
   return (
     <>
@@ -106,11 +98,13 @@ export function RouteMarkers({
           rotationAlignment="map"
         >
           <div
-            className="flex h-10 w-10 items-center justify-center"
-            style={{ transform: `rotate(${navHeading}deg) scale(${zoomScale})` }}
+            className="flex h-10 w-10 items-center justify-center transition-transform duration-220 ease-out"
+            style={{
+              transform: `rotate(${navHeading}deg) scale(${zoomScale})`,
+            }}
           >
             {navMode === "car" ? (
-              <Vehicle3D simplified={simplifiedTraffic && !mapLibreCar3D} />
+              <Vehicle3D ghost={simplifiedTraffic && !mapLibreCar3D} />
             ) : navMode === "bike" ? (
               <Bike className="h-4 w-4" />
             ) : (
@@ -131,13 +125,12 @@ export function RouteMarkers({
               rotationAlignment="map"
             >
               <div
-                className="relative flex h-8 w-8 items-center justify-center"
-                style={{ transform: `rotate(${car.bearing}deg) scale(${zoomScale * 0.9})` }}
+                className="relative flex h-9 w-9 items-center justify-center transition-transform duration-150 ease-out"
+                style={{
+                  transform: `rotate(${car.bearing}deg) scale(${zoomScale * 0.95})`,
+                }}
               >
-                <Vehicle3D
-                  compact
-                  simplified={simplifiedTraffic}
-                />
+                <Vehicle3D compact ghost={simplifiedTraffic} />
               </div>
             </Marker>
           ))
@@ -153,10 +146,12 @@ export function RouteMarkers({
           rotationAlignment="map"
         >
           <div
-            className="relative flex h-7 w-7 items-center justify-center opacity-90"
-            style={{ transform: `rotate(${vehicle.bearing}deg) scale(${zoomScale * 0.8})` }}
+            className="relative flex h-8 w-8 items-center justify-center opacity-72 transition-transform duration-180 ease-out"
+            style={{
+              transform: `rotate(${vehicle.bearing}deg) scale(${zoomScale * 0.84})`,
+            }}
           >
-            <Vehicle3D compact simplified={simplifiedTraffic} />
+            <Vehicle3D compact ghost />
           </div>
         </Marker>
       ))}
