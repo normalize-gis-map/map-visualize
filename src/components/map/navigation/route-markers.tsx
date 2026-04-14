@@ -18,13 +18,6 @@ type Props = {
   navMode: "car" | "bike" | "walk";
   mapLibreCar3D: boolean;
   trafficCars: TrafficSample[];
-  ambientTraffic: Array<{
-    id: string;
-    lng: number;
-    lat: number;
-    bearing: number;
-    direction: "forward" | "backward";
-  }>;
   mapZoom: number;
   vehicleScaleMultiplier?: number;
 };
@@ -62,11 +55,10 @@ export function RouteMarkers({
   navMode,
   mapLibreCar3D,
   trafficCars,
-  ambientTraffic,
   mapZoom,
   vehicleScaleMultiplier = 1,
 }: Props) {
-  if (!coordinates.length && !ambientTraffic.length) return null;
+  if (!coordinates.length) return null;
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
@@ -139,26 +131,6 @@ export function RouteMarkers({
             </Marker>
           ))
         : null}
-
-      {ambientTraffic.map((vehicle) => (
-        <Marker
-          key={vehicle.id}
-          longitude={vehicle.lng}
-          latitude={vehicle.lat}
-          anchor="center"
-          pitchAlignment="map"
-          rotationAlignment="map"
-        >
-          <div
-            className="relative flex h-8 w-8 items-center justify-center opacity-72 transition-transform duration-180 ease-out"
-            style={{
-              transform: `rotate(${vehicle.bearing}deg) scale(${zoomScale * 0.84})`,
-            }}
-          >
-            <Vehicle3D compact ghost />
-          </div>
-        </Marker>
-      ))}
     </>
   );
 }

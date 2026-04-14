@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   type AmbientRoadClass,
-  getRoadClassLaneOffsetMeters,
 } from "@/features/map/lib/get-road-class-lane-offset";
+import { getClampedLaneOffsetMeters } from "@/features/map/lib/get-clamped-lane-offset";
 import {
   normalizeBearing,
   offsetRouteSample,
@@ -22,6 +22,7 @@ export type AmbientTrafficVehicle = {
   bearing: number;
   speed: number;
   direction: "forward" | "backward";
+  roadClass: AmbientRoadClass;
 };
 
 export type AmbientTrafficRoute = {
@@ -117,6 +118,14 @@ function generateDirectionProgresses(count: number, seedRoot: string) {
   return progresses;
 }
 
+function allocateByClass(total: number) {
+  return {
+    major: Math.max(1, Math.round(total * 0.4)),
+    medium: Math.max(1, Math.round(total * 0.35)),
+    local: Math.max(1, Math.round(total * 0.25)),
+  };
+}
+
 export function useAmbientTraffic({
   routes,
   zoom,
@@ -145,48 +154,72 @@ export function useAmbientTraffic({
       .filter(({ route }) => route.coordinates.length > 3)
       .slice(0, getRoadLimitByZoom(zoom));
 
+    const byClass = {
+      major: eligibleRoutes.filter((entry) => entry.route.roadClass === "major"),
+      medium: eligibleRoutes.filter((entry) => entry.route.roadClass === "medium"),
+      local: eligibleRoutes.filter((entry) => entry.route.roadClass === "local"),
+    };
+    const classBudget = allocateByClass(targetCount);
     const generated: StreamVehicle[] = [];
-
-    for (const { route, index: routeIndex } of eligibleRoutes) {
-      const basePerDirection = getBaseVehiclesPerDirection(route.roadClass, zoom);
-      const asymmetry = 0.78 + seededUnit(`flow-bias-${routeIndex}`) * 0.5;
-      const forwardCount = Math.max(1, Math.round(basePerDirection * asymmetry));
-      const backwardCount = Math.max(
-        1,
-        Math.round(basePerDirection * (2 - asymmetry)),
-      );
-
-      for (const [direction, count] of [
-        ["forward", forwardCount],
-        ["backward", backwardCount],
-      ] as const) {
-        const progresses = generateDirectionProgresses(
-          count,
-          `${routeIndex}-${direction}`,
+    const addFromBucket = (
+      entries: typeof eligibleRoutes,
+      targetBudget: number,
+      fallbackCount = 1,
+    ) => {
+      let bucketCount = 0;
+      for (const { route, index: routeIndex } of entries) {
+        const basePerDirection = Math.max(
+          fallbackCount,
+          getBaseVehiclesPerDirection(route.roadClass, zoom),
+        );
+        const asymmetry = 0.78 + seededUnit(`flow-bias-${routeIndex}`) * 0.5;
+        const forwardCount = Math.max(1, Math.round(basePerDirection * asymmetry));
+        const backwardCount = Math.max(
+          1,
+          Math.round(basePerDirection * (2 - asymmetry)),
         );
 
-        for (let slot = 0; slot < progresses.length; slot += 1) {
-          const speedRange = getClassSpeedRange(route.roadClass);
-          const speedBlend = seededUnit(`${routeIndex}-${direction}-speed-${slot}`);
-          const speedFactor =
-            speedRange.min + speedBlend * (speedRange.max - speedRange.min);
-          const laneVariant =
-            seededUnit(`${routeIndex}-${direction}-lane-${slot}`) > 0.62 ? 1 : 0;
+        for (const [direction, count] of [
+          ["forward", forwardCount],
+          ["backward", backwardCount],
+        ] as const) {
+          const progresses = generateDirectionProgresses(
+            count,
+            `${routeIndex}-${direction}`,
+          );
 
-          generated.push({
-            id: `ambient-${routeIndex}-${direction}-${slot}`,
-            routeIndex,
-            baseProgress: progresses[slot] ?? 0,
-            laneVariant,
-            speedFactor,
-            roadClass: route.roadClass,
-            direction,
-          });
-          if (generated.length >= targetCount) {
-            return generated;
+          for (let slot = 0; slot < progresses.length; slot += 1) {
+            const speedRange = getClassSpeedRange(route.roadClass);
+            const speedBlend = seededUnit(`${routeIndex}-${direction}-speed-${slot}`);
+            const speedFactor =
+              speedRange.min + speedBlend * (speedRange.max - speedRange.min);
+            const laneVariant =
+              seededUnit(`${routeIndex}-${direction}-lane-${slot}`) > 0.62 ? 1 : 0;
+
+            generated.push({
+              id: `ambient-${routeIndex}-${direction}-${slot}`,
+              routeIndex,
+              baseProgress: progresses[slot] ?? 0,
+              laneVariant,
+              speedFactor,
+              roadClass: route.roadClass,
+              direction,
+            });
+            bucketCount += 1;
+            if (generated.length >= targetCount || bucketCount >= targetBudget) {
+              return;
+            }
           }
         }
       }
+    };
+
+    addFromBucket(byClass.major, classBudget.major, 2);
+    addFromBucket(byClass.medium, classBudget.medium, 1);
+    addFromBucket(byClass.local, classBudget.local, 1);
+
+    if (generated.length < targetCount) {
+      addFromBucket(eligibleRoutes, targetCount - generated.length, 1);
     }
 
     return generated;
@@ -226,10 +259,7 @@ export function useAmbientTraffic({
         const route = routeEntry?.coordinates;
         if (!route || route.length < 2) return null;
 
-        const baseLaneOffset = getRoadClassLaneOffsetMeters(
-          vehicle.roadClass,
-          zoom,
-        );
+        const baseLaneOffset = getClampedLaneOffsetMeters(vehicle.roadClass, zoom);
         const laneSpread =
           vehicle.roadClass === "major"
             ? 1
@@ -262,6 +292,7 @@ export function useAmbientTraffic({
           bearing: normalizeBearing(shifted.bearing),
           speed: vehicle.speedFactor,
           direction: vehicle.direction,
+          roadClass: vehicle.roadClass,
         };
       })
       .filter((item): item is AmbientTrafficVehicle => Boolean(item));

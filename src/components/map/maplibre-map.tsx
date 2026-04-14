@@ -20,6 +20,7 @@ import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
 import { applyF4InspiredMapStyle } from "@/features/map/lib/apply-f4-inspired-map-style";
+import { buildAmbientTrafficSource } from "@/features/map/lib/build-ambient-traffic-source";
 import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -150,6 +151,9 @@ export function MapLibreMap({
   const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<
     AmbientTrafficRoute[]
   >([]);
+  const ambientTrafficSourceId = "ambient-traffic-source";
+  const ambientTrafficShadowLayerId = "ambient-traffic-shadow";
+  const ambientTrafficBodyLayerId = "ambient-traffic-body";
   const programmaticMoveRef = useRef(false);
   const hasAppliedInitial25DCameraRef = useRef(false);
   const patchedStyleSignatureRef = useRef<string | null>(null);
@@ -311,6 +315,8 @@ export function MapLibreMap({
               "",
           ).toLowerCase();
 
+          const isMotorway = className.includes("motorway");
+          const isTrunk = className.includes("trunk");
           const isPrimary = className.includes("primary");
           const isSecondary = className.includes("secondary");
           const isTertiary = className.includes("tertiary");
@@ -318,7 +324,13 @@ export function MapLibreMap({
           const isService = className.includes("service");
 
           const isEligible =
-            isPrimary || isSecondary || isTertiary || isResidential || isService;
+            isMotorway ||
+            isTrunk ||
+            isPrimary ||
+            isSecondary ||
+            isTertiary ||
+            isResidential ||
+            isService;
           if (!isEligible) return [];
 
           if (!geometry) return [];
@@ -522,6 +534,103 @@ export function MapLibreMap({
 
     return Array.from(deduped.values()).slice(0, cap);
   }, [ambientTraffic, detailPreset, mapBounds, mapZoom, trafficDensity]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const style = mapInstance.getStyle();
+    if (!style) return;
+    const buildingLayer = style.layers.find((layer) => layer.type === "fill-extrusion");
+    const beforeLayerId = buildingLayer?.id;
+
+    if (!mapInstance.getSource(ambientTrafficSourceId)) {
+      mapInstance.addSource(ambientTrafficSourceId, {
+        type: "geojson",
+        data: buildAmbientTrafficSource(visibleAmbientTraffic),
+      });
+    }
+
+    if (!mapInstance.getLayer(ambientTrafficShadowLayerId)) {
+      mapInstance.addLayer(
+        {
+          id: ambientTrafficShadowLayerId,
+          type: "line",
+          source: ambientTrafficSourceId,
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#0f172a",
+            "line-opacity": 0.2,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              1.2,
+              14,
+              1.6,
+              16,
+              2.1,
+              18,
+              2.8,
+              20,
+              3.3,
+            ],
+          },
+        },
+        beforeLayerId,
+      );
+    }
+
+    if (!mapInstance.getLayer(ambientTrafficBodyLayerId)) {
+      mapInstance.addLayer(
+        {
+          id: ambientTrafficBodyLayerId,
+          type: "line",
+          source: ambientTrafficSourceId,
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": [
+              "match",
+              ["get", "roadClass"],
+              "major",
+              "#f8fafc",
+              "medium",
+              "#e2e8f0",
+              "#cbd5e1",
+            ],
+            "line-opacity": 0.92,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              0.75,
+              14,
+              1,
+              16,
+              1.35,
+              18,
+              1.8,
+              20,
+              2.2,
+            ],
+          },
+        },
+        beforeLayerId,
+      );
+    }
+
+    const source = mapInstance.getSource(
+      ambientTrafficSourceId,
+    ) as maplibregl.GeoJSONSource | null;
+    source?.setData(buildAmbientTrafficSource(visibleAmbientTraffic));
+  }, [mapInstance, visibleAmbientTraffic]);
 
   const vehicleScaleMultiplier = useMemo(() => {
     const baseZoomScale =
@@ -749,7 +858,6 @@ export function MapLibreMap({
           navMode={navMode}
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
-          ambientTraffic={visibleAmbientTraffic}
           mapZoom={mapZoom}
           vehicleScaleMultiplier={vehicleScaleMultiplier}
         />

@@ -31,13 +31,6 @@ type Props = {
     direction: "forward" | "backward";
     vehicleType: "car" | "bike";
   }>;
-  ambientTraffic: Array<{
-    id: string;
-    lng: number;
-    lat: number;
-    bearing: number;
-    direction: "forward" | "backward";
-  }>;
   mapZoom: number;
   vehicleScaleMultiplier?: number;
 };
@@ -54,7 +47,6 @@ function MapFeatureOverlaysImpl({
   navMode,
   mapLibreCar3D,
   trafficCars,
-  ambientTraffic,
   mapZoom,
   vehicleScaleMultiplier,
 }: Props) {
@@ -151,7 +143,7 @@ function MapFeatureOverlaysImpl({
         />
       )}
 
-      {activeRoute || ambientTraffic.length ? (
+      {activeRoute ? (
         <RouteMarkers
           coordinates={activeRoute?.geometry.coordinates ?? []}
           navCoordinate={navCoordinate}
@@ -159,7 +151,6 @@ function MapFeatureOverlaysImpl({
           navMode={navMode}
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
-          ambientTraffic={ambientTraffic}
           mapZoom={mapZoom}
           vehicleScaleMultiplier={vehicleScaleMultiplier}
         />
