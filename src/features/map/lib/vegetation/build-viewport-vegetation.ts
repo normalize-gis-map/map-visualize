@@ -3,13 +3,13 @@ import type { FeatureCollection, GeoJsonProperties, Geometry, Position } from "g
 import {
   classifyGreenArea,
   type GreenAreaRenderMode,
-} from "@/features/map/lib/classify-green-area";
+} from "@/features/map/lib/vegetation/classify-green-area";
 import {
   createSeededPoint,
   getStableSeed,
   pointInPolygon,
   unitFromStableHash,
-} from "@/features/map/lib/get-stable-seed-points";
+} from "@/features/map/lib/vegetation/get-stable-seed-points";
 
 type TreeType = "tall" | "compact" | "ornamental";
 type TreeArchetype = "pine" | "broadleaf" | "ornamental" | "waterside";

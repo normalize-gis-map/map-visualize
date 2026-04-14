@@ -1,7 +1,7 @@
 import * as Cesium from "cesium";
 import { useCallback, useRef } from "react";
 
-import { sampleRouteAtProgress } from "@/features/map/navigation/route-sampling";
+import { sampleRouteAtProgress } from "@/features/navigation/lib/route-sampling";
 
 const LOOKAHEAD_PROGRESS = 0.015;
 

@@ -12,7 +12,7 @@ import {
 import { useState } from "react";
 
 import { AlertDrawer } from "@/features/flood/components/alert-drawer";
-import { UserMenu } from "@/components/layout/user-menu";
+import { UserMenu } from "@/components/layout/header/user-menu";
 import { MapControlsMenu } from "@/features/map/components/map-controls-menu";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { SearchPanel } from "@/components/search/search-panel";

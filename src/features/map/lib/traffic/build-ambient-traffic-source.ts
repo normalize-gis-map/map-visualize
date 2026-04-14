@@ -1,7 +1,7 @@
 import type { FeatureCollection, Polygon } from "geojson";
 
 import type { AmbientTrafficVehicle } from "@/features/map/hooks/use-ambient-traffic";
-import { getRoadTrafficEnvelope } from "@/features/map/lib/get-road-traffic-envelope";
+import { getRoadTrafficEnvelope } from "@/features/map/lib/traffic/get-road-traffic-envelope";
 
 function metersToLatitudeDegrees(meters: number) {
   return meters / 111320;

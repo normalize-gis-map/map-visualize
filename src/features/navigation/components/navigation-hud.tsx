@@ -10,8 +10,8 @@ import {
 import { useState } from "react";
 
 import { MapLegend } from "@/features/map/components/map-legend";
-import { NavigationMiniMapInset } from "@/features/map/components/navigation/navigation-mini-map-inset";
-import { RouteDrawer } from "@/features/map/components/navigation/route-drawer";
+import { NavigationMiniMapInset } from "@/features/navigation/components/navigation-mini-map-inset";
+import { RouteDrawer } from "@/features/navigation/components/route-drawer";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type Props = {

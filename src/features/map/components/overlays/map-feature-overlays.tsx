@@ -1,7 +1,7 @@
 import { memo } from "react";
 
 import { FeaturePopup } from "@/features/map/components/feature-popup";
-import { RouteMarkers } from "@/features/map/components/navigation/route-markers";
+import { RouteMarkers } from "@/features/navigation/components/route-markers";
 import type { SelectedFeature } from "@/features/map/hooks/use-selected-features";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import {

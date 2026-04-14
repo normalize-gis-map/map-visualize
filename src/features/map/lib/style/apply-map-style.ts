@@ -72,7 +72,7 @@ function getCloseZoomRoadWidthPatch(
   return ["*", baseWidth, zoomMultiplier];
 }
 
-export function applyF4InspiredMapStyle(
+export function applyMapStyle(
   map: maplibregl.Map,
   options?: { laneDetailEnabled?: boolean; detailPreset?: "balanced" | "high" },
 ): void {
@@ -232,11 +232,11 @@ export function applyF4InspiredMapStyle(
     }
   }
 
-  if (firstParkFillLayer && !map.getLayer("f4-park-grass")) {
+  if (firstParkFillLayer && !map.getLayer("map-park-grass")) {
     try {
       const layerDef = withOptionalFilter(
         {
-          id: "f4-park-grass",
+          id: "map-park-grass",
           type: "fill",
           source: firstParkFillLayer.source,
           "source-layer":
@@ -257,11 +257,11 @@ export function applyF4InspiredMapStyle(
     } catch {}
   }
 
-  if (firstParkFillLayer && !map.getLayer("f4-park-grass-depth")) {
+  if (firstParkFillLayer && !map.getLayer("map-park-grass-depth")) {
     try {
       const layerDef = withOptionalFilter(
         {
-          id: "f4-park-grass-depth",
+          id: "map-park-grass-depth",
           type: "line",
           source: firstParkFillLayer.source,
           "source-layer":
@@ -303,7 +303,7 @@ export function applyF4InspiredMapStyle(
       continue;
     if (laneLayerCount >= laneLayerCap) continue;
 
-    const laneLayerId = `${roadLayer.id}__f4_lane_marking`;
+    const laneLayerId = `${roadLayer.id}__map_lane_marking`;
     if (map.getLayer(laneLayerId)) continue;
 
     try {
@@ -351,11 +351,11 @@ export function applyF4InspiredMapStyle(
   const firstBuildingLayer = style.layers.find(
     (layer) => layer.type === "fill-extrusion" && /building/i.test(layer.id),
   ) as any;
-  if (firstBuildingLayer && !map.getLayer("f4-building-shadow")) {
+  if (firstBuildingLayer && !map.getLayer("map-building-shadow")) {
     try {
       map.addLayer(
         {
-          id: "f4-building-shadow",
+          id: "map-building-shadow",
           type: "fill",
           source: firstBuildingLayer.source,
           "source-layer":
@@ -384,11 +384,11 @@ export function applyF4InspiredMapStyle(
     } catch {}
   }
 
-  if (firstBuildingLayer && !map.getLayer("f4-building-edge")) {
+  if (firstBuildingLayer && !map.getLayer("map-building-edge")) {
     try {
       map.addLayer(
         {
-          id: "f4-building-edge",
+          id: "map-building-edge",
           type: "line",
           source: firstBuildingLayer.source,
           "source-layer":

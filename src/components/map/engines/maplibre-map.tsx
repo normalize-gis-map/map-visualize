@@ -19,11 +19,11 @@ import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
-import { applyF4InspiredMapStyle } from "@/features/map/lib/apply-f4-inspired-map-style";
-import { buildAmbientTrafficSource } from "@/features/map/lib/build-ambient-traffic-source";
-import { buildViewportVegetation } from "@/features/map/lib/build-viewport-vegetation";
-import { buildViewportWaterEffect } from "@/features/map/lib/build-viewport-water-effect";
-import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
+import { applyMapStyle } from "@/features/map/lib/style/apply-map-style";
+import { buildAmbientTrafficSource } from "@/features/map/lib/traffic/build-ambient-traffic-source";
+import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-viewport-vegetation";
+import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
+import { useNavigationPlayback } from "@/features/navigation/hooks/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import {
@@ -34,10 +34,10 @@ import {
   MAP_STYLE_25D,
 } from "@/lib/constants/map.constants";
 
-import { MapDataLayers } from "./map-data-layers";
-import { MapFeatureOverlays } from "./map-feature-overlays";
-import { NavigationHud } from "./navigation/navigation-hud";
-import { RouteVisualLayers } from "./navigation/route-visual-layers";
+import { MapDataLayers } from "@/features/map/components/layers/map-data-layers";
+import { MapFeatureOverlays } from "@/features/map/components/overlays/map-feature-overlays";
+import { NavigationHud } from "@/features/navigation/components/navigation-hud";
+import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
 
 type Props = {
   selectedPlace: PlaceItem | null;
@@ -158,15 +158,15 @@ export function MapLibreMap({
   const ambientTrafficBodyLayerId = "ambient-traffic-body-3d";
   const ambientTrafficRoofLayerId = "ambient-traffic-roof-3d";
   const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
-  const waterViewportSourceId = "f4-water-viewport-source";
-  const waterViewportToneLayerId = "f4-water-viewport-tone-fill";
-  const waterViewportShoreLayerId = "f4-water-viewport-shore-line";
-  const waterViewportBaseLayerId = "f4-water-viewport-shimmer-base";
-  const waterViewportDetailLayerId = "f4-water-viewport-shimmer-detail";
-  const parkTreeSourceId = "f4-park-tree-points";
-  const parkTreeShadowLayerId = "f4-park-tree-shadow-circles";
-  const parkTreeCanopyLayerId = "f4-park-tree-canopy-circles";
-  const parkTreeHighlightLayerId = "f4-park-tree-highlight-circles";
+  const waterViewportSourceId = "map-water-viewport-source";
+  const waterViewportToneLayerId = "map-water-viewport-tone-fill";
+  const waterViewportShoreLayerId = "map-water-viewport-shore-line";
+  const waterViewportBaseLayerId = "map-water-viewport-shimmer-base";
+  const waterViewportDetailLayerId = "map-water-viewport-shimmer-detail";
+  const parkTreeSourceId = "map-park-tree-points";
+  const parkTreeShadowLayerId = "map-park-tree-shadow-circles";
+  const parkTreeCanopyLayerId = "map-park-tree-canopy-circles";
+  const parkTreeHighlightLayerId = "map-park-tree-highlight-circles";
   const programmaticMoveRef = useRef(false);
   const hasAppliedInitial25DCameraRef = useRef(false);
   const patchedStyleSignatureRef = useRef<string | null>(null);
@@ -186,7 +186,7 @@ export function MapLibreMap({
 
   const applyMapVisualStyle = useCallback(
     (map: maplibregl.Map) => {
-      applyF4InspiredMapStyle(map, {
+      applyMapStyle(map, {
         laneDetailEnabled,
         detailPreset,
       });

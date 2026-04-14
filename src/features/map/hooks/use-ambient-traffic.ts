@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   type AmbientRoadClass,
-} from "@/features/map/lib/get-road-class-lane-offset";
-import { getClampedLaneOffsetMeters } from "@/features/map/lib/get-clamped-lane-offset";
+} from "@/features/map/lib/traffic/get-road-class-lane-offset";
+import { getClampedLaneOffsetMeters } from "@/features/map/lib/traffic/get-clamped-lane-offset";
 import {
   normalizeBearing,
   offsetRouteSample,
   sampleRouteAtProgress,
-} from "@/features/map/navigation/route-sampling";
+} from "@/features/navigation/lib/route-sampling";
 import type {
   DetailPreset,
   TrafficDensity,

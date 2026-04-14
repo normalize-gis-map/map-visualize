@@ -1,4 +1,4 @@
-import type { AmbientRoadClass } from "@/features/map/lib/get-road-class-lane-offset";
+import type { AmbientRoadClass } from "@/features/map/lib/traffic/get-road-class-lane-offset";
 
 function interpolate(zoom: number, z0: number, v0: number, z1: number, v1: number) {
   if (zoom <= z0) return v0;
