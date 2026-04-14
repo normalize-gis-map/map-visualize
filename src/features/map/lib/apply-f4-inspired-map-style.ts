@@ -171,7 +171,28 @@ export function applyF4InspiredMapStyle(
     const id = layerId.toLowerCase();
 
     if (layer.type === "fill-extrusion" && /building/i.test(id)) {
-      setPaintSafe(map, layerId, "fill-extrusion-opacity", 0.88);
+      setPaintSafe(map, layerId, "fill-extrusion-color", [
+        "interpolate",
+        ["linear"],
+        ["coalesce", ["get", "render_height"], ["get", "height"], 0],
+        0,
+        "#d7dde6",
+        25,
+        "#c7d0dc",
+        80,
+        "#b8c2cf",
+      ]);
+      setPaintSafe(map, layerId, "fill-extrusion-opacity", [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        13,
+        0.82,
+        16,
+        0.88,
+        19,
+        0.92,
+      ]);
       setPaintSafe(map, layerId, "fill-extrusion-vertical-gradient", true);
       continue;
     }
