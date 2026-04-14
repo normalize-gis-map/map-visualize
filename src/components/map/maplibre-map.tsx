@@ -156,6 +156,10 @@ export function MapLibreMap({
   const ambientTrafficBodyLayerId = "ambient-traffic-body-3d";
   const ambientTrafficRoofLayerId = "ambient-traffic-roof-3d";
   const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
+  const parkTreeSourceId = "f4-park-tree-points";
+  const parkTreeShadowLayerId = "f4-park-tree-shadow-circles";
+  const parkTreeCanopyLayerId = "f4-park-tree-canopy-circles";
+  const parkTreeHighlightLayerId = "f4-park-tree-highlight-circles";
   const programmaticMoveRef = useRef(false);
   const hasAppliedInitial25DCameraRef = useRef(false);
   const patchedStyleSignatureRef = useRef<string | null>(null);
@@ -729,6 +733,178 @@ export function MapLibreMap({
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [mapInstance]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const seededType = (lng: number, lat: number) => {
+      const hash = Math.abs(Math.floor((lng * 9973 + lat * 7919) * 10000)) % 10;
+      if (hash < 2) return "tall";
+      if (hash < 7) return "compact";
+      return "ornamental";
+    };
+
+    const refreshTrees = () => {
+      const style = mapInstance.getStyle();
+      const parkLayerIds =
+        style?.layers
+          ?.filter(
+            (layer) =>
+              layer.type === "fill" && /(park|green|grass)/i.test(layer.id),
+          )
+          .map((layer) => layer.id) ?? [];
+      if (!parkLayerIds.length) return;
+
+      const features = mapInstance.queryRenderedFeatures(undefined, {
+        layers: parkLayerIds.slice(0, 3),
+      });
+
+      const maxTrees =
+        mapZoom >= 17
+          ? detailPreset === "high"
+            ? 300
+            : 220
+          : mapZoom >= 15
+            ? detailPreset === "high"
+              ? 180
+              : 130
+            : 80;
+      const step = mapZoom >= 17 ? 5 : mapZoom >= 15 ? 7 : 10;
+
+      const points: Array<{
+        type: "Feature";
+        geometry: { type: "Point"; coordinates: [number, number] };
+        properties: { treeType: "tall" | "compact" | "ornamental" };
+      }> = [];
+
+      for (const feature of features) {
+        const geometry = feature.geometry;
+        const rings =
+          geometry?.type === "Polygon"
+            ? geometry.coordinates
+            : geometry?.type === "MultiPolygon"
+              ? geometry.coordinates.flat()
+              : [];
+
+        for (const ring of rings) {
+          for (let index = 0; index < ring.length; index += step) {
+            const point = ring[index];
+            if (!point) continue;
+            points.push({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [point[0], point[1]] },
+              properties: {
+                treeType: seededType(point[0], point[1]),
+              },
+            });
+            if (points.length >= maxTrees) break;
+          }
+          if (points.length >= maxTrees) break;
+        }
+        if (points.length >= maxTrees) break;
+      }
+
+      const treeData: FeatureCollection = {
+        type: "FeatureCollection",
+        features: points,
+      };
+
+      const source = mapInstance.getSource(parkTreeSourceId) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!source) {
+        mapInstance.addSource(parkTreeSourceId, {
+          type: "geojson",
+          data: treeData,
+        });
+      } else {
+        source.setData(treeData);
+      }
+
+      const addLayerIfMissing = (layer: maplibregl.LayerSpecification) => {
+        if (mapInstance.getLayer(layer.id)) return;
+        mapInstance.addLayer(layer);
+      };
+
+      addLayerIfMissing({
+        id: parkTreeShadowLayerId,
+        type: "circle",
+        source: parkTreeSourceId,
+        paint: {
+          "circle-color": "#23311f",
+          "circle-opacity": 0.18,
+          "circle-translate": [1.4, 1.7],
+          "circle-radius": [
+            "match",
+            ["get", "treeType"],
+            "tall",
+            3.2,
+            "compact",
+            2.6,
+            2.1,
+          ],
+        },
+      });
+
+      addLayerIfMissing({
+        id: parkTreeCanopyLayerId,
+        type: "circle",
+        source: parkTreeSourceId,
+        paint: {
+          "circle-color": [
+            "match",
+            ["get", "treeType"],
+            "tall",
+            "#4f7c3a",
+            "compact",
+            "#5d8e47",
+            "#6ea45a",
+          ],
+          "circle-opacity": 0.76,
+          "circle-radius": [
+            "match",
+            ["get", "treeType"],
+            "tall",
+            2.8,
+            "compact",
+            2.3,
+            1.9,
+          ],
+          "circle-stroke-color": "#3e6430",
+          "circle-stroke-width": 0.6,
+        },
+      });
+
+      addLayerIfMissing({
+        id: parkTreeHighlightLayerId,
+        type: "circle",
+        source: parkTreeSourceId,
+        paint: {
+          "circle-color": "#cde8b7",
+          "circle-opacity": 0.26,
+          "circle-translate": [-0.6, -0.6],
+          "circle-radius": [
+            "match",
+            ["get", "treeType"],
+            "tall",
+            1.1,
+            "compact",
+            0.9,
+            0.7,
+          ],
+        },
+      });
+    };
+
+    refreshTrees();
+    mapInstance.on("moveend", refreshTrees);
+    mapInstance.on("style.load", refreshTrees);
+
+    return () => {
+      mapInstance.off("moveend", refreshTrees);
+      mapInstance.off("style.load", refreshTrees);
+    };
+  }, [detailPreset, mapInstance, mapZoom]);
 
   const resetRouteRuntime = () => {
     pause();
