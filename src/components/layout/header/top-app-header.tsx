@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BellDot,
   Car,
   Coffee,
   Fuel,
@@ -11,13 +12,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { AlertDrawer } from "@/features/flood/components/alert-drawer";
 import { UserMenu } from "@/components/layout/header/user-menu";
-import { MapControlsMenu } from "@/features/map/components/map-controls-menu";
 import { RoutePlanner } from "@/components/search/route-planner";
 import { SearchPanel } from "@/components/search/search-panel";
 import type { PlaceItem } from "@/data/places";
+import { AlertDrawer } from "@/features/flood/components/alert-drawer";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import { MapControlsMenu } from "@/features/map/components/map-controls-menu";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
 type TopAppHeaderProps = {
@@ -56,26 +57,30 @@ export function TopAppHeader({
   };
 
   return (
-    <header className="pointer-events-auto sticky top-0 z-40">
-      <div className="border-b border-slate-200/70 bg-white/86 px-3 py-2.5 shadow-lg backdrop-blur-xl md:px-4">
-        <div className="mx-auto max-w-[1600px]">
-          <div className="flex items-center gap-2 md:gap-3">
-            <button
-              type="button"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm"
-              aria-label="App logo"
-            >
-              <MapPinned className="h-5 w-5" />
-            </button>
+    <header className="pointer-events-auto sticky top-0 z-40 px-3 pt-3 md:px-5 md:pt-4">
+      <div className="mx-auto max-w-[1700px]">
+        <div className="rounded-2xl border border-slate-200/10 bg-slate-950/72 px-3 py-2.5 shadow-[0_20px_55px_-30px_rgba(15,23,42,0.95)] backdrop-blur-2xl md:px-4">
+          <div className="flex items-center gap-2.5 md:gap-3">
+            <div className="flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-slate-900/70 px-2.5 py-2 text-cyan-50">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-400/20 text-cyan-200">
+                <MapPinned className="h-4 w-4" />
+              </div>
+              <div className="hidden sm:block">
+                <div className="text-[10px] tracking-[0.14em] text-cyan-100/80 uppercase">
+                  Flood GIS
+                </div>
+                <div className="text-xs font-semibold text-white">Command</div>
+              </div>
+            </div>
 
-            <div className="inline-flex h-11 shrink-0 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 md:h-12">
+            <div className="inline-flex h-10 shrink-0 items-center rounded-xl border border-slate-700/80 bg-slate-900/70 p-1">
               <button
                 type="button"
                 onClick={() => setMode("view")}
-                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition md:text-sm ${
                   activeMode === "view"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500"
+                    ? "bg-slate-100 text-slate-900"
+                    : "text-slate-300 hover:text-white"
                 }`}
               >
                 View
@@ -83,10 +88,10 @@ export function TopAppHeader({
               <button
                 type="button"
                 onClick={() => setMode("route")}
-                className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition md:text-sm ${
                   activeMode === "route"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500"
+                    ? "bg-slate-100 text-slate-900"
+                    : "text-slate-300 hover:text-white"
                 }`}
               >
                 Route
@@ -101,17 +106,25 @@ export function TopAppHeader({
                 data={floodData}
                 mode="popover"
               />
+              <button
+                type="button"
+                onClick={onToggleAlert}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/80 bg-slate-900/80 text-slate-200 transition hover:border-cyan-400/40 hover:text-cyan-200"
+                aria-label="Alert quick action"
+              >
+                <BellDot className="h-4 w-4" />
+              </button>
               <UserMenu />
             </div>
           </div>
 
           {activeMode === "route" ? (
-            <div className="mt-3">
+            <div className="mt-3 border-t border-slate-700/70 pt-3">
               <div className="mb-2 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setRoutePlannerCollapsed((prev) => !prev)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600"
+                  className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs font-semibold text-slate-200"
                 >
                   {routePlannerCollapsed
                     ? "Mở Route panel"
@@ -125,7 +138,7 @@ export function TopAppHeader({
                   onBackToSearch={() => setMode("view")}
                 />
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-600">
+                <div className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-300">
                   Route panel đã thu gọn. Bấm “Mở Route panel” để chỉnh tuyến.
                 </div>
               )}
@@ -133,27 +146,27 @@ export function TopAppHeader({
           ) : null}
 
           {activeMode === "view" && selectedPreviewPlace ? (
-            <div className="mt-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg">
+            <div className="mt-3 rounded-2xl border border-slate-700/80 bg-slate-900/80 p-3 shadow-xl">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold tracking-[0.13em] text-slate-500 uppercase">
+                  <div className="text-xs font-semibold tracking-[0.13em] text-slate-400 uppercase">
                     Search Result
                   </div>
-                  <div className="text-base font-semibold text-slate-900">
+                  <div className="text-base font-semibold text-white">
                     {selectedPreviewPlace.label}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMode("route")}
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  className="rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white"
                 >
                   Đường đi
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPreviewPlace(null)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800/70"
                 >
                   Xoá
                 </button>
@@ -168,9 +181,9 @@ export function TopAppHeader({
                 ].map((item) => (
                   <div
                     key={item.label}
-                    className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                    className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm text-slate-200"
                   >
-                    <item.icon className="h-4 w-4 text-slate-500" />
+                    <item.icon className="h-4 w-4 text-cyan-200" />
                     {item.label}
                   </div>
                 ))}
@@ -181,12 +194,12 @@ export function TopAppHeader({
       </div>
 
       {activeMode === "view" ? (
-        <div className="fixed bottom-4 left-4 z-40">
+        <div className="fixed bottom-4 left-4 z-40 md:bottom-6 md:left-6">
           {searchOpen ? (
-            <div className="w-[min(92vw,420px)] rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur">
+            <div className="w-[min(92vw,420px)] rounded-3xl border border-slate-200/15 bg-slate-950/88 p-3 shadow-2xl backdrop-blur-2xl">
               <div className="mb-2 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
+                  <div className="text-xs font-semibold tracking-[0.12em] text-cyan-100 uppercase">
                     Search
                   </div>
                   <div className="text-[11px] text-slate-400">
@@ -196,7 +209,7 @@ export function TopAppHeader({
                 <button
                   type="button"
                   onClick={() => setSearchOpen(false)}
-                  className="rounded-lg border border-slate-200 p-1 text-slate-500"
+                  className="rounded-lg border border-slate-700 p-1 text-slate-300"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -211,7 +224,7 @@ export function TopAppHeader({
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/95 text-slate-700 shadow-2xl backdrop-blur"
+              className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200/15 bg-slate-950/82 text-cyan-100 shadow-2xl backdrop-blur-2xl"
               aria-label="Open search"
             >
               <Search className="h-6 w-6" />
