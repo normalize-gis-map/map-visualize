@@ -540,113 +540,118 @@ export function MapLibreMap({
   useEffect(() => {
     if (!mapInstance) return;
 
-    const style = mapInstance.getStyle();
-    if (!style) return;
-    const buildingLayer = style.layers.find((layer) => layer.type === "fill-extrusion");
-    const beforeLayerId = buildingLayer?.id;
+    const ensureAmbientTrafficLayers = () => {
+      const style = mapInstance.getStyle();
+      if (!style?.layers?.length) return;
 
-    if (!mapInstance.getSource(ambientTrafficSourceId)) {
-      mapInstance.addSource(ambientTrafficSourceId, {
-        type: "geojson",
-        data: buildAmbientTrafficSource(visibleAmbientTraffic),
+      const beforeLayerId = style.layers.find(
+        (layer) =>
+          layer.type === "fill-extrusion" && /building/i.test(layer.id),
+      )?.id;
+      if (!beforeLayerId) return;
+
+      const sourceData = buildAmbientTrafficSource(visibleAmbientTraffic);
+      const source = mapInstance.getSource(
+        ambientTrafficSourceId,
+      ) as maplibregl.GeoJSONSource | null;
+
+      if (!source) {
+        mapInstance.addSource(ambientTrafficSourceId, {
+          type: "geojson",
+          data: sourceData,
+        });
+      } else {
+        source.setData(sourceData);
+      }
+
+      const addOrMoveLayer = (layer: maplibregl.LayerSpecification) => {
+        if (mapInstance.getLayer(layer.id)) {
+          try {
+            mapInstance.moveLayer(layer.id, beforeLayerId);
+          } catch {}
+          return;
+        }
+        mapInstance.addLayer(layer, beforeLayerId);
+      };
+
+      addOrMoveLayer({
+        id: ambientTrafficShadowLayerId,
+        type: "fill",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "body"],
+        paint: {
+          "fill-color": "#0f172a",
+          "fill-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            12,
+            0.08,
+            16,
+            0.12,
+            20,
+            0.16,
+          ],
+        },
       });
-    }
 
-    if (!mapInstance.getLayer(ambientTrafficShadowLayerId)) {
-      mapInstance.addLayer(
-        {
-          id: ambientTrafficShadowLayerId,
-          type: "fill",
-          source: ambientTrafficSourceId,
-          filter: ["==", ["get", "part"], "body"],
-          paint: {
-            "fill-color": "#0f172a",
-            "fill-opacity": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12,
-              0.08,
-              16,
-              0.12,
-              20,
-              0.16,
-            ],
-          },
+      addOrMoveLayer({
+        id: ambientTrafficBodyLayerId,
+        type: "fill-extrusion",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "body"],
+        paint: {
+          "fill-extrusion-color": [
+            "match",
+            ["get", "roadClass"],
+            "major",
+            "#d8dde5",
+            "medium",
+            "#c8d0db",
+            "#bcc4d0",
+          ],
+          "fill-extrusion-opacity": 0.95,
+          "fill-extrusion-height": 0.42,
+          "fill-extrusion-base": 0.02,
+          "fill-extrusion-vertical-gradient": true,
         },
-        beforeLayerId,
-      );
-    }
+      });
 
-    if (!mapInstance.getLayer(ambientTrafficBodyLayerId)) {
-      mapInstance.addLayer(
-        {
-          id: ambientTrafficBodyLayerId,
-          type: "fill-extrusion",
-          source: ambientTrafficSourceId,
-          filter: ["==", ["get", "part"], "body"],
-          paint: {
-            "fill-extrusion-color": [
-              "match",
-              ["get", "roadClass"],
-              "major",
-              "#d8dde5",
-              "medium",
-              "#c8d0db",
-              "#bcc4d0",
-            ],
-            "fill-extrusion-opacity": 0.95,
-            "fill-extrusion-height": 0.42,
-            "fill-extrusion-base": 0.02,
-            "fill-extrusion-vertical-gradient": true,
-          },
+      addOrMoveLayer({
+        id: ambientTrafficRoofLayerId,
+        type: "fill-extrusion",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "roof"],
+        paint: {
+          "fill-extrusion-color": "#f8fafc",
+          "fill-extrusion-opacity": 0.93,
+          "fill-extrusion-height": 0.6,
+          "fill-extrusion-base": 0.18,
+          "fill-extrusion-vertical-gradient": true,
         },
-        beforeLayerId,
-      );
-    }
+      });
 
-    if (!mapInstance.getLayer(ambientTrafficRoofLayerId)) {
-      mapInstance.addLayer(
-        {
-          id: ambientTrafficRoofLayerId,
-          type: "fill-extrusion",
-          source: ambientTrafficSourceId,
-          filter: ["==", ["get", "part"], "roof"],
-          paint: {
-            "fill-extrusion-color": "#f8fafc",
-            "fill-extrusion-opacity": 0.93,
-            "fill-extrusion-height": 0.6,
-            "fill-extrusion-base": 0.18,
-            "fill-extrusion-vertical-gradient": true,
-          },
+      addOrMoveLayer({
+        id: ambientTrafficWindshieldLayerId,
+        type: "fill-extrusion",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "windshield"],
+        paint: {
+          "fill-extrusion-color": "#8ea0b5",
+          "fill-extrusion-opacity": 0.9,
+          "fill-extrusion-height": 0.72,
+          "fill-extrusion-base": 0.28,
+          "fill-extrusion-vertical-gradient": true,
         },
-        beforeLayerId,
-      );
-    }
+      });
+    };
 
-    if (!mapInstance.getLayer(ambientTrafficWindshieldLayerId)) {
-      mapInstance.addLayer(
-        {
-          id: ambientTrafficWindshieldLayerId,
-          type: "fill-extrusion",
-          source: ambientTrafficSourceId,
-          filter: ["==", ["get", "part"], "windshield"],
-          paint: {
-            "fill-extrusion-color": "#8ea0b5",
-            "fill-extrusion-opacity": 0.9,
-            "fill-extrusion-height": 0.72,
-            "fill-extrusion-base": 0.28,
-            "fill-extrusion-vertical-gradient": true,
-          },
-        },
-        beforeLayerId,
-      );
-    }
+    ensureAmbientTrafficLayers();
+    mapInstance.on("style.load", ensureAmbientTrafficLayers);
 
-    const source = mapInstance.getSource(
-      ambientTrafficSourceId,
-    ) as maplibregl.GeoJSONSource | null;
-    source?.setData(buildAmbientTrafficSource(visibleAmbientTraffic));
+    return () => {
+      mapInstance.off("style.load", ensureAmbientTrafficLayers);
+    };
   }, [mapInstance, visibleAmbientTraffic]);
 
   const vehicleScaleMultiplier = useMemo(() => {
