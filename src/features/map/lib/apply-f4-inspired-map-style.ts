@@ -1,13 +1,10 @@
 import type maplibregl from "maplibre-gl";
 
 import {
-  BUILDING_BASE_COLOR,
   BUILDING_EDGE_COLOR,
-  LAND_BASE_COLOR,
   ROAD_CASING_COLOR,
   ROAD_MAIN_COLOR,
   ROAD_MINOR_COLOR,
-  WATER_BASE_COLOR,
 } from "@/lib/constants/map.constants";
 
 const LANE_MARKING_WIDTH = [
@@ -32,6 +29,7 @@ const ROAD_NAME_RE =
   /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|living|unclassified|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
 const MEDIUM_ROAD_RE = /(secondary|tertiary|collector)/i;
+const SERVICE_ROAD_RE = /(service|living|unclassified)/i;
 const LOCAL_ROAD_RE = /(residential|service|living|unclassified|local)/i;
 const CASING_RE = /(casing|outline|border)/i;
 const RAIL_TRANSIT_HATCH_RE = /(rail|transit|hatching|hatch)/i;
@@ -51,7 +49,7 @@ function setPaintSafe(
 }
 
 function getRoadWidthExpression(
-  kind: "major" | "medium" | "local" | "casing",
+  kind: "major" | "medium" | "local" | "service" | "casing",
 ): unknown {
   switch (kind) {
     case "major":
@@ -60,15 +58,15 @@ function getRoadWidthExpression(
         ["linear"],
         ["zoom"],
         12,
-        2,
+        2.2,
         14,
-        4,
+        4.5,
         16,
-        8,
+        9,
         18,
-        14,
+        16,
         20,
-        22,
+        26,
       ];
     case "medium":
       return [
@@ -76,15 +74,31 @@ function getRoadWidthExpression(
         ["linear"],
         ["zoom"],
         12,
-        1.5,
+        1.8,
         14,
-        3,
+        3.8,
         16,
-        6,
+        7.5,
         18,
-        10,
+        13,
         20,
+        20,
+      ];
+    case "service":
+      return [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        12,
+        1.2,
+        14,
+        2.5,
         16,
+        5,
+        18,
+        8.5,
+        20,
+        13,
       ];
     case "local":
       return [
@@ -92,15 +106,15 @@ function getRoadWidthExpression(
         ["linear"],
         ["zoom"],
         12,
-        1.4,
+        1.5,
         14,
-        2.8,
+        3.2,
         16,
-        5.5,
+        6.5,
         18,
-        9,
+        11,
         20,
-        14,
+        17,
       ];
     case "casing":
       return [
@@ -108,15 +122,15 @@ function getRoadWidthExpression(
         ["linear"],
         ["zoom"],
         12,
-        2.2,
+        2.8,
         14,
-        4.2,
+        5.6,
         16,
-        7.2,
+        10.2,
         18,
-        11.5,
+        17.5,
         20,
-        16.5,
+        27,
       ];
   }
 }
@@ -157,25 +171,8 @@ export function applyF4InspiredMapStyle(
     const layerId = layer.id;
     const id = layerId.toLowerCase();
 
-    if (layer.type === "background" && /(background|land)/i.test(id)) {
-      setPaintSafe(map, layerId, "background-color", LAND_BASE_COLOR);
-      continue;
-    }
-
-    if (layer.type === "fill" && /(water|ocean|river|lake)/i.test(id)) {
-      setPaintSafe(map, layerId, "fill-color", WATER_BASE_COLOR);
-      setPaintSafe(map, layerId, "fill-opacity", 0.9);
-      continue;
-    }
-
-    if (layer.type === "fill" && /(land|park|earth)/i.test(id)) {
-      setPaintSafe(map, layerId, "fill-color", LAND_BASE_COLOR);
-      continue;
-    }
-
     if (layer.type === "fill-extrusion" && /building/i.test(id)) {
-      setPaintSafe(map, layerId, "fill-extrusion-color", BUILDING_BASE_COLOR);
-      setPaintSafe(map, layerId, "fill-extrusion-opacity", 0.94);
+      setPaintSafe(map, layerId, "fill-extrusion-opacity", 0.88);
       setPaintSafe(map, layerId, "fill-extrusion-vertical-gradient", true);
       continue;
     }
@@ -185,13 +182,17 @@ export function applyF4InspiredMapStyle(
       const isRailTransitHatch = RAIL_TRANSIT_HATCH_RE.test(id);
       const isMajor = MAJOR_ROAD_RE.test(id);
       const isMedium = MEDIUM_ROAD_RE.test(id);
+      const isService = SERVICE_ROAD_RE.test(id);
       const isLocal = LOCAL_ROAD_RE.test(id);
-      const widthKind: "major" | "medium" | "local" | "casing" = isCasing
+      const widthKind: "major" | "medium" | "local" | "service" | "casing" =
+        isCasing
         ? "casing"
         : isMajor
           ? "major"
           : isMedium
             ? "medium"
+            : isService
+              ? "service"
             : isLocal
               ? "local"
               : "local";
