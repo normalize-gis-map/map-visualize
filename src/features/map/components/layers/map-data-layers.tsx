@@ -26,7 +26,11 @@ export function MapDataLayers({
   return (
     <>
       {visibleLayers.riskZones && (
-        <Source id="risk-zones" type="geojson" data={riskZonesData as FeatureCollection}>
+        <Source
+          id="risk-zones"
+          type="geojson"
+          data={riskZonesData as FeatureCollection}
+        >
           <Layer
             id="risk-zones-fill"
             type="fill"
@@ -35,29 +39,41 @@ export function MapDataLayers({
                 "match",
                 ["get", "level"],
                 "high",
-                "#ef4444",
+                "#dc2626",
                 "medium",
-                "#f59e0b",
+                "#d97706",
                 "low",
-                "#60a5fa",
-                "#94a3b8",
+                "#3b82f6",
+                "#64748b",
               ],
-              "fill-opacity": 0.18,
+              "fill-opacity": 0.12,
             }}
           />
         </Source>
       )}
 
       {visibleLayers.drainage && (
-        <Source id="drainage" type="geojson" data={drainageData as FeatureCollection}>
+        <Source
+          id="drainage"
+          type="geojson"
+          data={drainageData as FeatureCollection}
+        >
           <Layer
             id="drainage-line"
             type="line"
             layout={{ "line-cap": "round", "line-join": "round" }}
             paint={{
-              "line-color": "#0ea5e9",
-              "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1.6, 15, 4.5],
-              "line-opacity": 0.8,
+              "line-color": "#64748b",
+              "line-width": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                9,
+                1.6,
+                15,
+                4.5,
+              ],
+              "line-opacity": 0.75,
               "line-blur": 0.25,
               "line-dasharray": [1, 0],
             }}
@@ -80,17 +96,25 @@ export function MapDataLayers({
                   "medium",
                   "#f59e0b",
                   "high",
-                  "#ef4444",
+                  "#dc2626",
                   "#60a5fa",
                 ],
-                "fill-extrusion-height": ["interpolate", ["linear"], ["get", "depth"], 0, 0, 2, 1200],
+                "fill-extrusion-height": [
+                  "interpolate",
+                  ["linear"],
+                  ["get", "depth"],
+                  0,
+                  0,
+                  2,
+                  1200,
+                ],
                 "fill-extrusion-opacity": [
                   "case",
                   ["==", ["get", "id"], selectedId],
                   1,
                   ["==", ["get", "id"], hoveredId],
                   0.95,
-                  0.8,
+                  0.64,
                 ],
               }}
             />
@@ -107,7 +131,7 @@ export function MapDataLayers({
                   "medium",
                   "#f59e0b",
                   "high",
-                  "#ef4444",
+                  "#dc2626",
                   "#60a5fa",
                 ],
                 "fill-opacity": [
@@ -116,7 +140,7 @@ export function MapDataLayers({
                   0.68,
                   ["==", ["get", "id"], hoveredId],
                   0.58,
-                  0.42,
+                  0.36,
                 ],
               }}
             />
@@ -126,8 +150,9 @@ export function MapDataLayers({
             id="flood-outline"
             type="line"
             paint={{
-              "line-color": "#1e293b",
-              "line-width": 1.5,
+              "line-color": "#334155",
+              "line-width": 1.25,
+              "line-opacity": 0.7,
             }}
           />
         </Source>

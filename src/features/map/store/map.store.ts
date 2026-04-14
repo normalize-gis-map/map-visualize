@@ -10,6 +10,9 @@ export type LayerKey =
   | "roads"
   | "riskZones";
 
+export type TrafficDensity = "off" | "light" | "full";
+export type DetailPreset = "balanced" | "high";
+
 type VisibleLayers = Record<LayerKey, boolean>;
 
 type MapUiStore = {
@@ -18,11 +21,19 @@ type MapUiStore = {
   visibleLayers: VisibleLayers;
   buildingOpacity: number;
   trafficVisualizationEnabled: boolean;
+  trafficDensity: TrafficDensity;
+  laneDetailEnabled: boolean;
+  routeAutoCameraEnabled: boolean;
+  detailPreset: DetailPreset;
   setMapMode: (mode: MapMode) => void;
   setMapEngine: (engine: MapEngine) => void;
   toggleLayer: (layer: LayerKey) => void;
   setBuildingOpacity: (value: number) => void;
   toggleTrafficVisualization: () => void;
+  setTrafficDensity: (density: TrafficDensity) => void;
+  setLaneDetailEnabled: (enabled: boolean) => void;
+  setRouteAutoCameraEnabled: (enabled: boolean) => void;
+  setDetailPreset: (preset: DetailPreset) => void;
   mapInteractionTick: number;
   notifyMapInteraction: () => void;
   hasHydrated: boolean;
@@ -43,6 +54,10 @@ export const useMapStore = create<MapUiStore>()(
       },
       buildingOpacity: 0.9,
       trafficVisualizationEnabled: true,
+      trafficDensity: "light",
+      laneDetailEnabled: true,
+      routeAutoCameraEnabled: true,
+      detailPreset: "balanced",
       mapInteractionTick: 0,
       hasHydrated: false,
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -59,7 +74,17 @@ export const useMapStore = create<MapUiStore>()(
       toggleTrafficVisualization: () =>
         set((state) => ({
           trafficVisualizationEnabled: !state.trafficVisualizationEnabled,
+          trafficDensity: state.trafficVisualizationEnabled ? "off" : "light",
         })),
+      setTrafficDensity: (trafficDensity) =>
+        set({
+          trafficDensity,
+          trafficVisualizationEnabled: trafficDensity !== "off",
+        }),
+      setLaneDetailEnabled: (laneDetailEnabled) => set({ laneDetailEnabled }),
+      setRouteAutoCameraEnabled: (routeAutoCameraEnabled) =>
+        set({ routeAutoCameraEnabled }),
+      setDetailPreset: (detailPreset) => set({ detailPreset }),
       notifyMapInteraction: () =>
         set((state) => ({ mapInteractionTick: state.mapInteractionTick + 1 })),
     }),
@@ -72,6 +97,10 @@ export const useMapStore = create<MapUiStore>()(
         visibleLayers: state.visibleLayers,
         buildingOpacity: state.buildingOpacity,
         trafficVisualizationEnabled: state.trafficVisualizationEnabled,
+        trafficDensity: state.trafficDensity,
+        laneDetailEnabled: state.laneDetailEnabled,
+        routeAutoCameraEnabled: state.routeAutoCameraEnabled,
+        detailPreset: state.detailPreset,
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.mapMode === "2d") {

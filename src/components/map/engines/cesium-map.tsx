@@ -4,13 +4,13 @@ import * as Cesium from "cesium";
 import { Globe, Map, Satellite } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { FeaturePopupCard } from "@/components/map/feature-popup";
-import { ControlBoard } from "@/components/map/navigation/control-board";
+import { FeaturePopupCard } from "@/features/map/components/feature-popup";
+import { ControlBoard } from "@/features/navigation/components/control-board";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { useCesiumChaseCamera } from "@/features/map/hooks/use-cesium-chase-camera";
-import { sampleRouteAtProgress } from "@/features/map/navigation/route-sampling";
-import { useNavigationPlayback } from "@/features/map/navigation/use-navigation-playback";
+import { sampleRouteAtProgress } from "@/features/navigation/lib/route-sampling";
+import { useNavigationPlayback } from "@/features/navigation/hooks/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import {

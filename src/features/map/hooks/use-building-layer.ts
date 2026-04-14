@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import type maplibregl from "maplibre-gl";
+import { useEffect } from "react";
 
 export function useBuildingLayer(
   map: maplibregl.Map | null,
@@ -28,8 +28,13 @@ export function useBuildingLayer(
         map.setLayoutProperty(id, "visibility", visibility);
 
         if (layer.type === "fill-extrusion") {
-          map.setPaintProperty(id, "fill-extrusion-color", "#94a3b8");
-          map.setPaintProperty(id, "fill-extrusion-opacity", opacity);
+          map.setPaintProperty(id, "fill-extrusion-color", "#d1d5db");
+          map.setPaintProperty(id, "fill-extrusion-vertical-gradient", true);
+          map.setPaintProperty(
+            id,
+            "fill-extrusion-opacity",
+            Math.min(0.94, Math.max(0.4, opacity)),
+          );
           map.setPaintProperty(id, "fill-extrusion-base", [
             "coalesce",
             ["get", "render_min_height"],
@@ -40,9 +45,9 @@ export function useBuildingLayer(
             "interpolate",
             ["linear"],
             ["zoom"],
-            14.8,
+            14.5,
             0,
-            15.05,
+            14.95,
             [
               "coalesce",
               ["get", "render_height"],

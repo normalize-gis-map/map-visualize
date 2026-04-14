@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { DashboardShell } from "@/components/layout/dashboard/dashboard-shell";
 import { AUTH_COOKIE_NAME } from "@/features/auth/constants/auth.constants";
 
 export const metadata: Metadata = {

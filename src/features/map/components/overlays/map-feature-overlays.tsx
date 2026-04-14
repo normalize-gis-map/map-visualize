@@ -1,5 +1,7 @@
-import { FeaturePopup } from "@/components/map/feature-popup";
-import { RouteMarkers } from "@/components/map/navigation/route-markers";
+import { memo } from "react";
+
+import { FeaturePopup } from "@/features/map/components/feature-popup";
+import { RouteMarkers } from "@/features/navigation/components/route-markers";
 import type { SelectedFeature } from "@/features/map/hooks/use-selected-features";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import {
@@ -29,17 +31,11 @@ type Props = {
     direction: "forward" | "backward";
     vehicleType: "car" | "bike";
   }>;
-  ambientTraffic: Array<{
-    id: string;
-    lng: number;
-    lat: number;
-    bearing: number;
-    direction: "forward" | "backward";
-  }>;
   mapZoom: number;
+  vehicleScaleMultiplier?: number;
 };
 
-export function MapFeatureOverlays({
+function MapFeatureOverlaysImpl({
   selectedFlood,
   selectedBuilding,
   selectedDrainage,
@@ -51,8 +47,8 @@ export function MapFeatureOverlays({
   navMode,
   mapLibreCar3D,
   trafficCars,
-  ambientTraffic,
   mapZoom,
+  vehicleScaleMultiplier,
 }: Props) {
   return (
     <>
@@ -101,7 +97,9 @@ export function MapFeatureOverlays({
             },
             {
               label: "Base",
-              value: formatMeters(selectedBuilding.properties.render_min_height),
+              value: formatMeters(
+                selectedBuilding.properties.render_min_height,
+              ),
             },
           ]}
         />
@@ -145,7 +143,7 @@ export function MapFeatureOverlays({
         />
       )}
 
-      {activeRoute || ambientTraffic.length ? (
+      {activeRoute ? (
         <RouteMarkers
           coordinates={activeRoute?.geometry.coordinates ?? []}
           navCoordinate={navCoordinate}
@@ -153,10 +151,12 @@ export function MapFeatureOverlays({
           navMode={navMode}
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
-          ambientTraffic={ambientTraffic}
           mapZoom={mapZoom}
+          vehicleScaleMultiplier={vehicleScaleMultiplier}
         />
       ) : null}
     </>
   );
 }
+
+export const MapFeatureOverlays = memo(MapFeatureOverlaysImpl);

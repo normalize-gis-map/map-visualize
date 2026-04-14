@@ -8,7 +8,7 @@ import {
   normalizeBearing,
   offsetRouteSample,
   sampleRouteAtProgress,
-} from "./route-sampling";
+} from "../lib/route-sampling";
 
 type UseNavigationPlaybackInput = {
   geometry: LineString | null;

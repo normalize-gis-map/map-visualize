@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 
-import { AlertDrawer } from "@/components/flood/alert-drawer";
-import { LayerCatalog } from "@/components/layout/layer-catalog";
-import { TopAppHeader } from "@/components/layout/top-app-header";
-import { MapEngineContainer } from "@/components/map/map-engine-container";
+import { DashboardLeftRail } from "@/components/dashboard/dashboard-left-rail";
+import { DashboardOverlay } from "@/components/dashboard/dashboard-overlay";
+import { DashboardRightInspector } from "@/components/dashboard/dashboard-right-inspector";
+import { LayerCatalog } from "@/features/map/components/controls/layer-catalog";
+import { TopAppHeader } from "@/components/layout/header/top-app-header";
+import { MapEngineContainer } from "@/components/map/engines/map-engine-container";
 import type { PlaceItem } from "@/data/places";
 import { useFloodData } from "@/features/flood/hooks/use-flood-data";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -29,7 +31,7 @@ export function DashboardShell() {
     <main className="relative h-screen w-screen overflow-hidden bg-slate-100">
       <h1 className="sr-only">Flood warning monitoring dashboard</h1>
 
-      <div className="h-full w-full">
+      <div className="absolute inset-0 z-0">
         {loading ? (
           <div className="flex h-full items-center justify-center text-slate-500">
             Loading map...
@@ -48,31 +50,24 @@ export function DashboardShell() {
         )}
       </div>
 
-      <div className="pointer-events-none absolute inset-0">
+      <DashboardOverlay>
         <TopAppHeader
           onSelectPlace={setSelectedPlace}
           onRoutesChange={setRoutePayload}
+          alertOpen={alertOpen}
+          onToggleAlert={() => setAlertOpen((prev) => !prev)}
+          floodData={data}
         />
 
-        <div className="pointer-events-auto absolute top-[150px] left-3 z-20 md:top-[156px] md:left-4">
+        <DashboardLeftRail>
           <LayerCatalog
             open={catalogOpen}
             onToggle={() => setCatalogOpen((prev) => !prev)}
           />
-        </div>
+        </DashboardLeftRail>
 
-        <div
-          className={`pointer-events-auto absolute bottom-2 left-1/2 z-20 w-[calc(100%-1rem)] -translate-x-1/2 md:right-4 md:bottom-4 md:left-auto md:w-auto md:translate-x-0 ${
-            catalogOpen ? "hidden md:block" : ""
-          }`}
-        >
-          <AlertDrawer
-            open={alertOpen}
-            onToggle={() => setAlertOpen((prev) => !prev)}
-            data={data}
-          />
-        </div>
-      </div>
+        <DashboardRightInspector selected={false} />
+      </DashboardOverlay>
     </main>
   );
 }

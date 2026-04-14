@@ -1,0 +1,1466 @@
+"use client";
+
+import type { FeatureCollection, Position } from "geojson";
+import maplibregl from "maplibre-gl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Map, { NavigationControl } from "react-map-gl/maplibre";
+
+import floodData from "@/data/geojson/flood-sample.json";
+import type { PlaceItem } from "@/data/places";
+import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import {
+  AMBIENT_TRAFFIC_ROUTE_SCAN,
+  MAP_DETAIL_ZOOM,
+} from "@/features/map/constants/map-detail.constants";
+import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
+import type { AmbientTrafficRoute } from "@/features/map/hooks/use-ambient-traffic";
+import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
+import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
+import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
+import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
+import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
+import { applyMapStyle } from "@/features/map/lib/style/apply-map-style";
+import { buildAmbientTrafficSource } from "@/features/map/lib/traffic/build-ambient-traffic-source";
+import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-viewport-vegetation";
+import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
+import { useNavigationPlayback } from "@/features/navigation/hooks/use-navigation-playback";
+import { useMapStore } from "@/features/map/store/map.store";
+import type { RouteAlternative } from "@/features/map/types/route.types";
+import {
+  MAP_25D_DEFAULT_BEARING,
+  MAP_25D_DEFAULT_PITCH,
+  MAP_GLYPHS_FALLBACK,
+  MAP_STYLE_2D,
+  MAP_STYLE_25D,
+} from "@/lib/constants/map.constants";
+
+import { MapDataLayers } from "@/features/map/components/layers/map-data-layers";
+import { MapFeatureOverlays } from "@/features/map/components/overlays/map-feature-overlays";
+import { NavigationHud } from "@/features/navigation/components/navigation-hud";
+import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
+
+type Props = {
+  selectedPlace: PlaceItem | null;
+  floodData: FloodGeoJson | null;
+  routePayload: {
+    from: PlaceItem;
+    to: PlaceItem;
+    routes: RouteAlternative[];
+    activeIndex: number;
+  } | null;
+  onRouteClear: () => void;
+};
+
+export function MapLibreMap({
+  selectedPlace,
+  floodData: serverFloodData,
+  routePayload,
+  onRouteClear,
+}: Props) {
+  const estimateRouteLengthMeters = useCallback((coordinates: Position[]) => {
+    if (coordinates.length < 2) return 0;
+
+    let total = 0;
+    for (let index = 0; index < coordinates.length - 1; index += 1) {
+      const start = coordinates[index];
+      const end = coordinates[index + 1];
+      if (!start || !end) continue;
+      const avgLat = ((start[1] + end[1]) * Math.PI) / 360;
+      const dx = (end[0] - start[0]) * (111320 * Math.cos(avgLat));
+      const dy = (end[1] - start[1]) * 111320;
+      total += Math.hypot(dx, dy);
+    }
+
+    return total;
+  }, []);
+
+  const classifyRoadClass = useCallback((className: string) => {
+    if (
+      className.includes("motorway") ||
+      className.includes("trunk") ||
+      className.includes("primary")
+    ) {
+      return "major" as const;
+    }
+    if (className.includes("secondary")) {
+      return "medium" as const;
+    }
+    return "local" as const;
+  }, []);
+
+  const {
+    mapMode,
+    visibleLayers,
+    buildingOpacity,
+    trafficVisualizationEnabled,
+    trafficDensity,
+    laneDetailEnabled,
+    routeAutoCameraEnabled,
+    detailPreset,
+    toggleTrafficVisualization,
+    notifyMapInteraction,
+    setMapEngine,
+  } = useMapStore();
+  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
+  const [mapZoom, setMapZoom] = useState(11.2);
+  const [mapBearing, setMapBearing] = useState(0);
+  const [mapBounds, setMapBounds] = useState<{
+    west: number;
+    south: number;
+    east: number;
+    north: number;
+  } | null>(null);
+  const [cameraDistanceMeters, setCameraDistanceMeters] = useState<
+    number | null
+  >(null);
+  const activeFloodData =
+    (serverFloodData as FeatureCollection | null) ??
+    (floodData as FeatureCollection);
+
+  const initialViewState = useMemo(
+    () => ({
+      longitude: 106.73,
+      latitude: 10.82,
+      zoom: 11.8,
+      pitch: 0,
+      bearing: 0,
+    }),
+    [],
+  );
+
+  useBuildingLayer(mapInstance, visibleLayers.buildings, buildingOpacity);
+  useMapViewMode(mapInstance, mapMode);
+  useMapFlyToPlace(mapInstance, selectedPlace);
+
+  const { cursor, hovered, handleMouseMove, handleMouseLeave } = useMapCursor();
+
+  const {
+    selectedFlood,
+    selectedBuilding,
+    selectedDrainage,
+    selectedRiskZone,
+    handleClick,
+    resetSelections,
+  } = useSelectedFeatures(mapInstance);
+
+  const hoveredId = hovered?.id ?? "";
+  const selectedId = selectedFlood?.id ?? "";
+  const [routePanelOpen, setRoutePanelOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"map" | "drive3d">("map");
+  const [mapLibreCar3D, setMapLibreCar3D] = useState(false);
+  const [drawerMinimalMode, setDrawerMinimalMode] = useState(false);
+  const [driveTiltDeg, setDriveTiltDeg] = useState(78);
+  const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<
+    AmbientTrafficRoute[]
+  >([]);
+  const ambientTrafficSourceId = "ambient-traffic-source";
+  const ambientTrafficShadowLayerId = "ambient-traffic-shadow-fill";
+  const ambientTrafficBodyLayerId = "ambient-traffic-body-3d";
+  const ambientTrafficRoofLayerId = "ambient-traffic-roof-3d";
+  const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
+  const waterViewportSourceId = "map-water-viewport-source";
+  const waterViewportToneLayerId = "map-water-viewport-tone-fill";
+  const waterViewportShoreLayerId = "map-water-viewport-shore-line";
+  const waterViewportBaseLayerId = "map-water-viewport-shimmer-base";
+  const waterViewportDetailLayerId = "map-water-viewport-shimmer-detail";
+  const parkTreeSourceId = "map-park-tree-points";
+  const parkTreeShadowLayerId = "map-park-tree-shadow-circles";
+  const parkTreeCanopyLayerId = "map-park-tree-canopy-circles";
+  const parkTreeHighlightLayerId = "map-park-tree-highlight-circles";
+  const programmaticMoveRef = useRef(false);
+  const hasAppliedInitial25DCameraRef = useRef(false);
+  const patchedStyleSignatureRef = useRef<string | null>(null);
+  const roadRefreshTickRef = useRef(0);
+  const followTickRef = useRef(0);
+  const lastFollowCenterRef = useRef<[number, number] | null>(null);
+  const mapShellRef = useRef<HTMLDivElement | null>(null);
+  const mapPointerInsideRef = useRef(false);
+  const mapPointerDownRef = useRef(false);
+
+  const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+    const lat = (bounds.getNorth() + bounds.getSouth()) / 2;
+    const deltaLng = Math.abs(east - west);
+    const metersPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
+    return Math.max(0, deltaLng * metersPerDegLng);
+  };
+
+  const applyMapVisualStyle = useCallback(
+    (map: maplibregl.Map) => {
+      applyMapStyle(map, {
+        laneDetailEnabled,
+        detailPreset,
+      });
+    },
+    [detailPreset, laneDetailEnabled],
+  );
+
+  useEffect(() => {
+    if (!mapInstance || !routePayload) return;
+    const activeRoute = routePayload.routes[routePayload.activeIndex];
+    const [start, next] = activeRoute.geometry.coordinates;
+    const bearing =
+      start && next
+        ? (Math.atan2(next[0] - start[0], next[1] - start[1]) * 180) / Math.PI
+        : 0;
+
+    mapInstance.flyTo({
+      center: routePayload.from.center,
+      zoom: Math.max(mapInstance.getZoom(), 13),
+      pitch: mapMode === "2.5d" ? 62 : 0,
+      bearing: mapMode === "2.5d" ? bearing : 0,
+      duration: 900,
+    });
+  }, [mapInstance, routePayload, mapMode]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const applyStyleOncePerSignature = () => {
+      const style = mapInstance.getStyle();
+      if (!style) return;
+
+      const signature = `${style.sprite ?? ""}|${style.glyphs ?? ""}|${style.layers?.length ?? 0}|${style.layers?.[0]?.id ?? ""}|${style.layers?.[style.layers.length - 1]?.id ?? ""}`;
+      if (patchedStyleSignatureRef.current === signature) return;
+      patchedStyleSignatureRef.current = signature;
+
+      if (style.glyphs && style.glyphs !== MAP_GLYPHS_FALLBACK) {
+        const patchedLayers = style.layers?.map((layer) => {
+          if (
+            layer.type !== "symbol" ||
+            !layer.layout ||
+            !("text-font" in layer.layout)
+          ) {
+            return layer;
+          }
+
+          return {
+            ...layer,
+            layout: {
+              ...layer.layout,
+              "text-font": ["Open Sans Regular"],
+            },
+          };
+        });
+
+        mapInstance.setStyle(
+          {
+            ...style,
+            layers: patchedLayers,
+            glyphs: MAP_GLYPHS_FALLBACK,
+          },
+          { diff: true },
+        );
+        return;
+      }
+
+      applyMapVisualStyle(mapInstance);
+    };
+
+    applyStyleOncePerSignature();
+    mapInstance.on("style.load", applyStyleOncePerSignature);
+
+    return () => {
+      mapInstance.off("style.load", applyStyleOncePerSignature);
+    };
+  }, [applyMapVisualStyle, mapInstance]);
+
+  useEffect(() => {
+    if (
+      !mapInstance ||
+      !trafficVisualizationEnabled ||
+      trafficDensity === "off"
+    )
+      return;
+
+    const refreshRoadNetwork = () => {
+      const now = performance.now();
+      if (
+        now - roadRefreshTickRef.current <
+        AMBIENT_TRAFFIC_ROUTE_SCAN.throttleMs
+      )
+        return;
+      roadRefreshTickRef.current = now;
+
+      if (mapInstance.getZoom() < MAP_DETAIL_ZOOM.LOW) {
+        setAmbientNetworkRoutes((prev) => (prev.length ? [] : prev));
+        return;
+      }
+
+      const style = mapInstance.getStyle();
+      const currentZoom = mapInstance.getZoom();
+      const roadLayerIds =
+        style.layers
+          ?.filter(
+            (layer) =>
+              layer.type === "line" && layer.id.toLowerCase().includes("road"),
+          )
+          .map((layer) => layer.id) ?? [];
+
+      if (!roadLayerIds.length) return;
+
+      const features = mapInstance.queryRenderedFeatures(undefined, {
+        layers: roadLayerIds.slice(0, AMBIENT_TRAFFIC_ROUTE_SCAN.layers),
+      });
+
+      const serviceSelectionMod = currentZoom >= MAP_DETAIL_ZOOM.CLOSE ? 3 : 5;
+      const maxCollected =
+        currentZoom >= MAP_DETAIL_ZOOM.CLOSE
+          ? detailPreset === "high"
+            ? 120
+            : 96
+          : currentZoom >= MAP_DETAIL_ZOOM.MID
+            ? detailPreset === "high"
+              ? 84
+              : 64
+            : 36;
+      const minLengthMeters =
+        currentZoom >= MAP_DETAIL_ZOOM.CLOSE
+          ? 90
+          : currentZoom >= MAP_DETAIL_ZOOM.MID
+            ? 130
+            : 190;
+
+      const collected = features
+        .flatMap((feature) => {
+          const geometry = feature.geometry;
+          const className = String(
+            (feature.properties?.class as string | undefined) ??
+              (feature.properties?.type as string | undefined) ??
+              "",
+          ).toLowerCase();
+
+          const isMotorway = className.includes("motorway");
+          const isTrunk = className.includes("trunk");
+          const isPrimary = className.includes("primary");
+          const isSecondary = className.includes("secondary");
+          const isTertiary = className.includes("tertiary");
+          const isResidential = className.includes("residential");
+          const isService = className.includes("service");
+
+          const isEligible =
+            isMotorway ||
+            isTrunk ||
+            isPrimary ||
+            isSecondary ||
+            isTertiary ||
+            isResidential ||
+            isService;
+          if (!isEligible) return [];
+
+          if (!geometry) return [];
+          if (geometry.type === "LineString") {
+            const lengthMeters = estimateRouteLengthMeters(geometry.coordinates);
+            if (lengthMeters < minLengthMeters) return [];
+
+            if (isService) {
+              const keep =
+                Math.floor((geometry.coordinates[0]?.[0] ?? 0) * 10000) %
+                  serviceSelectionMod ===
+                0;
+              if (!keep) return [];
+            }
+
+            return [
+              {
+                coordinates: geometry.coordinates,
+                roadClass: classifyRoadClass(className),
+                lengthMeters,
+              } satisfies AmbientTrafficRoute,
+            ];
+          }
+          if (geometry.type === "MultiLineString") {
+            return geometry.coordinates.map(
+              (coordinates) => {
+                const lengthMeters = estimateRouteLengthMeters(coordinates);
+                return {
+                  coordinates,
+                  roadClass: classifyRoadClass(className),
+                  lengthMeters,
+                } satisfies AmbientTrafficRoute;
+              },
+            );
+          }
+          return [];
+        })
+        .filter(
+          (route) =>
+            route.coordinates.length > 3 &&
+            (route.lengthMeters ?? 0) >= minLengthMeters,
+        )
+        .map((route) => {
+          const classScore =
+            route.roadClass === "major" ? 1.25 : route.roadClass === "medium" ? 1 : 0.82;
+          const zoomScore = currentZoom >= MAP_DETAIL_ZOOM.CLOSE ? 1.08 : 0.94;
+          const lengthScore = Math.min(1.4, Math.max(0.35, (route.lengthMeters ?? 0) / 520));
+          return {
+            route,
+            score: classScore * lengthScore * zoomScore,
+          };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Math.min(maxCollected, AMBIENT_TRAFFIC_ROUTE_SCAN.maxRoutes * 2))
+        .map((item) => item.route);
+
+      setAmbientNetworkRoutes((prev) => {
+        if (prev.length === collected.length) {
+          const sameHead =
+            prev[0]?.coordinates?.[0]?.[0] === collected[0]?.coordinates?.[0]?.[0] &&
+            prev[0]?.coordinates?.[0]?.[1] === collected[0]?.coordinates?.[0]?.[1];
+          const sameTail =
+            prev[prev.length - 1]?.coordinates?.[0]?.[0] ===
+              collected[collected.length - 1]?.coordinates?.[0]?.[0] &&
+            prev[prev.length - 1]?.coordinates?.[0]?.[1] ===
+              collected[collected.length - 1]?.coordinates?.[0]?.[1];
+          if (sameHead && sameTail) return prev;
+        }
+        return collected;
+      });
+    };
+
+    refreshRoadNetwork();
+    mapInstance.on("moveend", refreshRoadNetwork);
+
+    return () => {
+      mapInstance.off("moveend", refreshRoadNetwork);
+    };
+  }, [
+    classifyRoadClass,
+    detailPreset,
+    estimateRouteLengthMeters,
+    mapInstance,
+    trafficDensity,
+    trafficVisualizationEnabled,
+  ]);
+
+  const routeCollection: FeatureCollection | null = routePayload
+    ? {
+        type: "FeatureCollection",
+        features: routePayload.routes.map((route, index) => ({
+          type: "Feature",
+          geometry: route.geometry,
+          properties: {
+            routeId: route.id,
+            isPrimary: index === routePayload.activeIndex ? 1 : 0,
+          },
+        })),
+      }
+    : null;
+
+  const activeRoute = routePayload?.routes[routePayload.activeIndex] ?? null;
+  const navMode = activeRoute?.mode ?? "car";
+  const {
+    isPlaying: isNavigating,
+    progress: navProgress,
+    heading: navHeading,
+    navCoordinate,
+    trafficSamples,
+    activeStepIndex,
+    togglePlayback,
+    pause,
+    reset,
+    seek,
+    speedMultiplier,
+    availableSpeedMultipliers,
+    setSpeedMultiplier,
+  } = useNavigationPlayback({
+    geometry: activeRoute?.geometry ?? null,
+    steps: activeRoute?.steps ?? [],
+    mode: navMode,
+  });
+  const routeFromLabel = routePayload?.from.label ?? "Start";
+  const routeToLabel = routePayload?.to.label ?? "Destination";
+  const etaMinutes = activeRoute
+    ? Math.max(1, Math.round(activeRoute.durationSeconds / 60))
+    : 0;
+  const distanceKm = activeRoute
+    ? (activeRoute.distanceMeters / 1000).toFixed(1)
+    : "0.0";
+  const normalizedProgress = Number.isFinite(navProgress) ? navProgress : 0;
+  const safeProgress = Math.min(0.998, Math.max(0, normalizedProgress));
+  const progressFadeStart = Math.min(0.999, safeProgress + 0.0005);
+  const remainingProgressEnd = Math.min(0.9995, progressFadeStart + 0.018);
+  const trafficCars = useMemo(() => {
+    if (viewMode !== "drive3d" || !trafficVisualizationEnabled) return [];
+
+    const maxVehicles =
+      mapZoom >= 14 ? 11 : mapZoom >= 12.5 ? 8 : mapZoom >= 11 ? 6 : 4;
+    return trafficSamples.slice(0, maxVehicles);
+  }, [mapZoom, trafficSamples, trafficVisualizationEnabled, viewMode]);
+  const ambientRoutes = useMemo(
+    () =>
+      ambientNetworkRoutes.length
+        ? ambientNetworkRoutes
+        : (routePayload?.routes.map((route) => ({
+            coordinates: route.geometry.coordinates,
+            roadClass: "medium" as const,
+          })) ??
+          []),
+    [ambientNetworkRoutes, routePayload],
+  );
+  const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
+    routes: ambientRoutes,
+    zoom: mapZoom,
+    enabled: trafficVisualizationEnabled,
+    density: trafficDensity,
+    detailPreset,
+  });
+  const visibleAmbientTraffic = useMemo(() => {
+    if (!mapBounds) return ambientTraffic;
+
+    const precision = mapZoom >= 16 ? 4 : mapZoom >= 14 ? 3 : 2;
+    const deduped = new globalThis.Map<
+      string,
+      (typeof ambientTraffic)[number]
+    >();
+
+    for (const vehicle of ambientTraffic) {
+      if (
+        vehicle.lng < mapBounds.west ||
+        vehicle.lng > mapBounds.east ||
+        vehicle.lat < mapBounds.south ||
+        vehicle.lat > mapBounds.north
+      ) {
+        continue;
+      }
+
+      const key = `${vehicle.lng.toFixed(precision)}:${vehicle.lat.toFixed(precision)}`;
+      if (!deduped.has(key)) deduped.set(key, vehicle);
+    }
+
+    const cap =
+      mapZoom >= MAP_DETAIL_ZOOM.CLOSE
+        ? trafficDensity === "full"
+          ? detailPreset === "high"
+            ? 112
+            : 90
+          : detailPreset === "high"
+            ? 78
+            : 60
+        : mapZoom >= MAP_DETAIL_ZOOM.MID
+          ? trafficDensity === "full"
+            ? detailPreset === "high"
+              ? 64
+              : 50
+            : detailPreset === "high"
+              ? 42
+              : 30
+          : 16;
+
+    return Array.from(deduped.values()).slice(0, cap);
+  }, [ambientTraffic, detailPreset, mapBounds, mapZoom, trafficDensity]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const ensureAmbientTrafficLayers = () => {
+      const style = mapInstance.getStyle();
+      if (!style?.layers?.length) return;
+
+      const beforeLayerId = style.layers.find(
+        (layer) =>
+          layer.type === "fill-extrusion" && /building/i.test(layer.id),
+      )?.id;
+      if (!beforeLayerId) return;
+
+      const sourceData = buildAmbientTrafficSource(visibleAmbientTraffic, mapZoom);
+      const source = mapInstance.getSource(
+        ambientTrafficSourceId,
+      ) as maplibregl.GeoJSONSource | null;
+
+      if (!source) {
+        mapInstance.addSource(ambientTrafficSourceId, {
+          type: "geojson",
+          data: sourceData,
+        });
+      } else {
+        source.setData(sourceData);
+      }
+
+      const addOrMoveLayer = (layer: maplibregl.LayerSpecification) => {
+        if (mapInstance.getLayer(layer.id)) {
+          try {
+            mapInstance.moveLayer(layer.id, beforeLayerId);
+          } catch {}
+          return;
+        }
+        mapInstance.addLayer(layer, beforeLayerId);
+      };
+
+      addOrMoveLayer({
+        id: ambientTrafficShadowLayerId,
+        type: "fill",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "body"],
+        paint: {
+          "fill-color": "#0f172a",
+          "fill-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            12,
+            0.08,
+            16,
+            0.12,
+            20,
+            0.16,
+          ],
+        },
+      });
+
+      addOrMoveLayer({
+        id: ambientTrafficBodyLayerId,
+        type: "fill-extrusion",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "body"],
+        paint: {
+          "fill-extrusion-color": [
+            "match",
+            ["get", "roadClass"],
+            "major",
+            "#d8dde5",
+            "medium",
+            "#c8d0db",
+            "#bcc4d0",
+          ],
+          "fill-extrusion-opacity": 0.95,
+          "fill-extrusion-height": 0.42,
+          "fill-extrusion-base": 0.02,
+          "fill-extrusion-vertical-gradient": true,
+        },
+      });
+
+      addOrMoveLayer({
+        id: ambientTrafficRoofLayerId,
+        type: "fill-extrusion",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "roof"],
+        paint: {
+          "fill-extrusion-color": "#f8fafc",
+          "fill-extrusion-opacity": 0.93,
+          "fill-extrusion-height": 0.6,
+          "fill-extrusion-base": 0.18,
+          "fill-extrusion-vertical-gradient": true,
+        },
+      });
+
+      addOrMoveLayer({
+        id: ambientTrafficWindshieldLayerId,
+        type: "fill-extrusion",
+        source: ambientTrafficSourceId,
+        filter: ["==", ["get", "part"], "windshield"],
+        paint: {
+          "fill-extrusion-color": "#8ea0b5",
+          "fill-extrusion-opacity": 0.9,
+          "fill-extrusion-height": 0.72,
+          "fill-extrusion-base": 0.28,
+          "fill-extrusion-vertical-gradient": true,
+        },
+      });
+    };
+
+    ensureAmbientTrafficLayers();
+    mapInstance.on("style.load", ensureAmbientTrafficLayers);
+
+    return () => {
+      mapInstance.off("style.load", ensureAmbientTrafficLayers);
+    };
+  }, [mapInstance, mapZoom, visibleAmbientTraffic]);
+
+  const vehicleScaleMultiplier = useMemo(() => {
+    const baseZoomScale =
+      mapZoom <= 11
+        ? 0.7
+        : mapZoom >= 18
+          ? 1.3
+          : mapZoom <= 15
+            ? 0.7 + ((mapZoom - 11) / 4) * 0.3
+            : 1 + ((mapZoom - 15) / 3) * 0.3;
+
+    const residentialWidth =
+      mapZoom <= 12
+        ? 1.2
+        : mapZoom >= 20
+          ? 12
+          : mapZoom <= 14
+            ? 1.2 + ((mapZoom - 12) / 2) * (2.5 - 1.2)
+            : mapZoom <= 16
+              ? 2.5 + ((mapZoom - 14) / 2) * (5 - 2.5)
+              : mapZoom <= 18
+                ? 5 + ((mapZoom - 16) / 2) * (8 - 5)
+                : 8 + ((mapZoom - 18) / 2) * (12 - 8);
+
+    const roadWidthFactor = Math.min(1.2, Math.max(0.6, residentialWidth / 5));
+    return Math.min(1.6, Math.max(0.62, baseZoomScale * roadWidthFactor));
+  }, [mapZoom]);
+
+  useEffect(() => {
+    if (
+      !mapInstance ||
+      mapMode !== "2.5d" ||
+      hasAppliedInitial25DCameraRef.current
+    )
+      return;
+
+    hasAppliedInitial25DCameraRef.current = true;
+    mapInstance.easeTo({
+      pitch: MAP_25D_DEFAULT_PITCH,
+      bearing: MAP_25D_DEFAULT_BEARING,
+      duration: 120,
+    });
+  }, [mapInstance, mapMode]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+    let lastRefresh = 0;
+
+    const refreshEnvironmentViewport = () => {
+      const now = performance.now();
+      if (now - lastRefresh < 180) return;
+      lastRefresh = now;
+      const style = mapInstance.getStyle();
+      if (!style?.layers?.length) return;
+
+      const canvas = mapInstance.getCanvas();
+      const screenPad = 88;
+      const queryBox: [[number, number], [number, number]] = [
+        [-screenPad, -screenPad],
+        [canvas.width + screenPad, canvas.height + screenPad],
+      ];
+      const viewportBounds = mapInstance.getBounds();
+      const bufferedBounds = {
+        west: viewportBounds.getWest() - 0.01,
+        south: viewportBounds.getSouth() - 0.01,
+        east: viewportBounds.getEast() + 0.01,
+        north: viewportBounds.getNorth() + 0.01,
+      };
+
+      const waterLayerIds =
+        style.layers
+          ?.filter(
+            (layer) =>
+              layer.type === "fill" && /(water|ocean|river|lake)/i.test(layer.id),
+          )
+          .map((layer) => layer.id)
+          .slice(0, 4) ?? [];
+
+      if (waterLayerIds.length) {
+        const waterFeatures = mapInstance.queryRenderedFeatures(queryBox, {
+          layers: waterLayerIds,
+        });
+        const waterData = buildViewportWaterEffect(waterFeatures);
+        const waterSource = mapInstance.getSource(waterViewportSourceId) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+        if (!waterSource) {
+          mapInstance.addSource(waterViewportSourceId, {
+            type: "geojson",
+            data: waterData,
+          });
+        } else {
+          waterSource.setData(waterData);
+        }
+      }
+
+      const parkLayerIds =
+        style?.layers
+          ?.filter(
+            (layer) =>
+              layer.type === "fill" && /(park|green|grass)/i.test(layer.id),
+          )
+          .map((layer) => layer.id) ?? [];
+      const treeData: FeatureCollection = parkLayerIds.length
+        ? buildViewportVegetation({
+            features: mapInstance.queryRenderedFeatures(queryBox, {
+              layers: parkLayerIds.slice(0, 3),
+            }),
+            viewportBounds: bufferedBounds,
+            detailPreset,
+            mapZoom,
+          })
+        : { type: "FeatureCollection", features: [] };
+
+      const source = mapInstance.getSource(parkTreeSourceId) as
+        | maplibregl.GeoJSONSource
+        | undefined;
+      if (!source) {
+        mapInstance.addSource(parkTreeSourceId, {
+          type: "geojson",
+          data: treeData,
+        });
+      } else {
+        source.setData(treeData);
+      }
+
+      const addLayerIfMissing = (layer: maplibregl.LayerSpecification) => {
+        if (mapInstance.getLayer(layer.id)) return;
+        try {
+          mapInstance.addLayer(layer);
+        } catch {}
+      };
+
+      if (mapInstance.getSource(waterViewportSourceId)) {
+        addLayerIfMissing({
+          id: waterViewportToneLayerId,
+          type: "fill",
+          source: waterViewportSourceId,
+          paint: {
+            "fill-color": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              "#7fc5ea",
+              13,
+              "#74bde8",
+              17,
+              "#6cb4e2",
+            ],
+            "fill-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              0.08,
+              13,
+              0.13,
+              17,
+              0.18,
+            ],
+          },
+        });
+
+        addLayerIfMissing({
+          id: waterViewportShoreLayerId,
+          type: "line",
+          source: waterViewportSourceId,
+          paint: {
+            "line-color": "#c8e8f8",
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.08,
+              14,
+              0.15,
+              18,
+              0.22,
+            ],
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.25,
+              15,
+              0.6,
+              19,
+              1.1,
+            ],
+          },
+        });
+
+        addLayerIfMissing({
+          id: waterViewportBaseLayerId,
+          type: "line",
+          source: waterViewportSourceId,
+          paint: {
+            "line-color": "#d7f0ff",
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              9,
+              detailPreset === "high" ? 0.1 : 0.07,
+              14,
+              detailPreset === "high" ? 0.16 : 0.12,
+              18,
+              detailPreset === "high" ? 0.21 : 0.16,
+            ],
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              0.3,
+              14,
+              0.65,
+              17,
+              1.0,
+              20,
+              1.3,
+            ],
+            "line-dasharray": [1.1, 2.2],
+          },
+        });
+
+        addLayerIfMissing({
+          id: waterViewportDetailLayerId,
+          type: "line",
+          source: waterViewportSourceId,
+          minzoom: 14.5,
+          paint: {
+            "line-color": "#f4fbff",
+            "line-opacity": detailPreset === "high" ? 0.12 : 0.07,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              15,
+              0.35,
+              18,
+              0.8,
+              20,
+              1.1,
+            ],
+            "line-dasharray": [0.45, 1.1],
+          },
+        });
+      }
+
+      addLayerIfMissing({
+        id: parkTreeShadowLayerId,
+        type: "circle",
+        source: parkTreeSourceId,
+        minzoom: 13,
+        paint: {
+          "circle-color": "#23311f",
+          "circle-opacity": [
+            "match",
+            ["get", "greenMode"],
+            "grass_first",
+            0.11,
+            "dense_wooded",
+            0.24,
+            0.2,
+          ],
+          "circle-translate": [1.4, 1.7],
+          "circle-radius": [
+            "*",
+            [
+              "match",
+              ["get", "treeType"],
+              "tall",
+              2.9,
+              "compact",
+              2.4,
+              2.05,
+            ],
+            ["coalesce", ["get", "treeScale"], 1],
+          ],
+        },
+      });
+
+      addLayerIfMissing({
+        id: parkTreeCanopyLayerId,
+        type: "circle",
+        source: parkTreeSourceId,
+        minzoom: 13,
+        paint: {
+          "circle-color": [
+            "case",
+            ["==", ["get", "treeTone"], "cool"],
+            [
+              "match",
+              ["get", "treeArchetype"],
+              "pine",
+              "#4c7d45",
+              "broadleaf",
+              "#5a9261",
+              "ornamental",
+              "#73aa6f",
+              "waterside",
+              "#66a985",
+              "#5e9362",
+            ],
+            ["==", ["get", "treeTone"], "warm"],
+            [
+              "match",
+              ["get", "treeArchetype"],
+              "pine",
+              "#567737",
+              "broadleaf",
+              "#688e44",
+              "ornamental",
+              "#78a25e",
+              "waterside",
+              "#6a9a6e",
+              "#658d4d",
+            ],
+            [
+              "match",
+              ["get", "treeArchetype"],
+              "pine",
+              "#4d7a3b",
+              "broadleaf",
+              "#5c8f4a",
+              "ornamental",
+              "#6ea55f",
+              "waterside",
+              "#5f9c70",
+              "#5b8e45",
+            ],
+          ],
+          "circle-opacity": [
+            "match",
+            ["get", "greenMode"],
+            "grass_first",
+            0.63,
+            "dense_wooded",
+            0.82,
+            0.78,
+          ],
+          "circle-radius": [
+            "*",
+            [
+              "match",
+              ["get", "treeType"],
+              "tall",
+              2.6,
+              "compact",
+              2.1,
+              1.8,
+            ],
+            ["coalesce", ["get", "treeScale"], 1],
+          ],
+          "circle-stroke-color": "#3e6430",
+          "circle-stroke-width": 0.6,
+        },
+      });
+
+      addLayerIfMissing({
+        id: parkTreeHighlightLayerId,
+        type: "circle",
+        source: parkTreeSourceId,
+        minzoom: 15.8,
+        paint: {
+          "circle-color": "#cde8b7",
+          "circle-opacity": [
+            "match",
+            ["get", "greenMode"],
+            "grass_first",
+            0.18,
+            "dense_wooded",
+            0.23,
+            0.28,
+          ],
+          "circle-translate": [-0.6, -0.6],
+          "circle-radius": [
+            "*",
+            [
+              "match",
+              ["get", "treeType"],
+              "tall",
+              1.1,
+              "compact",
+              0.9,
+              0.7,
+            ],
+            ["coalesce", ["get", "treeScale"], 1],
+          ],
+        },
+      });
+    };
+
+    refreshEnvironmentViewport();
+    mapInstance.on("moveend", refreshEnvironmentViewport);
+    mapInstance.on("style.load", refreshEnvironmentViewport);
+
+    return () => {
+      mapInstance.off("moveend", refreshEnvironmentViewport);
+      mapInstance.off("style.load", refreshEnvironmentViewport);
+    };
+  }, [detailPreset, mapInstance, mapZoom]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    let phase = 0;
+    const interval = window.setInterval(() => {
+      if (!mapInstance.getLayer(waterViewportBaseLayerId)) return;
+      phase += 0.23;
+      const baseOpacity = 0.12 + Math.sin(phase) * 0.03;
+      const detailOpacity = 0.08 + Math.cos(phase * 1.4) * 0.025;
+      const shoreOpacity = 0.16 + Math.sin(phase * 0.7) * 0.02;
+
+      try {
+        mapInstance.setPaintProperty(
+          waterViewportBaseLayerId,
+          "line-opacity",
+          [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            9,
+            baseOpacity * 0.62,
+            14,
+            baseOpacity,
+            18,
+            baseOpacity * 1.08,
+          ],
+        );
+        mapInstance.setPaintProperty(
+          waterViewportDetailLayerId,
+          "line-opacity",
+          [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            14.5,
+            detailOpacity * 0.8,
+            18,
+            detailOpacity * 1.12,
+          ],
+        );
+        mapInstance.setPaintProperty(
+          waterViewportShoreLayerId,
+          "line-opacity",
+          [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            10,
+            shoreOpacity * 0.6,
+            15,
+            shoreOpacity,
+            18,
+            shoreOpacity * 1.08,
+          ],
+        );
+      } catch {}
+    }, 280);
+
+    return () => window.clearInterval(interval);
+  }, [
+    mapInstance,
+    waterViewportBaseLayerId,
+    waterViewportDetailLayerId,
+    waterViewportShoreLayerId,
+  ]);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+
+    const container = mapInstance.getContainer();
+    container.style.touchAction = "pan-x pan-y";
+    container.style.overscrollBehaviorX = "contain";
+    container.style.overscrollBehaviorY = "contain";
+
+    const markPointerEnter = () => {
+      mapPointerInsideRef.current = true;
+    };
+    const markPointerLeave = () => {
+      mapPointerInsideRef.current = false;
+      mapPointerDownRef.current = false;
+    };
+    const markPointerDown = () => {
+      mapPointerDownRef.current = true;
+    };
+    const markPointerUp = () => {
+      mapPointerDownRef.current = false;
+    };
+
+    const preventHorizontalGesture = (event: WheelEvent) => {
+      if (!event.cancelable) return;
+      const mapOwnsInteraction =
+        mapPointerInsideRef.current || mapPointerDownRef.current;
+      if (
+        mapOwnsInteraction &&
+        Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.1
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    container.addEventListener("pointerenter", markPointerEnter);
+    container.addEventListener("pointerleave", markPointerLeave);
+    container.addEventListener("pointerdown", markPointerDown);
+    container.addEventListener("pointerup", markPointerUp);
+    container.addEventListener("pointercancel", markPointerUp);
+    container.addEventListener("wheel", preventHorizontalGesture, {
+      passive: false,
+    });
+
+    return () => {
+      container.removeEventListener("pointerenter", markPointerEnter);
+      container.removeEventListener("pointerleave", markPointerLeave);
+      container.removeEventListener("pointerdown", markPointerDown);
+      container.removeEventListener("pointerup", markPointerUp);
+      container.removeEventListener("pointercancel", markPointerUp);
+      container.removeEventListener("wheel", preventHorizontalGesture);
+    };
+  }, [mapInstance]);
+
+  const resetRouteRuntime = () => {
+    pause();
+    reset();
+    setRoutePanelOpen(false);
+    setDrawerMinimalMode(false);
+    setMapLibreCar3D(false);
+  };
+
+  const handleToggleViewMode = (mode: "map" | "drive3d") => {
+    setViewMode(mode);
+  };
+
+  const handleSwitchToCesium = () => {
+    resetRouteRuntime();
+    setViewMode("map");
+    setMapEngine("cesium");
+  };
+  const isRouteCameraActive =
+    routeAutoCameraEnabled &&
+    viewMode === "drive3d" &&
+    Boolean(isNavigating && navCoordinate);
+
+  useEffect(() => {
+    if (!mapInstance || !isRouteCameraActive || !navCoordinate) return;
+    const now = performance.now();
+    const minFollowInterval = 140;
+    if (now - followTickRef.current < minFollowInterval) return;
+
+    const prevCenter = lastFollowCenterRef.current;
+    if (prevCenter) {
+      const deltaLng = Math.abs(prevCenter[0] - navCoordinate[0]);
+      const deltaLat = Math.abs(prevCenter[1] - navCoordinate[1]);
+      if (deltaLng < 0.00001 && deltaLat < 0.00001) return;
+    }
+
+    followTickRef.current = now;
+    lastFollowCenterRef.current = navCoordinate;
+    programmaticMoveRef.current = true;
+    mapInstance.once("moveend", () => {
+      programmaticMoveRef.current = false;
+    });
+    mapInstance.easeTo({
+      center: navCoordinate,
+      pitch:
+        mapMode === "2.5d" ? (viewMode === "drive3d" ? driveTiltDeg : 62) : 0,
+      bearing: mapMode === "2.5d" ? navHeading : mapInstance.getBearing(),
+      zoom:
+        viewMode === "drive3d"
+          ? Math.max(mapInstance.getZoom(), 14.5)
+          : undefined,
+      duration: 280,
+      easing: (t) => 1 - Math.pow(1 - t, 2.2),
+    });
+  }, [
+    driveTiltDeg,
+    mapInstance,
+    navCoordinate,
+    isRouteCameraActive,
+    mapMode,
+    navHeading,
+    viewMode,
+  ]);
+
+  return (
+    <div
+      ref={mapShellRef}
+      className="map-shell relative h-full w-full"
+      style={{
+        overscrollBehaviorX: "contain",
+        overscrollBehaviorY: "contain",
+        touchAction: "pan-x pan-y",
+      }}
+    >
+      <Map
+        initialViewState={initialViewState}
+        style={{
+          width: "100%",
+          height: "100%",
+          cursor,
+          touchAction: "pan-x pan-y",
+          overscrollBehaviorX: "contain",
+          overscrollBehaviorY: "contain",
+        }}
+        mapStyle={mapMode === "2d" ? MAP_STYLE_2D : MAP_STYLE_25D}
+        maxPitch={85}
+        dragRotate={mapMode !== "2d"}
+        interactiveLayerIds={[
+          "flood-fill",
+          "flood-extrusion",
+          "flood-outline",
+          "building",
+          "building-3d",
+          "building-extrusion",
+          "drainage-line",
+          "risk-zones-fill",
+        ]}
+        onClick={(event) => {
+          notifyMapInteraction();
+          handleClick(event);
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onDragStart={() => {
+          if (!programmaticMoveRef.current) notifyMapInteraction();
+        }}
+        onMove={(event) => {
+          if (Math.abs(event.viewState.zoom - mapZoom) > 0.01) {
+            setMapZoom(event.viewState.zoom);
+          }
+          if (Math.abs(event.viewState.bearing - mapBearing) > 0.9) {
+            setMapBearing(event.viewState.bearing);
+          }
+        }}
+        onMoveEnd={(event) => {
+          const bounds = event.target.getBounds();
+          const nextDistance = estimateBoundsWidthMeters(bounds);
+          setCameraDistanceMeters((prev) => {
+            if (prev !== null && Math.abs(prev - nextDistance) < 45)
+              return prev;
+            return nextDistance;
+          });
+          setMapBounds((prev) => {
+            const next = {
+              west: bounds.getWest(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              north: bounds.getNorth(),
+            };
+            if (
+              prev &&
+              Math.abs(prev.west - next.west) < 0.0007 &&
+              Math.abs(prev.south - next.south) < 0.0007 &&
+              Math.abs(prev.east - next.east) < 0.0007 &&
+              Math.abs(prev.north - next.north) < 0.0007
+            ) {
+              return prev;
+            }
+            return next;
+          });
+        }}
+        onLoad={(e) => {
+          const loadedMap = e.target;
+
+          setMapInstance(loadedMap);
+          setMapZoom(loadedMap.getZoom());
+          setMapBearing(loadedMap.getBearing());
+
+          applyMapVisualStyle(loadedMap);
+
+          if (mapMode === "2.5d" && !hasAppliedInitial25DCameraRef.current) {
+            hasAppliedInitial25DCameraRef.current = true;
+            loadedMap.easeTo({
+              pitch: MAP_25D_DEFAULT_PITCH,
+              bearing: MAP_25D_DEFAULT_BEARING,
+              duration: 120,
+            });
+          }
+
+          const bounds = loadedMap.getBounds();
+          setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
+          setMapBounds({
+            west: bounds.getWest(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            north: bounds.getNorth(),
+          });
+        }}
+      >
+        <NavigationControl position="top-right" />
+
+        <MapDataLayers
+          visibleLayers={visibleLayers}
+          activeFloodData={activeFloodData}
+          mapMode={mapMode}
+          selectedId={selectedId}
+          hoveredId={hoveredId}
+        />
+
+        <RouteVisualLayers
+          routeCollection={routeCollection}
+          viewMode={viewMode}
+          safeProgress={safeProgress}
+          progressFadeStart={progressFadeStart}
+          remainingProgressEnd={remainingProgressEnd}
+        />
+
+        <MapFeatureOverlays
+          selectedFlood={selectedFlood}
+          selectedBuilding={selectedBuilding}
+          selectedDrainage={selectedDrainage}
+          selectedRiskZone={selectedRiskZone}
+          resetSelections={resetSelections}
+          activeRoute={activeRoute}
+          navCoordinate={navCoordinate}
+          navHeading={navHeading}
+          navMode={navMode}
+          mapLibreCar3D={mapLibreCar3D}
+          trafficCars={trafficCars}
+          mapZoom={mapZoom}
+          vehicleScaleMultiplier={vehicleScaleMultiplier}
+        />
+      </Map>
+
+      <NavigationHud
+        activeRoute={activeRoute}
+        routePayload={routePayload}
+        mapZoom={mapZoom}
+        visibleFloodLegend={visibleLayers.flood}
+        routePanelOpen={routePanelOpen}
+        setRoutePanelOpen={setRoutePanelOpen}
+        navProgress={navProgress}
+        navMode={navMode}
+        viewMode={viewMode}
+        mapLibreCar3D={mapLibreCar3D}
+        routeFromLabel={routeFromLabel}
+        routeToLabel={routeToLabel}
+        etaMinutes={etaMinutes}
+        distanceKm={distanceKm}
+        activeStepIndex={activeStepIndex}
+        isNavigating={isNavigating}
+        speedMultiplier={speedMultiplier}
+        availableSpeedMultipliers={availableSpeedMultipliers}
+        drawerMinimalMode={drawerMinimalMode}
+        navCoordinate={navCoordinate}
+        onToggleViewMode={handleToggleViewMode}
+        onToggleMapLibreCar3D={() => {
+          setMapLibreCar3D((prev) => !prev);
+          setViewMode("drive3d");
+        }}
+        onSwitchToCesium={handleSwitchToCesium}
+        onTogglePlayback={() => {
+          if (navProgress >= 1) seek(0);
+          togglePlayback();
+        }}
+        onSeek={seek}
+        onSetSpeed={setSpeedMultiplier}
+        onToggleMinimalMode={() => setDrawerMinimalMode((prev) => !prev)}
+        onReset={() => {
+          pause();
+          reset();
+          setRoutePanelOpen(false);
+          setDrawerMinimalMode(false);
+          onRouteClear();
+        }}
+        cameraTiltDeg={driveTiltDeg}
+        onCameraTiltChange={setDriveTiltDeg}
+        onFocusVehicle={() => {
+          if (!mapInstance || !navCoordinate) return;
+          mapInstance.easeTo({
+            center: navCoordinate,
+            bearing: 0,
+            duration: 320,
+          });
+        }}
+        onToggleTraffic={toggleTrafficVisualization}
+        mapBearing={mapBearing}
+      />
+
+      {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
+        <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">
+          Zoom ≥ {minZoomToRender} để hiện traffic thành phố
+        </div>
+      ) : null}
+
+      <div className="pointer-events-none absolute top-4 right-4 z-20 rounded-lg border border-white/70 bg-white/90 px-2.5 py-1 text-[11px] text-slate-600 shadow-sm">
+        Camera:{" "}
+        {cameraDistanceMeters ? `${Math.round(cameraDistanceMeters)} m` : "--"}
+      </div>
+    </div>
+  );
+}
