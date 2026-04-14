@@ -39,6 +39,20 @@ type UseAmbientTrafficInput = {
 
 const MIN_ZOOM_TO_RENDER = 13;
 
+function getTargetVehicleCount(
+  zoom: number,
+  density: TrafficDensity,
+  detailPreset: DetailPreset,
+) {
+  if (density === "off") return 0;
+
+  const byZoom = zoom >= 16.8 ? 180 : zoom >= 15 ? 130 : zoom >= 14 ? 80 : 24;
+  const densityFactor = density === "full" ? 1 : 0.58;
+  const detailFactor = detailPreset === "high" ? 1.06 : 1;
+
+  return Math.max(12, Math.round(byZoom * densityFactor * detailFactor));
+}
+
 export function useAmbientTraffic({
   routes,
   zoom,
@@ -54,64 +68,70 @@ export function useAmbientTraffic({
     zoom >= MIN_ZOOM_TO_RENDER &&
     routes.some((r) => r.length > 1);
 
-  const targetCount = useMemo(() => {
-    if (!shouldRender) return 0;
-
-    const multiplier = density === "full" ? 1 : 0.62;
-    const detailBoost = detailPreset === "high" ? 1.12 : 1;
-
-    const base =
-      zoom >= 17.2
-        ? 72
-        : zoom >= 16
-          ? 54
-          : zoom >= 15
-            ? 38
-            : zoom >= 14
-              ? 24
-              : 14;
-
-    return Math.max(8, Math.round(base * multiplier * detailBoost));
-  }, [detailPreset, density, shouldRender, zoom]);
+  const targetCount = useMemo(
+    () => getTargetVehicleCount(zoom, density, detailPreset),
+    [zoom, density, detailPreset],
+  );
 
   useEffect(() => {
-    if (!shouldRender || targetCount === 0) {
+    if (!shouldRender || targetCount <= 0 || !routes.length) {
       const frame = requestAnimationFrame(() =>
         setSeedVehicles((prev) => (prev.length ? [] : prev)),
       );
       return () => cancelAnimationFrame(frame);
     }
 
-    const frame = requestAnimationFrame(() =>
-      setSeedVehicles((prev) => {
-        const limitedPrev = prev.slice(0, targetCount);
-        if (limitedPrev.length === targetCount) return limitedPrev;
+    const frame = requestAnimationFrame(() => {
+      const usableRouteIndexes = routes
+        .map((route, index) => ({ route, index }))
+        .filter((item) => item.route.length > 2)
+        .slice(0, 48)
+        .map((item) => item.index);
 
-        const appended = Array.from(
-          { length: targetCount - limitedPrev.length },
-          (_, index) => {
-            const order = limitedPrev.length + index;
-            const lane = (order % 2) as 0 | 1;
-            const progressBand =
-              (((order * 0.071) % 1) + Math.random() * 0.02) % 1;
-            return {
-              id: `ambient-${order}`,
-              routeIndex: Math.floor(Math.random() * routes.length),
-              progress: progressBand,
-              lane,
-              speed: 0.012 + (order % 5) * 0.0025 + Math.random() * 0.003,
-              direction: (lane === 0 ? "forward" : "backward") as
-                | "forward"
-                | "backward",
-            };
-          },
-        );
+      if (!usableRouteIndexes.length) {
+        setSeedVehicles((prev) => (prev.length ? [] : prev));
+        return;
+      }
 
-        return [...limitedPrev, ...appended];
-      }),
-    );
+      const perDirection = Math.max(
+        1,
+        Math.floor(targetCount / (usableRouteIndexes.length * 2)),
+      );
+      const maxPerDirection = zoom >= 16 ? 4 : zoom >= 15 ? 3 : 2;
+      const vehiclesPerDirection = Math.min(maxPerDirection, perDirection);
+      const generated: SeedVehicle[] = [];
+
+      for (const routeIndex of usableRouteIndexes) {
+        for (const direction of ["forward", "backward"] as const) {
+          let progressCursor = Math.random() * 0.12;
+          for (let lane = 0 as 0 | 1; lane < 2; lane += 1) {
+            for (let slot = 0; slot < vehiclesPerDirection; slot += 1) {
+              const spacingMeters = 15 + Math.random() * 45;
+              const spacingProgress = spacingMeters / 1600;
+              progressCursor = (progressCursor + spacingProgress) % 1;
+
+              generated.push({
+                id: `ambient-${routeIndex}-${direction}-${lane}-${slot}`,
+                routeIndex,
+                progress: progressCursor,
+                lane,
+                speed: 0.0105 + Math.random() * 0.0045,
+                direction,
+              });
+              if (generated.length >= targetCount) break;
+            }
+            if (generated.length >= targetCount) break;
+          }
+          if (generated.length >= targetCount) break;
+        }
+        if (generated.length >= targetCount) break;
+      }
+
+      setSeedVehicles(generated);
+    });
+
     return () => cancelAnimationFrame(frame);
-  }, [routes.length, shouldRender, targetCount]);
+  }, [routes, shouldRender, targetCount, zoom]);
 
   useEffect(() => {
     if (!shouldRender || !seedVehicles.length) return;
@@ -129,46 +149,20 @@ export function useAmbientTraffic({
       const dt = elapsed / 1000;
       last = now;
 
-      setSeedVehicles((prev) => {
-        const moved = prev.map((vehicle, index) => {
-          const dir = vehicle.direction === "forward" ? 1 : -1;
-          const tempo = 0.85 + Math.sin(now * 0.00035 + index) * 0.15;
-          const nextProgressRaw =
-            vehicle.progress + vehicle.speed * dt * dir * tempo;
-          const wrapped = ((nextProgressRaw % 1) + 1) % 1;
-          return { ...vehicle, progress: wrapped };
-        });
+      setSeedVehicles((prev) =>
+        prev.map((vehicle, index) => {
+          const directionSign = vehicle.direction === "forward" ? 1 : -1;
+          const speedMultiplier = 0.8 + (index % 9) * 0.05;
+          const nextProgress =
+            vehicle.progress +
+            vehicle.speed * dt * directionSign * speedMultiplier;
 
-        const minGap = 0.014;
-        const grouped = new Map<string, SeedVehicle[]>();
-        moved.forEach((vehicle) => {
-          const key = `${vehicle.routeIndex}-${vehicle.direction}-${vehicle.lane}`;
-          const list = grouped.get(key);
-          if (list) list.push(vehicle);
-          else grouped.set(key, [vehicle]);
-        });
-
-        grouped.forEach((items) => {
-          items.sort((a, b) => a.progress - b.progress);
-          for (let index = 1; index < items.length; index += 1) {
-            const prevItem = items[index - 1];
-            const current = items[index];
-            if (current.progress - prevItem.progress < minGap) {
-              current.progress = (prevItem.progress + minGap) % 1;
-            }
-          }
-          if (items.length > 1) {
-            const first = items[0];
-            const lastItem = items[items.length - 1];
-            const wrappedGap = first.progress + 1 - lastItem.progress;
-            if (wrappedGap < minGap) {
-              first.progress = (lastItem.progress + minGap) % 1;
-            }
-          }
-        });
-
-        return moved;
-      });
+          return {
+            ...vehicle,
+            progress: ((nextProgress % 1) + 1) % 1,
+          };
+        }),
+      );
 
       frame = requestAnimationFrame(tick);
     };
@@ -193,7 +187,7 @@ export function useAmbientTraffic({
             ? normalizeBearing(sample.bearing)
             : normalizeBearing(sample.bearing + 180);
 
-        const laneOffset = vehicle.direction === "forward" ? 0.45 : -0.45;
+        const laneOffset = vehicle.direction === "forward" ? 0.38 : -0.38;
         const shifted = offsetRouteSample(
           { ...sample, bearing: directionalBearing },
           laneOffset,

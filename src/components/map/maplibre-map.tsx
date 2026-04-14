@@ -28,8 +28,6 @@ import {
   MAP_GLYPHS_FALLBACK,
   MAP_STYLE_2D,
   MAP_STYLE_25D,
-  TRAFFIC_MAX_SCALE,
-  TRAFFIC_MIN_SCALE,
 } from "@/lib/constants/map.constants";
 
 import { MapDataLayers } from "./map-data-layers";
@@ -394,29 +392,31 @@ export function MapLibreMap({
     return Array.from(deduped.values()).slice(0, cap);
   }, [ambientTraffic, mapBounds, mapZoom, trafficDensity]);
 
-  const vehicleScale = useMemo(() => {
-    const points: Array<[number, number]> = [
-      [11, TRAFFIC_MIN_SCALE],
-      [13, 1],
-      [15, 1.22],
-      [17, 1.42],
-      [19, TRAFFIC_MAX_SCALE],
-    ];
+  const vehicleScaleMultiplier = useMemo(() => {
+    const baseZoomScale =
+      mapZoom <= 11
+        ? 0.7
+        : mapZoom >= 18
+          ? 1.3
+          : mapZoom <= 15
+            ? 0.7 + ((mapZoom - 11) / 4) * 0.3
+            : 1 + ((mapZoom - 15) / 3) * 0.3;
 
-    if (mapZoom <= points[0][0]) return points[0][1];
-    if (mapZoom >= points[points.length - 1][0])
-      return points[points.length - 1][1];
+    const residentialWidth =
+      mapZoom <= 12
+        ? 1.2
+        : mapZoom >= 20
+          ? 12
+          : mapZoom <= 14
+            ? 1.2 + ((mapZoom - 12) / 2) * (2.5 - 1.2)
+            : mapZoom <= 16
+              ? 2.5 + ((mapZoom - 14) / 2) * (5 - 2.5)
+              : mapZoom <= 18
+                ? 5 + ((mapZoom - 16) / 2) * (8 - 5)
+                : 8 + ((mapZoom - 18) / 2) * (12 - 8);
 
-    for (let index = 0; index < points.length - 1; index += 1) {
-      const [z1, s1] = points[index];
-      const [z2, s2] = points[index + 1];
-      if (mapZoom < z1 || mapZoom > z2) continue;
-
-      const ratio = (mapZoom - z1) / (z2 - z1);
-      return s1 + (s2 - s1) * ratio;
-    }
-
-    return 1;
+    const roadWidthFactor = Math.min(1.2, Math.max(0.6, residentialWidth / 5));
+    return Math.min(1.6, Math.max(0.62, baseZoomScale * roadWidthFactor));
   }, [mapZoom]);
 
   useEffect(() => {
@@ -619,7 +619,8 @@ export function MapLibreMap({
           mapLibreCar3D={mapLibreCar3D}
           trafficCars={trafficCars}
           ambientTraffic={visibleAmbientTraffic}
-          mapZoom={mapZoom + (vehicleScale - 1) * 4.6}
+          mapZoom={mapZoom}
+          vehicleScaleMultiplier={vehicleScaleMultiplier}
         />
       </Map>
 

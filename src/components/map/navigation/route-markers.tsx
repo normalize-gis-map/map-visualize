@@ -26,6 +26,7 @@ type Props = {
     direction: "forward" | "backward";
   }>;
   mapZoom: number;
+  vehicleScaleMultiplier?: number;
 };
 
 function Vehicle3D({
@@ -63,12 +64,15 @@ export function RouteMarkers({
   trafficCars,
   ambientTraffic,
   mapZoom,
+  vehicleScaleMultiplier = 1,
 }: Props) {
   if (!coordinates.length && !ambientTraffic.length) return null;
 
   const start = coordinates[0];
   const end = coordinates[coordinates.length - 1];
-  const zoomScale = Math.min(2.6, Math.max(0.78, 0.8 + (mapZoom - 11) * 0.24));
+  const zoomScale =
+    Math.min(2, Math.max(0.64, 0.68 + (mapZoom - 11) * 0.16)) *
+    vehicleScaleMultiplier;
   const simplifiedTraffic = mapZoom < 13.6;
 
   return (

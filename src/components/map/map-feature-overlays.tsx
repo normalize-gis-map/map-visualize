@@ -39,6 +39,7 @@ type Props = {
     direction: "forward" | "backward";
   }>;
   mapZoom: number;
+  vehicleScaleMultiplier?: number;
 };
 
 function MapFeatureOverlaysImpl({
@@ -55,6 +56,7 @@ function MapFeatureOverlaysImpl({
   trafficCars,
   ambientTraffic,
   mapZoom,
+  vehicleScaleMultiplier,
 }: Props) {
   return (
     <>
@@ -159,6 +161,7 @@ function MapFeatureOverlaysImpl({
           trafficCars={trafficCars}
           ambientTraffic={ambientTraffic}
           mapZoom={mapZoom}
+          vehicleScaleMultiplier={vehicleScaleMultiplier}
         />
       ) : null}
     </>
