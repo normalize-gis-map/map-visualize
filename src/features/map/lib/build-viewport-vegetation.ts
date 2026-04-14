@@ -31,7 +31,8 @@ function getSpacingDeg(
   zoom: number,
   mode: GreenAreaRenderMode,
 ): { lng: number; lat: number } {
-  const baseSpacing = zoom >= 17 ? 0.00038 : zoom >= 15 ? 0.0005 : 0.00072;
+  const baseSpacing =
+    zoom >= 17 ? 0.00036 : zoom >= 16 ? 0.00046 : zoom >= 15 ? 0.00058 : 0.00078;
   const adjusted =
     mode === "grass_first"
       ? baseSpacing * 2.1
@@ -134,6 +135,13 @@ function getTreeBudget(
   detailPreset: "balanced" | "high",
   mode: GreenAreaRenderMode,
 ): number {
+  if (zoom < 16) {
+    const midBase = detailPreset === "high" ? 44 : 32;
+    if (mode === "dense_wooded") return Math.floor(midBase * 1.12);
+    if (mode === "park_trees") return midBase;
+    return 0;
+  }
+
   const base =
     zoom >= 17
       ? detailPreset === "high"
@@ -154,9 +162,25 @@ function getGlobalTreeBudget(
   zoom: number,
   detailPreset: "balanced" | "high",
 ): number {
+  if (zoom < 16) return detailPreset === "high" ? 56 : 40;
   if (zoom >= 17) return detailPreset === "high" ? 320 : 240;
   if (zoom >= 15) return detailPreset === "high" ? 200 : 150;
   return 90;
+}
+
+function readSemanticText(properties?: GeoJsonProperties): string {
+  if (!properties) return "";
+  return [properties.name, properties.class, properties.type, properties.leisure]
+    .filter((value) => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+}
+
+function isStrongTreeAreaSignal(properties?: GeoJsonProperties): boolean {
+  const text = readSemanticText(properties);
+  return /(park|garden|botanical|arboretum|wood|forest|reserve|waterfront)/i.test(
+    text,
+  );
 }
 
 function buildClusterCenters(
@@ -276,7 +300,7 @@ export function buildViewportVegetation(params: {
   detailPreset: "balanced" | "high";
 }): FeatureCollection {
   const { features, viewportBounds, mapZoom, detailPreset } = params;
-  if (mapZoom < 14) {
+  if (mapZoom < 13) {
     return { type: "FeatureCollection", features: [] };
   }
   const points: FeatureCollection["features"] = [];
@@ -298,7 +322,14 @@ export function buildViewportVegetation(params: {
         properties: feature.properties,
         outerRing,
       });
+      if (mapZoom < 16 && mode === "grass_first") continue;
+      if (mapZoom < 16 && mode === "park_trees") {
+        const semanticBoost = isStrongTreeAreaSignal(feature.properties);
+        if (!semanticBoost && unitFromStableHash(featureSeed, "midzoom-filter") < 0.55)
+          continue;
+      }
       const perPolygonBudget = getTreeBudget(mapZoom, detailPreset, mode);
+      if (perPolygonBudget <= 0) continue;
       let polygonTreeCount = 0;
 
       const polygonBounds = ringBounds(outerRing);
@@ -375,6 +406,12 @@ export function buildViewportVegetation(params: {
                   : mode === "dense_wooded"
                     ? 0.9 + unitFromStableHash(featureSeed, cellX, cellY, "scale") * 0.5
                     : 0.88 + unitFromStableHash(featureSeed, cellX, cellY, "scale") * 0.4,
+              treeTone:
+                unitFromStableHash(featureSeed, cellX, cellY, "tone") < 0.33
+                  ? "cool"
+                  : unitFromStableHash(featureSeed, cellX, cellY, "tone") < 0.66
+                    ? "neutral"
+                    : "warm",
             },
           });
           polygonTreeCount += 1;
