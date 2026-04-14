@@ -10,6 +10,7 @@ type Props = {
   onReset: () => void;
   onSetSpeed: (value: 0.5 | 1 | 2) => void;
   className?: string;
+  theme?: "dark" | "light";
 };
 
 export function ControlBoard({
@@ -22,20 +23,35 @@ export function ControlBoard({
   onReset,
   onSetSpeed,
   className,
+  theme = "dark",
 }: Props) {
+  const isLight = theme === "light";
   return (
-    <div className={className ?? "rounded-2xl border border-white/20 bg-slate-900/80 p-3 text-white backdrop-blur"}>
+    <div
+      className={
+        className ??
+        (isLight
+          ? "rounded-2xl border border-slate-200 bg-white p-3 text-slate-700"
+          : "rounded-2xl border border-white/20 bg-slate-900/80 p-3 text-white backdrop-blur")
+      }
+    >
       <div className="mb-2 flex items-center justify-between text-xs">
         <span>{Math.round(progress * 100)}%</span>
         <div className="flex items-center gap-1">
-          <Gauge className="h-3.5 w-3.5 text-cyan-200" />
+          <Gauge className={`h-3.5 w-3.5 ${isLight ? "text-blue-600" : "text-cyan-200"}`} />
           {availableSpeedMultipliers.map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => onSetSpeed(item)}
               className={`rounded-md px-2 py-1 ${
-                speedMultiplier === item ? "bg-cyan-300 text-slate-900" : "bg-white/15"
+                speedMultiplier === item
+                  ? isLight
+                    ? "bg-blue-600 text-white"
+                    : "bg-cyan-300 text-slate-900"
+                  : isLight
+                    ? "border border-slate-200 bg-slate-50"
+                    : "bg-white/15"
               }`}
             >
               {item}x
@@ -51,21 +67,25 @@ export function ControlBoard({
         step={0.01}
         value={progress}
         onChange={(event) => onSeek(Number(event.target.value))}
-        className="w-full accent-cyan-300"
+        className={`w-full ${isLight ? "accent-blue-600" : "accent-cyan-300"}`}
       />
 
       <div className="mt-2 flex gap-2">
         <button
           type="button"
           onClick={onTogglePlayback}
-          className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-900"
+          className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold ${
+            isLight ? "bg-blue-600 text-white" : "bg-cyan-400 text-slate-900"
+          }`}
         >
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </button>
         <button
           type="button"
           onClick={onReset}
-          className="flex items-center justify-center rounded-lg border border-white/30 px-3 py-2 text-sm"
+          className={`flex items-center justify-center rounded-lg px-3 py-2 text-sm ${
+            isLight ? "border border-slate-200 text-slate-600" : "border border-white/30"
+          }`}
         >
           <RotateCcw className="h-4 w-4" />
         </button>

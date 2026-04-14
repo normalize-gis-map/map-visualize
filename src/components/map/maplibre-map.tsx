@@ -107,6 +107,8 @@ export function MapLibreMap({
   const [ambientNetworkRoutes, setAmbientNetworkRoutes] = useState<Position[][]>([]);
   const programmaticMoveRef = useRef(false);
   const zoomPitchStateRef = useRef<"far" | "near" | null>(null);
+  const followTickRef = useRef(0);
+  const lastFollowCenterRef = useRef<[number, number] | null>(null);
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -319,6 +321,19 @@ export function MapLibreMap({
   };
   useEffect(() => {
     if (!mapInstance || !isNavigating || !navCoordinate) return;
+    const now = performance.now();
+    const minFollowInterval = viewMode === "drive3d" ? 140 : 220;
+    if (now - followTickRef.current < minFollowInterval) return;
+
+    const prevCenter = lastFollowCenterRef.current;
+    if (prevCenter) {
+      const deltaLng = Math.abs(prevCenter[0] - navCoordinate[0]);
+      const deltaLat = Math.abs(prevCenter[1] - navCoordinate[1]);
+      if (deltaLng < 0.00001 && deltaLat < 0.00001) return;
+    }
+
+    followTickRef.current = now;
+    lastFollowCenterRef.current = navCoordinate;
     programmaticMoveRef.current = true;
     mapInstance.once("moveend", () => {
       programmaticMoveRef.current = false;
@@ -341,8 +356,12 @@ export function MapLibreMap({
   useEffect(() => {
     if (!mapInstance || mapMode !== "2.5d" || viewMode === "drive3d") return;
 
-    const thresholdState: "far" | "near" =
-      cameraDistanceMeters !== null && cameraDistanceMeters <= 500 ? "near" : "far";
+    const currentState = zoomPitchStateRef.current ?? "far";
+    let thresholdState: "far" | "near" = currentState;
+    if (cameraDistanceMeters !== null) {
+      if (cameraDistanceMeters <= 450) thresholdState = "near";
+      if (cameraDistanceMeters >= 550) thresholdState = "far";
+    }
     if (zoomPitchStateRef.current === thresholdState) return;
     zoomPitchStateRef.current = thresholdState;
 
@@ -363,7 +382,7 @@ export function MapLibreMap({
         duration: 520,
       });
     }
-  }, [mapInstance, mapMode, viewMode, mapZoom, cameraDistanceMeters]);
+  }, [mapInstance, mapMode, viewMode, cameraDistanceMeters]);
 
   return (
     <div className="map-shell relative h-full w-full">
@@ -393,15 +412,35 @@ export function MapLibreMap({
           if (!programmaticMoveRef.current) notifyMapInteraction();
         }}
         onMove={(event) => {
-          setMapZoom(event.viewState.zoom);
+          if (Math.abs(event.viewState.zoom - mapZoom) > 0.01) {
+            setMapZoom(event.viewState.zoom);
+          }
           setMapBearing(event.viewState.bearing);
+        }}
+        onMoveEnd={(event) => {
           const bounds = event.target.getBounds();
-          setCameraDistanceMeters(estimateBoundsWidthMeters(bounds));
-          setMapBounds({
-            west: bounds.getWest(),
-            south: bounds.getSouth(),
-            east: bounds.getEast(),
-            north: bounds.getNorth(),
+          const nextDistance = estimateBoundsWidthMeters(bounds);
+          setCameraDistanceMeters((prev) => {
+            if (prev !== null && Math.abs(prev - nextDistance) < 10) return prev;
+            return nextDistance;
+          });
+          setMapBounds((prev) => {
+            const next = {
+              west: bounds.getWest(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              north: bounds.getNorth(),
+            };
+            if (
+              prev &&
+              Math.abs(prev.west - next.west) < 0.0001 &&
+              Math.abs(prev.south - next.south) < 0.0001 &&
+              Math.abs(prev.east - next.east) < 0.0001 &&
+              Math.abs(prev.north - next.north) < 0.0001
+            ) {
+              return prev;
+            }
+            return next;
           });
         }}
         onLoad={(e) => {

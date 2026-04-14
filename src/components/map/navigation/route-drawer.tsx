@@ -2,17 +2,14 @@ import {
   Bike,
   Car,
   Footprints,
-  Gauge,
   Map,
   Navigation,
-  Pause,
-  Play,
-  RotateCcw,
   Sparkles,
   Waypoints,
 } from "lucide-react";
 import { useState } from "react";
 
+import { ControlBoard } from "@/components/map/navigation/control-board";
 import type { RouteStep } from "@/features/map/types/route.types";
 
 type Props = {
@@ -120,57 +117,18 @@ export function RouteDrawer({
 
       {activeTab === "playback" ? (
         <>
-          <div className="mb-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2">
-            <button
-              type="button"
-              onClick={onTogglePlayback}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white"
-              aria-label={isNavigating ? "Pause navigation" : "Start navigation"}
-            >
-              {isNavigating ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </button>
-
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={navProgress}
-              onChange={(event) => onSeek(Number(event.target.value))}
-              className="h-1.5 w-full cursor-pointer accent-blue-600"
-              aria-label="Seek route playback"
-            />
-
-            <button
-              type="button"
-              onClick={onReset}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600"
-              aria-label="Reset navigation"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mb-2 flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 font-medium text-slate-600">
-              <Gauge className="h-3.5 w-3.5" />
-              {Math.round(navProgress * 100)}%
-            </span>
-            {availableSpeedMultipliers.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => onSetSpeed(item)}
-                className={`rounded-lg border px-2.5 py-1 font-semibold ${
-                  speedMultiplier === item
-                    ? "border-blue-300 bg-blue-50 text-blue-700"
-                    : "border-slate-200 text-slate-600"
-                }`}
-              >
-                {item}x
-              </button>
-            ))}
-          </div>
+          <ControlBoard
+            progress={navProgress}
+            isPlaying={isNavigating}
+            speedMultiplier={speedMultiplier}
+            availableSpeedMultipliers={availableSpeedMultipliers}
+            onSeek={onSeek}
+            onSetSpeed={onSetSpeed}
+            onTogglePlayback={onTogglePlayback}
+            onReset={onReset}
+            className="mb-2 rounded-xl border border-slate-200 bg-white p-2 text-slate-700"
+            theme="light"
+          />
         </>
       ) : (
         <>
