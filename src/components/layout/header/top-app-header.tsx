@@ -63,7 +63,7 @@ export function TopAppHeader({
   };
 
   return (
-    <header className="pointer-events-none absolute top-0 right-0 left-0 z-50 flex flex-col items-center px-3 pt-3 md:px-4 md:pt-4">
+    <header className="pointer-events-none absolute top-0 right-0 left-0 z-50 flex flex-col items-center px-3 pt-0 md:px-4">
       <div className="pointer-events-auto w-full max-w-[1320px]">
         <div className="flex h-16 items-center rounded-2xl border border-slate-200/12 bg-slate-950/78 px-4 shadow-[0_16px_36px_-24px_rgba(2,6,23,0.95)] backdrop-blur-2xl md:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -139,6 +139,31 @@ export function TopAppHeader({
 
             <UserMenu />
           </div>
+        </div>
+
+        <div className="mt-2 inline-flex w-full items-center rounded-xl border border-slate-700 bg-slate-950/82 p-1 sm:hidden">
+          <button
+            type="button"
+            onClick={() => setMode("view")}
+            className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+              activeMode === "view"
+                ? "bg-slate-100 text-slate-900"
+                : "text-slate-300"
+            }`}
+          >
+            View
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("route")}
+            className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition ${
+              activeMode === "route"
+                ? "bg-slate-100 text-slate-900"
+                : "text-slate-300"
+            }`}
+          >
+            Route
+          </button>
         </div>
 
         {activeMode === "route" ? (

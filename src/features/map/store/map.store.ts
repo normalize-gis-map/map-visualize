@@ -12,8 +12,12 @@ export type LayerKey =
 
 export type TrafficDensity = "off" | "light" | "full";
 export type DetailPreset = "balanced" | "high";
+export type TransportMode = "cars" | "boats" | "bike" | "people";
+export type WeatherMode = "sun" | "rain" | "snows";
+export type TimeMode = "live" | "night" | "morning" | "noon" | "evening";
 
 type VisibleLayers = Record<LayerKey, boolean>;
+type TransportVisibility = Record<TransportMode, boolean>;
 
 type MapUiStore = {
   mapMode: MapMode;
@@ -25,6 +29,9 @@ type MapUiStore = {
   laneDetailEnabled: boolean;
   routeAutoCameraEnabled: boolean;
   detailPreset: DetailPreset;
+  transportVisibility: TransportVisibility;
+  weatherMode: WeatherMode;
+  timeMode: TimeMode;
   setMapMode: (mode: MapMode) => void;
   setMapEngine: (engine: MapEngine) => void;
   toggleLayer: (layer: LayerKey) => void;
@@ -34,6 +41,9 @@ type MapUiStore = {
   setLaneDetailEnabled: (enabled: boolean) => void;
   setRouteAutoCameraEnabled: (enabled: boolean) => void;
   setDetailPreset: (preset: DetailPreset) => void;
+  toggleTransportMode: (mode: TransportMode) => void;
+  setWeatherMode: (mode: WeatherMode) => void;
+  setTimeMode: (mode: TimeMode) => void;
   mapInteractionTick: number;
   notifyMapInteraction: () => void;
   hasHydrated: boolean;
@@ -58,6 +68,14 @@ export const useMapStore = create<MapUiStore>()(
       laneDetailEnabled: true,
       routeAutoCameraEnabled: true,
       detailPreset: "balanced",
+      transportVisibility: {
+        cars: true,
+        boats: false,
+        bike: false,
+        people: false,
+      },
+      weatherMode: "rain",
+      timeMode: "live",
       mapInteractionTick: 0,
       hasHydrated: false,
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -85,6 +103,27 @@ export const useMapStore = create<MapUiStore>()(
       setRouteAutoCameraEnabled: (routeAutoCameraEnabled) =>
         set({ routeAutoCameraEnabled }),
       setDetailPreset: (detailPreset) => set({ detailPreset }),
+      toggleTransportMode: (mode) =>
+        set((state) => ({
+          transportVisibility: {
+            ...state.transportVisibility,
+            [mode]: !state.transportVisibility[mode],
+          },
+          trafficDensity:
+            mode === "cars"
+              ? state.transportVisibility.cars
+                ? "off"
+                : state.trafficDensity === "off"
+                  ? "light"
+                  : state.trafficDensity
+              : state.trafficDensity,
+          trafficVisualizationEnabled:
+            mode === "cars"
+              ? !state.transportVisibility.cars
+              : state.trafficVisualizationEnabled,
+        })),
+      setWeatherMode: (weatherMode) => set({ weatherMode }),
+      setTimeMode: (timeMode) => set({ timeMode }),
       notifyMapInteraction: () =>
         set((state) => ({ mapInteractionTick: state.mapInteractionTick + 1 })),
     }),
@@ -101,6 +140,9 @@ export const useMapStore = create<MapUiStore>()(
         laneDetailEnabled: state.laneDetailEnabled,
         routeAutoCameraEnabled: state.routeAutoCameraEnabled,
         detailPreset: state.detailPreset,
+        transportVisibility: state.transportVisibility,
+        weatherMode: state.weatherMode,
+        timeMode: state.timeMode,
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.mapMode === "2d") {

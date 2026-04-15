@@ -6,15 +6,21 @@ import {
   Car,
   Clock3,
   CloudRain,
+  CloudSnow,
   PanelLeftClose,
   PersonStanding,
   Sailboat,
   Sun,
-  Umbrella,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useFloodStore, type LayerKey } from "@/features/map/store/map.store";
+import {
+  useFloodStore,
+  type LayerKey,
+  type TimeMode,
+  type TransportMode,
+  type WeatherMode,
+} from "@/features/map/store/map.store";
 
 type LayerCatalogProps = {
   open: boolean;
@@ -22,9 +28,6 @@ type LayerCatalogProps = {
 };
 
 type CategoryId = "buildings" | "transportation" | "weather" | "time";
-type TransportMode = "cars" | "boats" | "bike" | "people";
-type WeatherMode = "sun" | "rain" | "snows";
-type TimeMode = "live" | "night" | "morning" | "noon" | "evening";
 
 const CATEGORY_ITEMS: Array<{
   id: CategoryId;
@@ -38,28 +41,28 @@ const CATEGORY_ITEMS: Array<{
     label: "Buildings",
     icon: <Building2 className="h-4 w-4" />,
     layerKey: "buildings",
-    description: "3D building visibility controls",
+    description: "Control 3D building visibility for the active scene.",
   },
   {
     id: "transportation",
     label: "Transportation",
     icon: <Car className="h-4 w-4" />,
     layerKey: "roads",
-    description: "Mobility overlays and transport filters",
+    description: "Enable mobility overlays by transportation type.",
   },
   {
     id: "weather",
     label: "Weather",
     icon: <CloudRain className="h-4 w-4" />,
     layerKey: "flood",
-    description: "Weather scenario and flood context",
+    description: "Apply weather mode to map tone and environment cues.",
   },
   {
     id: "time",
     label: "Time",
     icon: <Clock3 className="h-4 w-4" />,
     layerKey: "riskZones",
-    description: "Temporal display presets",
+    description: "Adjust time-of-day ambiance and exposure profile.",
   },
 ];
 
@@ -68,17 +71,13 @@ const TRANSPORT_OPTIONS: Array<{
   label: string;
   icon: React.ReactNode;
 }> = [
-  { id: "cars", label: "Cars", icon: <Car className="h-3.5 w-3.5" /> },
-  {
-    id: "boats",
-    label: "Boats",
-    icon: <Sailboat className="h-3.5 w-3.5" />,
-  },
-  { id: "bike", label: "Bike", icon: <Bike className="h-3.5 w-3.5" /> },
+  { id: "cars", label: "Cars", icon: <Car className="h-4 w-4" /> },
+  { id: "boats", label: "Boats", icon: <Sailboat className="h-4 w-4" /> },
+  { id: "bike", label: "Bike", icon: <Bike className="h-4 w-4" /> },
   {
     id: "people",
     label: "People",
-    icon: <PersonStanding className="h-3.5 w-3.5" />,
+    icon: <PersonStanding className="h-4 w-4" />,
   },
 ];
 
@@ -87,16 +86,18 @@ const WEATHER_OPTIONS: Array<{
   label: string;
   icon: React.ReactNode;
 }> = [
-  { id: "sun", label: "Sun", icon: <Sun className="h-3.5 w-3.5" /> },
-  { id: "rain", label: "Rain", icon: <Umbrella className="h-3.5 w-3.5" /> },
-  {
-    id: "snows",
-    label: "Snows",
-    icon: <CloudRain className="h-3.5 w-3.5" />,
-  },
+  { id: "sun", label: "Sun", icon: <Sun className="h-4 w-4" /> },
+  { id: "rain", label: "Rain", icon: <CloudRain className="h-4 w-4" /> },
+  { id: "snows", label: "Snows", icon: <CloudSnow className="h-4 w-4" /> },
 ];
 
-const TIME_OPTIONS: TimeMode[] = ["live", "night", "morning", "noon", "evening"];
+const TIME_OPTIONS: Array<{ id: TimeMode; label: string; icon: React.ReactNode }> = [
+  { id: "live", label: "Live", icon: <Clock3 className="h-4 w-4" /> },
+  { id: "night", label: "Night", icon: <CloudSnow className="h-4 w-4" /> },
+  { id: "morning", label: "Morning", icon: <Sun className="h-4 w-4" /> },
+  { id: "noon", label: "Noon", icon: <Sun className="h-4 w-4" /> },
+  { id: "evening", label: "Evening", icon: <CloudRain className="h-4 w-4" /> },
+];
 
 function FloatingToolbar({
   active,
@@ -107,7 +108,7 @@ function FloatingToolbar({
 }) {
   return (
     <div className="rounded-xl border border-slate-700/75 bg-slate-950/82 p-2 shadow-xl backdrop-blur-2xl">
-      <div className="flex flex-col gap-2 md:gap-1.5">
+      <div className="flex flex-col gap-1.5">
         {CATEGORY_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -129,29 +130,31 @@ function FloatingToolbar({
   );
 }
 
-function OptionChip({
+function OptionCard({
   active,
-  onClick,
   label,
   icon,
+  onClick,
 }: {
   active: boolean;
-  onClick: () => void;
   label: string;
-  icon?: React.ReactNode;
+  icon: React.ReactNode;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold transition ${
+      className={`flex h-16 items-center gap-2 rounded-xl border px-3 text-left text-xs font-semibold transition ${
         active
-          ? "border-cyan-300/60 bg-cyan-400/20 text-cyan-100"
+          ? "border-cyan-300/65 bg-cyan-400/20 text-cyan-100 shadow-[0_0_16px_-10px_rgba(34,211,238,1)]"
           : "border-slate-700 bg-slate-900/70 text-slate-200 hover:border-slate-500"
       }`}
     >
-      {icon}
-      {label}
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900/80">
+        {icon}
+      </span>
+      <span>{label}</span>
     </button>
   );
 }
@@ -163,114 +166,113 @@ function FloatingPanel({
   category: (typeof CATEGORY_ITEMS)[number];
   onClose: () => void;
 }) {
-  const { visibleLayers, toggleLayer, trafficDensity, setTrafficDensity } =
-    useFloodStore();
-  const [transportModes, setTransportModes] = useState<TransportMode[]>(["cars"]);
-  const [weatherMode, setWeatherMode] = useState<WeatherMode>("rain");
-  const [timeMode, setTimeMode] = useState<TimeMode>("live");
+  const {
+    visibleLayers,
+    toggleLayer,
+    transportVisibility,
+    toggleTransportMode,
+    weatherMode,
+    setWeatherMode,
+    timeMode,
+    setTimeMode,
+  } = useFloodStore();
+
   const active = visibleLayers[category.layerKey];
-
-  const toggleTransportMode = (mode: TransportMode) => {
-    setTransportModes((prev) =>
-      prev.includes(mode) ? prev.filter((item) => item !== mode) : [...prev, mode],
-    );
-
-    if (mode === "cars") {
-      setTrafficDensity(
-        transportModes.includes("cars") ? "off" : trafficDensity === "off" ? "light" : trafficDensity,
-      );
-    }
-  };
 
   const renderCategoryContent = () => {
     if (category.id === "buildings") {
       return (
-        <>
-          <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
-          <OptionChip
-            active={active}
+        <div className="space-y-3">
+          <p className="text-xs leading-5 text-slate-400">{category.description}</p>
+          <button
+            type="button"
             onClick={() => toggleLayer(category.layerKey)}
-            label={active ? "Visible" : "Hidden"}
-            icon={<Building2 className="h-3.5 w-3.5" />}
-          />
-          <p className="mt-3 text-[11px] text-slate-500">
-            Additional building controls can be connected here later.
-          </p>
-        </>
+            className={`flex h-12 w-full items-center justify-center rounded-xl border text-sm font-semibold transition ${
+              active
+                ? "border-cyan-300/65 bg-cyan-400/20 text-cyan-100"
+                : "border-slate-700 bg-slate-900/70 text-slate-200"
+            }`}
+          >
+            {active ? "Buildings: Visible" : "Buildings: Hidden"}
+          </button>
+        </div>
       );
     }
 
     if (category.id === "transportation") {
       return (
-        <>
-          <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="space-y-3">
+          <p className="text-xs leading-5 text-slate-400">{category.description}</p>
+          <div className="grid grid-cols-2 gap-2">
             {TRANSPORT_OPTIONS.map((option) => (
-              <OptionChip
+              <OptionCard
                 key={option.id}
-                active={transportModes.includes(option.id)}
-                onClick={() => toggleTransportMode(option.id)}
+                active={transportVisibility[option.id]}
                 label={option.label}
                 icon={option.icon}
+                onClick={() => toggleTransportMode(option.id)}
               />
             ))}
           </div>
-        </>
+        </div>
       );
     }
 
     if (category.id === "weather") {
       return (
-        <>
-          <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="space-y-3">
+          <p className="text-xs leading-5 text-slate-400">{category.description}</p>
+          <div className="grid grid-cols-3 gap-2">
             {WEATHER_OPTIONS.map((option) => (
-              <OptionChip
+              <OptionCard
                 key={option.id}
                 active={weatherMode === option.id}
-                onClick={() => {
-                  setWeatherMode(option.id);
-                  toggleLayer(category.layerKey);
-                }}
                 label={option.label}
                 icon={option.icon}
+                onClick={() => {
+                  setWeatherMode(option.id);
+                  if (!visibleLayers.flood) {
+                    toggleLayer("flood");
+                  }
+                }}
               />
             ))}
           </div>
-        </>
+        </div>
       );
     }
 
     return (
-      <>
-        <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
-        <div className="flex flex-wrap gap-2">
+      <div className="space-y-3">
+        <p className="text-xs leading-5 text-slate-400">{category.description}</p>
+        <div className="grid grid-cols-2 gap-2">
           {TIME_OPTIONS.map((option) => (
-            <OptionChip
-              key={option}
-              active={timeMode === option}
+            <OptionCard
+              key={option.id}
+              active={timeMode === option.id}
+              label={option.label}
+              icon={option.icon}
               onClick={() => {
-                setTimeMode(option);
-                if (!visibleLayers[category.layerKey]) {
-                  toggleLayer(category.layerKey);
+                setTimeMode(option.id);
+                if (!visibleLayers.riskZones) {
+                  toggleLayer("riskZones");
                 }
               }}
-              label={option[0].toUpperCase() + option.slice(1)}
             />
           ))}
         </div>
-      </>
+      </div>
     );
   };
 
   return (
-    <div className="w-[248px] rounded-xl border border-slate-700/75 bg-slate-950/86 p-3 shadow-2xl backdrop-blur-2xl">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className="w-[280px] rounded-xl border border-slate-700/75 bg-slate-950/88 p-3.5 shadow-2xl backdrop-blur-2xl sm:w-[300px]">
+      <div className="mb-3 flex items-start justify-between gap-2 border-b border-slate-700/70 pb-3">
         <div>
-          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-            Layer
+          <p className="text-[10px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
+            Control Group
           </p>
-          <h2 className="text-sm font-semibold text-white">{category.label}</h2>
+          <h2 className="text-base font-semibold text-white">{category.label}</h2>
         </div>
         <button
           type="button"
@@ -321,7 +323,7 @@ export function LayerCatalog({ open, onToggle }: LayerCatalogProps) {
       ) : null}
 
       {open ? (
-        <div className="fixed inset-x-3 bottom-16 z-40 md:hidden">
+        <div className="fixed inset-x-2 bottom-16 z-40 md:hidden">
           <FloatingPanel category={selectedCategory} onClose={onToggle} />
         </div>
       ) : null}
