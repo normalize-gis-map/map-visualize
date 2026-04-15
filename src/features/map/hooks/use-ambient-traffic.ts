@@ -47,6 +47,8 @@ type UseAmbientTrafficInput = {
   enabled: boolean;
   density: TrafficDensity;
   detailPreset: DetailPreset;
+  densityMultiplier?: number;
+  speedMultiplier?: number;
 };
 
 const MIN_ZOOM_TO_RENDER = 11.6;
@@ -177,6 +179,8 @@ export function useAmbientTraffic({
   enabled,
   density,
   detailPreset,
+  densityMultiplier = 1,
+  speedMultiplier = 1,
 }: UseAmbientTrafficInput) {
   const [simulationClock, setSimulationClock] = useState(0);
 
@@ -187,8 +191,8 @@ export function useAmbientTraffic({
     routes.some((r) => r.coordinates.length > 1);
 
   const targetCount = useMemo(
-    () => getTargetVehicleCount(zoom, density, detailPreset),
-    [zoom, density, detailPreset],
+    () => Math.max(0, Math.round(getTargetVehicleCount(zoom, density, detailPreset) * densityMultiplier)),
+    [zoom, density, densityMultiplier, detailPreset],
   );
 
   const streamVehicles = useMemo<StreamVehicle[]>(() => {
@@ -327,7 +331,7 @@ export function useAmbientTraffic({
           directionSign * baseLaneOffset +
           (vehicle.laneVariant === 1 ? directionSign * laneSpread : 0);
         const baseSpeed = 0.0095;
-        const progressShift = simulationClock * baseSpeed * vehicle.speedFactor;
+        const progressShift = simulationClock * baseSpeed * vehicle.speedFactor * speedMultiplier;
         const progress = ((vehicle.baseProgress + progressShift) % 1 + 1) % 1;
         const nextSample = sampleRouteAtProgress(route, progress);
         if (!nextSample) return null;
@@ -348,7 +352,7 @@ export function useAmbientTraffic({
         };
       })
       .filter((item): item is AmbientTrafficVehicle => Boolean(item));
-  }, [routes, shouldRender, simulationClock, streamVehicles, zoom]);
+  }, [routes, shouldRender, simulationClock, speedMultiplier, streamVehicles, zoom]);
 
   return { vehicles, minZoomToRender: MIN_ZOOM_TO_RENDER };
 }

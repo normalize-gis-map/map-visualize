@@ -21,7 +21,15 @@ import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
-import { buildBuildingShadows } from "@/features/map/lib/buildings/building-shadows";
+import {
+  buildBuildingShadows,
+  type ShadowSceneTuning,
+} from "@/features/map/lib/buildings/building-shadows";
+import { SceneController } from "@/features/map/lib/scene/scene-controller";
+import { computeSceneProfile, type SceneProfile } from "@/features/map/lib/scene/scene-profile";
+import { applySceneLighting } from "@/features/map/lib/scene/scene-sync-light";
+import { deriveTrafficSceneTuning } from "@/features/map/lib/scene/scene-sync-traffic";
+import { buildWaterSceneContext } from "@/features/map/lib/scene/scene-sync-water";
 import { applyMapStyle } from "@/features/map/lib/style/apply-map-style";
 import { buildAmbientTrafficSource } from "@/features/map/lib/traffic/build-ambient-traffic-source";
 import { buildBoatEntities } from "@/features/map/lib/transport/boat-entities";
@@ -31,7 +39,6 @@ import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewpor
 import { createWaterCustomLayer } from "@/features/map/lib/water/water-custom-layer";
 import { ensureWaterLayerOrder } from "@/features/map/lib/water/water-layer-order";
 import { extractBoatSamples } from "@/features/map/lib/water/water-wake-system";
-import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 import { WeatherOverlay } from "@/features/map/ui/weather-overlay";
@@ -119,6 +126,9 @@ export function MapLibreMap({
     east: number;
     north: number;
   } | null>(null);
+  const [sceneUiProfile, setSceneUiProfile] = useState(() =>
+    computeSceneProfile(timeMode, weatherMode),
+  );
   const [cameraDistanceMeters, setCameraDistanceMeters] = useState<
     number | null
   >(null);
@@ -140,8 +150,18 @@ export function MapLibreMap({
   useBuildingLayer(mapInstance, visibleLayers.buildings, timeMode);
 
   useEffect(() => {
+    if (!sceneControllerRef.current) {
+      sceneControllerRef.current = new SceneController(timeMode, weatherMode);
+      sceneProfileRef.current = sceneControllerRef.current.getProfile();
+    }
+
+    sceneControllerRef.current.setModes(timeMode, weatherMode);
+    const nextProfile = sceneControllerRef.current.tick();
+    sceneProfileRef.current = nextProfile;
+    setSceneUiProfile(nextProfile);
+
     if (!mapInstance) return;
-    const apply = () => applySceneStyle(mapInstance, weatherMode, timeMode);
+    const apply = () => applySceneLighting(mapInstance, nextProfile);
     apply();
     mapInstance.on("style.load", apply);
     return () => {
@@ -204,6 +224,8 @@ export function MapLibreMap({
   const transportPhaseRef = useRef(0);
   const visibleWaterFeaturesRef = useRef<FeatureCollection["features"]>([]);
   const waterCustomLayerRef = useRef<ReturnType<typeof createWaterCustomLayer> | null>(null);
+  const sceneControllerRef = useRef<SceneController | null>(null);
+  const sceneProfileRef = useRef<SceneProfile>(computeSceneProfile(timeMode, weatherMode));
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -527,12 +549,16 @@ export function MapLibreMap({
           []),
     [ambientNetworkRoutes, routePayload],
   );
+  const trafficTuning = deriveTrafficSceneTuning(sceneUiProfile);
+
   const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
     routes: ambientRoutes,
     zoom: mapZoom,
     enabled: trafficVisualizationEnabled,
     density: trafficDensity,
     detailPreset,
+    densityMultiplier: trafficTuning.densityMultiplier,
+    speedMultiplier: trafficTuning.speedMultiplier,
   });
   const visibleAmbientTraffic = useMemo(() => {
     if (!mapBounds) return ambientTraffic;
@@ -801,7 +827,15 @@ export function MapLibreMap({
           );
         } catch {}
       }
-      waterCustomLayerRef.current?.setSceneContext({ weatherMode, timeMode });
+      const profile = sceneControllerRef.current?.tick() ?? sceneProfileRef.current;
+      if (profile) {
+        sceneProfileRef.current = profile;
+        setSceneUiProfile(profile);
+        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode));
+        applySceneLighting(mapInstance, profile);
+        const mapContainer = mapInstance.getContainer();
+        mapContainer.style.filter = `contrast(${profile.contrast.toFixed(3)}) saturate(${profile.saturation.toFixed(3)})`;
+      }
       ensureWaterLayerOrder(mapInstance, "map-water-custom-layer");
 
       if (waterLayerIds.length) {
@@ -887,7 +921,15 @@ export function MapLibreMap({
         const buildingFeatures = mapInstance.queryRenderedFeatures(queryBox, {
           layers: buildingLayerIds.slice(0, 3),
         });
-        const shadowData = buildBuildingShadows(buildingFeatures, timeMode);
+        const shadowProfile = sceneProfileRef.current;
+        const shadowTuning: ShadowSceneTuning | undefined = shadowProfile
+          ? {
+              lightDirection: shadowProfile.lightDirection,
+              shadowLength: shadowProfile.shadowLength,
+              shadowSoftness: shadowProfile.shadowSoftness,
+            }
+          : undefined;
+        const shadowData = buildBuildingShadows(buildingFeatures, timeMode, 220, shadowTuning);
         const shadowSource = mapInstance.getSource(buildingShadowSourceId) as
           | maplibregl.GeoJSONSource
           | undefined;
@@ -1195,7 +1237,17 @@ export function MapLibreMap({
 
     let phase = 0;
     const interval = window.setInterval(() => {
-      phase += 0.23;
+      const profile = sceneControllerRef.current?.tick() ?? sceneProfileRef.current;
+      if (profile) {
+        sceneProfileRef.current = profile;
+        setSceneUiProfile(profile);
+        const traffic = deriveTrafficSceneTuning(profile);
+        phase += 0.23 * traffic.speedMultiplier;
+        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode));
+        applySceneLighting(mapInstance, profile);
+      } else {
+        phase += 0.23;
+      }
       transportPhaseRef.current = phase;
 
       try {
@@ -1207,7 +1259,7 @@ export function MapLibreMap({
             buildTransportEntities({
               phase: transportPhaseRef.current,
               zoom: mapZoom,
-              routes: ambientRoutes,
+              routes: ambientRoutes.slice(0, Math.max(8, Math.floor(ambientRoutes.length * (sceneProfileRef.current?.trafficDensityMultiplier ?? 1)))),
               bounds: mapBounds,
               transportVisibility,
             }),
@@ -1239,6 +1291,8 @@ export function MapLibreMap({
     mapZoom,
     transportVisibility,
     transportEntitySourceId,
+    timeMode,
+    weatherMode,
   ]);
 
   useEffect(() => {
@@ -1552,7 +1606,7 @@ export function MapLibreMap({
         mapBearing={mapBearing}
       />
 
-      <WeatherOverlay weather={weatherMode} intensity="medium" />
+      <WeatherOverlay weather={weatherMode} intensity={sceneUiProfile.weatherParticleIntensity} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
         <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">

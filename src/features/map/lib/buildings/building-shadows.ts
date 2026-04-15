@@ -13,6 +13,12 @@ type ShadowPreset = {
   strength: number;
 };
 
+export type ShadowSceneTuning = {
+  lightDirection: [number, number];
+  shadowLength: number;
+  shadowSoftness: number;
+};
+
 function getShadowPreset(timeMode: TimeMode): ShadowPreset {
   if (timeMode === "morning") {
     return { offsetLngPerMeter: 0.0000019, offsetLatPerMeter: -0.0000012, strength: 0.34 };
@@ -79,8 +85,16 @@ export function buildBuildingShadows(
   features: BuildingFeature[],
   timeMode: TimeMode,
   maxFeatures = 220,
+  sceneTuning?: ShadowSceneTuning,
 ): FeatureCollection {
-  const preset = getShadowPreset(timeMode);
+  const basePreset = getShadowPreset(timeMode);
+  const preset: ShadowPreset = sceneTuning
+    ? {
+        offsetLngPerMeter: basePreset.offsetLngPerMeter * sceneTuning.shadowLength * sceneTuning.lightDirection[0],
+        offsetLatPerMeter: basePreset.offsetLatPerMeter * sceneTuning.shadowLength * Math.abs(sceneTuning.lightDirection[1]),
+        strength: basePreset.strength * (1 - sceneTuning.shadowSoftness * 0.45),
+      }
+    : basePreset;
 
   const shadowFeatures = features.slice(0, maxFeatures).flatMap((feature) => {
     const geometry = feature.geometry;

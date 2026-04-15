@@ -28,6 +28,11 @@ type Uniforms = {
   highlightColor: WebGLUniformLocation | null;
   weatherMode: WebGLUniformLocation | null;
   timeMode: WebGLUniformLocation | null;
+  skyReflectionColor: WebGLUniformLocation | null;
+  lightDirection: WebGLUniformLocation | null;
+  specularStrength: WebGLUniformLocation | null;
+  flowSpeed: WebGLUniformLocation | null;
+  reflectionStrength: WebGLUniformLocation | null;
   wakes: WebGLUniformLocation | null;
 };
 
@@ -76,7 +81,15 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
   let positionLocation = -1;
   let uniforms: Uniforms | null = null;
   let flowDirection: [number, number] = DEFAULT_WATER_SHADER_CONFIG.flowDirection;
-  let sceneContext: WaterSceneContext = { weatherMode: "sun", timeMode: "live" };
+  let sceneContext: WaterSceneContext = {
+    weatherMode: "sun",
+    timeMode: "live",
+    skyReflectionColor: [0.74, 0.86, 0.98],
+    lightDirection: [0.2, -0.9],
+    specularStrength: 0.7,
+    flowSpeed: 1,
+    reflectionStrength: 0.8,
+  };
   const wakeSystem = new WaterWakeSystem(MAX_WATER_WAKES);
   const wakeUniformBuffer = new Float32Array(MAX_WATER_WAKES * 4);
 
@@ -124,6 +137,11 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
         highlightColor: glContext.getUniformLocation(program, "u_highlight_color"),
         weatherMode: glContext.getUniformLocation(program, "u_weatherMode"),
         timeMode: glContext.getUniformLocation(program, "u_timeMode"),
+        skyReflectionColor: glContext.getUniformLocation(program, "u_skyReflectionColor"),
+        lightDirection: glContext.getUniformLocation(program, "u_lightDirection"),
+        specularStrength: glContext.getUniformLocation(program, "u_specularStrength"),
+        flowSpeed: glContext.getUniformLocation(program, "u_flowSpeed"),
+        reflectionStrength: glContext.getUniformLocation(program, "u_reflectionStrength"),
         wakes: glContext.getUniformLocation(program, "u_wakes"),
       };
 
@@ -158,6 +176,16 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
       );
       glContext.uniform1f(uniforms.weatherMode, weatherModeToNumber(sceneContext.weatherMode));
       glContext.uniform1f(uniforms.timeMode, timeModeToNumber(sceneContext.timeMode));
+      glContext.uniform3f(
+        uniforms.skyReflectionColor,
+        sceneContext.skyReflectionColor[0],
+        sceneContext.skyReflectionColor[1],
+        sceneContext.skyReflectionColor[2],
+      );
+      glContext.uniform2f(uniforms.lightDirection, sceneContext.lightDirection[0], sceneContext.lightDirection[1]);
+      glContext.uniform1f(uniforms.specularStrength, sceneContext.specularStrength);
+      glContext.uniform1f(uniforms.flowSpeed, sceneContext.flowSpeed);
+      glContext.uniform1f(uniforms.reflectionStrength, sceneContext.reflectionStrength);
       glContext.uniform4fv(uniforms.wakes, wakeUniformBuffer);
 
       glContext.enable(glContext.BLEND);

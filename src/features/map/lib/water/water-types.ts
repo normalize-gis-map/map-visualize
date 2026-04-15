@@ -38,6 +38,11 @@ export type WakeState = {
 export type WaterSceneContext = {
   weatherMode: WeatherMode;
   timeMode: TimeMode;
+  skyReflectionColor: [number, number, number];
+  lightDirection: [number, number];
+  specularStrength: number;
+  flowSpeed: number;
+  reflectionStrength: number;
 };
 
 export type WaterCustomLayer = maplibregl.CustomLayerInterface & {
