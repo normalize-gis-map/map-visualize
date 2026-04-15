@@ -31,6 +31,7 @@ import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewpor
 import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
+import { WaterOverlay } from "@/features/map/ui/water-overlay";
 import { WeatherOverlay } from "@/features/map/ui/weather-overlay";
 import { NavigationHud } from "@/features/navigation/components/navigation-hud";
 import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
@@ -1208,36 +1209,7 @@ export function MapLibreMap({
             }),
           );
         }
-        const shimmer = 0.91 + Math.sin(phase * 0.7) * 0.05;
-        const brightness = Math.max(140, Math.min(176, Math.round(158 * shimmer)));
-        const mid = Math.max(122, Math.min(164, Math.round(146 * shimmer)));
-        const deep = Math.max(108, Math.min(152, Math.round(132 * shimmer)));
-
-        for (const layerId of waterLayerIds) {
-          if (!mapInstance.getLayer(layerId)) continue;
-          mapInstance.setPaintProperty(layerId, "fill-color", [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            8,
-            `rgb(${deep - 18}, ${mid - 12}, ${brightness - 8})`,
-            13,
-            `rgb(${deep}, ${mid}, ${brightness})`,
-            17,
-            `rgb(${deep - 6}, ${mid - 4}, ${brightness - 3})`,
-          ]);
-          mapInstance.setPaintProperty(layerId, "fill-opacity", [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            8,
-            0.88,
-            13,
-            0.92,
-            17,
-            0.95,
-          ]);
-        }
+        if (!waterLayerIds.length) return;
       } catch {}
     }, 280);
 
@@ -1564,6 +1536,7 @@ export function MapLibreMap({
       />
 
       <WeatherOverlay weather={weatherMode} intensity="medium" />
+      <WaterOverlay map={mapInstance} enabled={mapMode !== "2d"} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
         <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">
