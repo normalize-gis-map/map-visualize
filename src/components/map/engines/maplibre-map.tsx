@@ -28,10 +28,11 @@ import { buildBoatEntities } from "@/features/map/lib/transport/boat-entities";
 import { buildTransportEntities } from "@/features/map/lib/transport/transport-entities";
 import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-viewport-vegetation";
 import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
+import { createWaterCustomLayer } from "@/features/map/lib/water/water-custom-layer";
+import { ensureWaterLayerOrder } from "@/features/map/lib/water/water-layer-order";
 import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
-import { WaterOverlay } from "@/features/map/ui/water-overlay";
 import { WeatherOverlay } from "@/features/map/ui/weather-overlay";
 import { NavigationHud } from "@/features/navigation/components/navigation-hud";
 import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
@@ -201,7 +202,7 @@ export function MapLibreMap({
   const mapPointerDownRef = useRef(false);
   const transportPhaseRef = useRef(0);
   const visibleWaterFeaturesRef = useRef<FeatureCollection["features"]>([]);
-  const nativeWaterLayerIdsRef = useRef<string[]>([]);
+  const waterCustomLayerRef = useRef<ReturnType<typeof createWaterCustomLayer> | null>(null);
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -777,7 +778,6 @@ export function MapLibreMap({
           )
           .map((layer) => layer.id)
           .slice(0, 4) ?? [];
-      nativeWaterLayerIdsRef.current = waterLayerIds;
       const firstRoadBridgeLayerId = style.layers?.find((layer) =>
         /(bridge|road|street|highway)/i.test(layer.id),
       )?.id;
@@ -789,6 +789,18 @@ export function MapLibreMap({
           } catch {}
         });
       }
+      if (!waterCustomLayerRef.current) {
+        waterCustomLayerRef.current = createWaterCustomLayer("map-water-custom-layer");
+      }
+      if (!mapInstance.getLayer("map-water-custom-layer")) {
+        try {
+          mapInstance.addLayer(
+            waterCustomLayerRef.current as maplibregl.CustomLayerInterface,
+            firstRoadBridgeLayerId,
+          );
+        } catch {}
+      }
+      ensureWaterLayerOrder(mapInstance, "map-water-custom-layer");
 
       if (waterLayerIds.length) {
         const waterFeatures = mapInstance.queryRenderedFeatures(queryBox, {
@@ -796,6 +808,7 @@ export function MapLibreMap({
         });
         const waterData = buildViewportWaterEffect(waterFeatures);
         visibleWaterFeaturesRef.current = waterData.features;
+        waterCustomLayerRef.current?.setWaterFeatures(waterData.features as any);
 
         const boatData = buildBoatEntities({
           waterFeatures: waterData.features,
@@ -817,6 +830,7 @@ export function MapLibreMap({
         }
       } else {
         visibleWaterFeaturesRef.current = [];
+        waterCustomLayerRef.current?.setWaterFeatures([]);
       }
 
       const parkLayerIds =
@@ -1176,7 +1190,6 @@ export function MapLibreMap({
 
     let phase = 0;
     const interval = window.setInterval(() => {
-      const waterLayerIds = nativeWaterLayerIdsRef.current;
       phase += 0.23;
       transportPhaseRef.current = phase;
 
@@ -1209,7 +1222,6 @@ export function MapLibreMap({
             }),
           );
         }
-        if (!waterLayerIds.length) return;
       } catch {}
     }, 280);
 
@@ -1536,7 +1548,6 @@ export function MapLibreMap({
       />
 
       <WeatherOverlay weather={weatherMode} intensity="medium" />
-      <WaterOverlay map={mapInstance} enabled={mapMode !== "2d"} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
         <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">
