@@ -74,6 +74,25 @@ function createProgram(gl: WebGLRenderingContext) {
   return program;
 }
 
+
+function extractProjectionMatrix(input: unknown): Float32Array | null {
+  if (!input) return null;
+
+  const candidate =
+    (input as { modelViewProjectionMatrix?: unknown }).modelViewProjectionMatrix ??
+    (input as { defaultProjectionData?: { mainMatrix?: unknown; projectionMatrix?: unknown } }).defaultProjectionData
+      ?.mainMatrix ??
+    (input as { defaultProjectionData?: { projectionMatrix?: unknown } }).defaultProjectionData?.projectionMatrix ??
+    (input as { matrix?: unknown }).matrix ??
+    input;
+
+  if (candidate instanceof Float32Array) return candidate;
+  if (Array.isArray(candidate) || ArrayBuffer.isView(candidate)) {
+    return new Float32Array(candidate as Iterable<number>);
+  }
+
+  return null;
+}
 export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
   let map: maplibregl.Map | null = null;
   let gl: WebGLRenderingContext | null = null;
@@ -99,6 +118,7 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
     lodDetailFactor: 1,
   };
   const wakeSystem = new WaterWakeSystem(MAX_WATER_WAKES);
+  let hasLoggedMatrixShape = false;
   const wakeUniformBuffer = new Float32Array(MAX_WATER_WAKES * 4);
 
   const setWaterFeatures = (features: WaterFeature[]) => {
@@ -160,8 +180,17 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
       glContext.bindBuffer(glContext.ARRAY_BUFFER, buffer);
       glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array(), glContext.DYNAMIC_DRAW);
     },
-    render(glContext, matrix) {
+    render(glContext, renderInput) {
       if (!program || !buffer || !uniforms || vertexCount < 3 || positionLocation < 0) return;
+
+      const safeMatrix = extractProjectionMatrix(renderInput);
+      if (!safeMatrix) {
+        if (!hasLoggedMatrixShape) {
+          console.debug("[water-custom-layer] Unexpected render input; could not extract projection matrix", renderInput);
+          hasLoggedMatrixShape = true;
+        }
+        return;
+      }
 
       const now = performance.now();
       wakeSystem.step((now - prevFrame) / 1000);
@@ -174,7 +203,7 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
       glContext.vertexAttribPointer(positionLocation, 2, glContext.FLOAT, false, 0, 0);
 
       const config = DEFAULT_WATER_SHADER_CONFIG;
-      glContext.uniformMatrix4fv(uniforms.matrix, false, matrix as unknown as Float32Array);
+      glContext.uniformMatrix4fv(uniforms.matrix, false, safeMatrix);
       glContext.uniform1f(uniforms.time, animationTimeSeconds(startTime));
       glContext.uniform1f(uniforms.opacity, config.opacity);
       glContext.uniform1f(uniforms.rippleScale, config.rippleScale);
