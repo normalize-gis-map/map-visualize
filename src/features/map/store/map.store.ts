@@ -52,7 +52,7 @@ export const useMapStore = create<MapUiStore>()(
         roads: false,
         riskZones: false,
       },
-      buildingOpacity: 0.9,
+      buildingOpacity: 1,
       trafficVisualizationEnabled: true,
       trafficDensity: "light",
       laneDetailEnabled: true,
@@ -105,6 +105,9 @@ export const useMapStore = create<MapUiStore>()(
       onRehydrateStorage: () => (state) => {
         if (state?.mapMode === "2d") {
           state.setMapMode("2.5d");
+        }
+        if (state && state.buildingOpacity !== 1) {
+          state.setBuildingOpacity(1);
         }
         state?.setHasHydrated(true);
       },

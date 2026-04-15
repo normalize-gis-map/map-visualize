@@ -8,7 +8,6 @@ import { DashboardRightInspector } from "@/components/dashboard/dashboard-right-
 import { TopAppHeader } from "@/components/layout/header/top-app-header";
 import { MapEngineContainer } from "@/components/map/engines/map-engine-container";
 import type { PlaceItem } from "@/data/places";
-import { AlertDrawer } from "@/features/flood/components/alert-drawer";
 import { useFloodData } from "@/features/flood/hooks/use-flood-data";
 import { LayerCatalog } from "@/features/map/components/controls/layer-catalog";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -68,17 +67,6 @@ export function DashboardShell() {
             onToggle={() => setCatalogOpen((prev) => !prev)}
           />
         </DashboardLeftRail>
-
-        <div className="pointer-events-none absolute right-3 bottom-4 left-3 z-30 flex justify-end md:right-5 md:bottom-6 md:left-auto">
-          <div className="pointer-events-auto w-full max-w-[340px] md:w-auto">
-            <AlertDrawer
-              open={alertOpen}
-              onToggle={() => setAlertOpen((prev) => !prev)}
-              data={data}
-              mode="card"
-            />
-          </div>
-        </div>
 
         <DashboardRightInspector selected={false} />
       </DashboardOverlay>

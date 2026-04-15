@@ -2,15 +2,12 @@
 
 import {
   Building2,
-  GitBranch,
-  Layers3,
+  Car,
+  Clock3,
+  CloudRain,
   PanelLeftClose,
-  PanelLeftOpen,
-  Route,
-  ShieldAlert,
-  Waves,
-  X,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { useFloodStore, type LayerKey } from "@/features/map/store/map.store";
 
@@ -19,383 +16,160 @@ type LayerCatalogProps = {
   onToggle: () => void;
 };
 
-const LAYER_ITEMS: Array<{
-  key: LayerKey;
+type CategoryId = "buildings" | "transportation" | "weather" | "time";
+
+const CATEGORY_ITEMS: Array<{
+  id: CategoryId;
   label: string;
-  description: string;
   icon: React.ReactNode;
-  disabled?: boolean;
+  layerKey: LayerKey;
+  description: string;
 }> = [
   {
-    key: "flood",
-    label: "Flood",
-    description: "Flood polygons and depth",
-    icon: <Waves className="h-4 w-4" />,
-  },
-  {
-    key: "buildings",
+    id: "buildings",
     label: "Buildings",
-    description: "3D building extrusions",
     icon: <Building2 className="h-4 w-4" />,
+    layerKey: "buildings",
+    description: "3D building extrusions",
   },
   {
-    key: "drainage",
-    label: "Drainage",
-    description: "Drainage channels",
-    icon: <GitBranch className="h-4 w-4" />,
+    id: "transportation",
+    label: "Transportation",
+    icon: <Car className="h-4 w-4" />,
+    layerKey: "roads",
+    description: "Road network overlays",
   },
   {
-    key: "roads",
-    label: "Roads",
-    description: "Custom road network",
-    icon: <Route className="h-4 w-4" />,
-    disabled: true,
+    id: "weather",
+    label: "Weather",
+    icon: <CloudRain className="h-4 w-4" />,
+    layerKey: "flood",
+    description: "Live weather / flood overlays",
   },
   {
-    key: "riskZones",
-    label: "Risk Zones",
-    description: "Flood risk classification",
-    icon: <ShieldAlert className="h-4 w-4" />,
+    id: "time",
+    label: "Time",
+    icon: <Clock3 className="h-4 w-4" />,
+    layerKey: "riskZones",
+    description: "Temporal risk zoning layer",
   },
 ];
 
-function getVisibleLayerItems(mapEngine: "maplibre" | "cesium") {
-  if (mapEngine === "cesium") {
-    return LAYER_ITEMS.filter((item) => item.key === "buildings");
-  }
-
-  return LAYER_ITEMS;
-}
-
-function ToggleSwitch({
+function FloatingToolbar({
   active,
-  disabled,
-  onClick,
-  label,
+  onPick,
 }: {
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  label: string;
+  active: CategoryId;
+  onPick: (category: CategoryId) => void;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`relative h-7 w-12 shrink-0 rounded-full border transition ${
-        disabled
-          ? "cursor-not-allowed border-slate-700 bg-slate-800"
-          : active
-            ? "border-cyan-300/60 bg-cyan-400/45"
-            : "border-slate-600 bg-slate-800/80"
-      }`}
-      aria-label={`Toggle ${label}`}
-    >
-      <span
-        className={`absolute top-1 h-5 w-5 rounded-full bg-slate-100 shadow-sm transition ${
-          active ? "left-6" : "left-1"
-        }`}
-      />
-    </button>
-  );
-}
-
-function LayerItem({
-  item,
-  active,
-  onToggle,
-  buildingOpacity,
-  onBuildingOpacityChange,
-}: {
-  item: (typeof LAYER_ITEMS)[number];
-  active: boolean;
-  onToggle: () => void;
-  buildingOpacity: number;
-  onBuildingOpacityChange: (value: number) => void;
-}) {
-  const isBuildings = item.key === "buildings";
-
-  return (
-    <div
-      className={`group rounded-2xl border p-3 transition-all ${
-        item.disabled
-          ? "border-slate-700/90 bg-slate-900/60 opacity-65"
-          : active
-            ? "border-cyan-300/45 bg-cyan-500/10"
-            : "border-slate-700/85 bg-slate-900/60 hover:border-slate-500"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition ${
-            active
-              ? "bg-cyan-400/20 text-cyan-100"
-              : "bg-slate-800 text-slate-300 group-hover:bg-slate-700"
-          }`}
-        >
-          {item.icon}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="truncate text-sm font-semibold text-slate-100">
-                  {item.label}
-                </div>
-
-                {item.disabled ? (
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase ring-1 ring-slate-700">
-                    Soon
-                  </span>
-                ) : active ? (
-                  <span className="rounded-full bg-cyan-400/20 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-cyan-100 uppercase ring-1 ring-cyan-300/40">
-                    On
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase ring-1 ring-slate-700">
-                    Off
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-1 text-xs leading-5 text-slate-400">
-                {item.description}
-              </div>
-            </div>
-
-            <ToggleSwitch
-              active={active}
-              disabled={item.disabled}
-              onClick={onToggle}
-              label={item.label}
-            />
-          </div>
-
-          {isBuildings && !item.disabled ? (
-            <div
-              className={`mt-3 rounded-xl border px-3 py-3 transition ${
-                active
-                  ? "border-cyan-300/30 bg-slate-900/70"
-                  : "border-slate-700 bg-slate-900/40"
-              }`}
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
-                  Building opacity
-                </span>
-                <span className="text-[11px] font-semibold text-slate-200">
-                  {Math.round(buildingOpacity * 100)}%
-                </span>
-              </div>
-
-              <input
-                type="range"
-                min={0.1}
-                max={1}
-                step={0.01}
-                value={buildingOpacity}
-                onChange={(e) => onBuildingOpacityChange(Number(e.target.value))}
-                disabled={!active}
-                className="w-full accent-cyan-400 disabled:cursor-not-allowed"
-                aria-label="Adjust building opacity"
-              />
-
-              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-                <span>Light</span>
-                <span>Solid</span>
-              </div>
-            </div>
-          ) : null}
-        </div>
+    <div className="rounded-xl border border-slate-700/75 bg-slate-950/82 p-2 shadow-xl backdrop-blur-2xl">
+      <div className="flex flex-col gap-2 md:gap-1.5">
+        {CATEGORY_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onPick(item.id)}
+            title={item.label}
+            aria-label={item.label}
+            className={`flex h-10 w-10 items-center justify-center rounded-lg border transition ${
+              active === item.id
+                ? "border-cyan-300/60 bg-cyan-400/20 text-cyan-100 shadow-[0_0_20px_-12px_rgba(34,211,238,1)]"
+                : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-slate-500"
+            }`}
+          >
+            {item.icon}
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
-function DesktopCollapsedRail({ onToggle }: { onToggle: () => void }) {
-  const { mapEngine, visibleLayers, toggleLayer } = useFloodStore();
-  const items = getVisibleLayerItems(mapEngine);
+function FloatingPanel({
+  category,
+  onClose,
+}: {
+  category: (typeof CATEGORY_ITEMS)[number];
+  onClose: () => void;
+}) {
+  const { visibleLayers, toggleLayer } = useFloodStore();
+  const active = visibleLayers[category.layerKey];
 
   return (
-    <div className="hidden md:block">
-      <div className="rounded-2xl border border-slate-700/70 bg-slate-950/74 p-2 shadow-2xl backdrop-blur-2xl">
+    <div className="w-[248px] rounded-xl border border-slate-700/75 bg-slate-950/86 p-3 shadow-2xl backdrop-blur-2xl">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
+            Layer
+          </p>
+          <h2 className="text-sm font-semibold text-white">{category.label}</h2>
+        </div>
         <button
           type="button"
-          onClick={onToggle}
-          className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 transition hover:bg-slate-800"
-          aria-label="Open layers"
+          onClick={onClose}
+          aria-label="Close layer panel"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-800"
         >
-          <PanelLeftOpen className="h-5 w-5" />
+          <PanelLeftClose className="h-4 w-4" />
         </button>
-
-        <div className="space-y-2">
-          {items.map((item) => {
-            const active = visibleLayers[item.key];
-
-            return (
-              <button
-                key={item.key}
-                type="button"
-                disabled={item.disabled}
-                onClick={() => toggleLayer(item.key)}
-                className={`flex h-11 w-11 items-center justify-center rounded-xl border transition ${
-                  item.disabled
-                    ? "cursor-not-allowed border-slate-700 bg-slate-900 text-slate-600"
-                    : active
-                      ? "border-cyan-300/50 bg-cyan-400/20 text-cyan-100"
-                      : "border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800"
-                }`}
-                title={item.label}
-                aria-label={item.label}
-              >
-                {item.icon}
-              </button>
-            );
-          })}
-        </div>
       </div>
-    </div>
-  );
-}
 
-function DesktopPanel({ onToggle }: { onToggle: () => void }) {
-  const {
-    mapEngine,
-    visibleLayers,
-    toggleLayer,
-    buildingOpacity,
-    setBuildingOpacity,
-  } = useFloodStore();
-  const items = getVisibleLayerItems(mapEngine);
+      <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
 
-  return (
-    <div className="hidden md:block">
-      <aside className="w-[320px] max-w-[calc(100vw-3rem)] rounded-[1.6rem] border border-slate-700/70 bg-slate-950/78 p-4 shadow-[0_35px_60px_-35px_rgba(15,23,42,1)] backdrop-blur-2xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-100">
-                <Layers3 className="h-5 w-5" />
-              </div>
-
-              <div>
-                <h2 className="text-lg font-bold tracking-tight text-white">Layers</h2>
-                <p className="text-sm text-slate-400">Control visible map datasets</p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onToggle}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-300 transition hover:bg-slate-800"
-            aria-label="Collapse layers"
-          >
-            <PanelLeftClose className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          {items.map((item) => (
-            <LayerItem
-              key={item.key}
-              item={item}
-              active={visibleLayers[item.key]}
-              onToggle={() => toggleLayer(item.key)}
-              buildingOpacity={buildingOpacity}
-              onBuildingOpacityChange={setBuildingOpacity}
-            />
-          ))}
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-function MobileTrigger({ onToggle }: { onToggle: () => void }) {
-  return (
-    <div className="md:hidden">
       <button
         type="button"
-        onClick={onToggle}
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/82 px-4 py-3 text-sm font-medium text-slate-200 shadow-xl backdrop-blur"
+        onClick={() => toggleLayer(category.layerKey)}
+        className={`inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition ${
+          active
+            ? "bg-cyan-500 text-slate-950"
+            : "border border-slate-700 bg-slate-900/70 text-slate-200"
+        }`}
       >
-        <Layers3 className="h-4 w-4 text-cyan-200" />
-        Layers
+        {active ? "Visible" : "Enable layer"}
       </button>
     </div>
   );
 }
 
-function MobileSheet({ onToggle }: { onToggle: () => void }) {
-  const {
-    mapEngine,
-    visibleLayers,
-    toggleLayer,
-    buildingOpacity,
-    setBuildingOpacity,
-  } = useFloodStore();
-  const items = getVisibleLayerItems(mapEngine);
-
-  return (
-    <div className="md:hidden">
-      <div
-        className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm"
-        onClick={onToggle}
-      />
-
-      <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-[1.6rem] border-t border-slate-700 bg-slate-950 px-4 pt-3 pb-5 shadow-2xl">
-        <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-700" />
-
-        <div className="mb-4 flex items-center justify-between">
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold text-white">Layers</h2>
-            <p className="text-sm text-slate-400">Map dataset controls</p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onToggle}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-300 transition hover:bg-slate-800"
-            aria-label="Close layers"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="max-h-[65vh] space-y-3 overflow-y-auto pb-2">
-          {items.map((item) => (
-            <LayerItem
-              key={item.key}
-              item={item}
-              active={visibleLayers[item.key]}
-              onToggle={() => toggleLayer(item.key)}
-              buildingOpacity={buildingOpacity}
-              onBuildingOpacityChange={setBuildingOpacity}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function LayerCatalog({ open, onToggle }: LayerCatalogProps) {
-  if (!open) {
-    return (
-      <>
-        <DesktopCollapsedRail onToggle={onToggle} />
-        <MobileTrigger onToggle={onToggle} />
-      </>
-    );
-  }
+  const [selected, setSelected] = useState<CategoryId>("buildings");
+
+  const selectedCategory = useMemo(
+    () => CATEGORY_ITEMS.find((item) => item.id === selected) ?? CATEGORY_ITEMS[0],
+    [selected],
+  );
+
+  const handlePick = (category: CategoryId) => {
+    if (!open) {
+      onToggle();
+      setSelected(category);
+      return;
+    }
+
+    if (selected === category) {
+      onToggle();
+      return;
+    }
+
+    setSelected(category);
+  };
 
   return (
-    <>
-      <DesktopPanel onToggle={onToggle} />
-      <MobileSheet onToggle={onToggle} />
-    </>
+    <div className="flex items-end gap-2 md:items-start">
+      <FloatingToolbar active={selected} onPick={handlePick} />
+
+      {open ? (
+        <div className="hidden md:block">
+          <FloatingPanel category={selectedCategory} onClose={onToggle} />
+        </div>
+      ) : null}
+
+      {open ? (
+        <div className="fixed inset-x-3 bottom-16 z-40 md:hidden">
+          <FloatingPanel category={selectedCategory} onClose={onToggle} />
+        </div>
+      ) : null}
+    </div>
   );
 }
