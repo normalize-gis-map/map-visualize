@@ -77,6 +77,20 @@ function getRoadWidthExpression(
   }
 }
 
+function classifyRoadWidthKindById(
+  layerId: string,
+): "major" | "medium" | "local" | "service" | "casing" | null {
+  const id = layerId.toLowerCase();
+  if (!ROAD_NAME_RE.test(id)) return null;
+  if (RAIL_TRANSIT_HATCH_RE.test(id) || NON_ROAD_OR_DECOR_RE.test(id)) return null;
+  if (CASING_RE.test(id)) return "casing";
+  if (MAJOR_ROAD_RE.test(id)) return "major";
+  if (MEDIUM_ROAD_RE.test(id)) return "medium";
+  if (SERVICE_ROAD_RE.test(id)) return "service";
+  if (LOCAL_ROAD_RE.test(id)) return "local";
+  return null;
+}
+
 export function applyMapStyle(
   map: maplibregl.Map,
   options?: { laneDetailEnabled?: boolean; detailPreset?: "balanced" | "high" },
@@ -175,18 +189,11 @@ export function applyMapStyle(
     }
 
     if (layer.type === "line" && ROAD_NAME_RE.test(id)) {
-      const isCasing = CASING_RE.test(id);
-      const isRailTransitHatch = RAIL_TRANSIT_HATCH_RE.test(id);
-      const isDecorativeTransport = NON_ROAD_OR_DECOR_RE.test(id);
-      const isMajor = MAJOR_ROAD_RE.test(id);
-      const isMedium = MEDIUM_ROAD_RE.test(id);
-      const isLocal = LOCAL_ROAD_RE.test(id);
-      const isService = SERVICE_ROAD_RE.test(id);
-      const shouldPatchRoadFamily =
-        !isRailTransitHatch &&
-        !isDecorativeTransport &&
-        (isMajor || isMedium || isLocal || isService || isCasing);
-      if (!shouldPatchRoadFamily) continue;
+      const widthKind = classifyRoadWidthKindById(layerId);
+      if (!widthKind) continue;
+      const isCasing = widthKind === "casing";
+      const isMajor = widthKind === "major";
+      const isMedium = widthKind === "medium";
 
       setPaintSafe(
         map,
@@ -204,16 +211,6 @@ export function applyMapStyle(
         "line-opacity",
         isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
       );
-
-      const widthKind: "major" | "medium" | "local" | "service" | "casing" = isCasing
-        ? "casing"
-        : isMajor
-          ? "major"
-          : isMedium
-            ? "medium"
-            : isService
-              ? "service"
-              : "local";
       setPaintSafe(map, layerId, "line-width", getRoadWidthExpression(widthKind));
       continue;
     }
