@@ -46,6 +46,7 @@ export type WaterSceneContext = {
   exposure: number;
   bloomStrength: number;
   highlightCompression: number;
+  lodDetailFactor: number;
 };
 
 export type WaterCustomLayer = maplibregl.CustomLayerInterface & {

@@ -36,6 +36,7 @@ type Uniforms = {
   exposure: WebGLUniformLocation | null;
   bloomStrength: WebGLUniformLocation | null;
   highlightCompression: WebGLUniformLocation | null;
+  lodDetailFactor: WebGLUniformLocation | null;
   wakes: WebGLUniformLocation | null;
 };
 
@@ -95,6 +96,7 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
     exposure: 1,
     bloomStrength: 0.09,
     highlightCompression: 1,
+    lodDetailFactor: 1,
   };
   const wakeSystem = new WaterWakeSystem(MAX_WATER_WAKES);
   const wakeUniformBuffer = new Float32Array(MAX_WATER_WAKES * 4);
@@ -151,6 +153,7 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
         exposure: glContext.getUniformLocation(program, "u_exposure"),
         bloomStrength: glContext.getUniformLocation(program, "u_bloomStrength"),
         highlightCompression: glContext.getUniformLocation(program, "u_highlightCompression"),
+        lodDetailFactor: glContext.getUniformLocation(program, "u_lodDetailFactor"),
         wakes: glContext.getUniformLocation(program, "u_wakes"),
       };
 
@@ -198,6 +201,7 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
       glContext.uniform1f(uniforms.exposure, sceneContext.exposure);
       glContext.uniform1f(uniforms.bloomStrength, sceneContext.bloomStrength);
       glContext.uniform1f(uniforms.highlightCompression, sceneContext.highlightCompression);
+      glContext.uniform1f(uniforms.lodDetailFactor, sceneContext.lodDetailFactor);
       glContext.uniform4fv(uniforms.wakes, wakeUniformBuffer);
 
       glContext.enable(glContext.BLEND);

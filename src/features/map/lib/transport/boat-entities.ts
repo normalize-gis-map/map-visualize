@@ -30,6 +30,7 @@ type BuildBoatEntitiesParams = {
   phase: number;
   bounds: Bounds | null;
   enabled: boolean;
+  densityMultiplier?: number;
 };
 
 function buildBoatHullPolygon(center: Position, headingDeg: number, scale: number): Position[] {
@@ -85,6 +86,7 @@ export function buildBoatEntities({
   phase,
   bounds,
   enabled,
+  densityMultiplier = 1,
 }: BuildBoatEntitiesParams): FeatureCollection {
   if (!enabled || zoom < 11.75) {
     return { type: "FeatureCollection", features: [] };
@@ -98,7 +100,7 @@ export function buildBoatEntities({
     .slice(0, zoom >= 16 ? 18 : zoom >= 14 ? 14 : 10);
 
   const totalVisibleWaterArea = rings.reduce((sum, item) => sum + item.area, 0);
-  const densityPlan = getBoatDensityPlan(zoom, totalVisibleWaterArea);
+  const densityPlan = getBoatDensityPlan(zoom, totalVisibleWaterArea, densityMultiplier);
   if (!densityPlan.maxBoats) {
     return { type: "FeatureCollection", features: [] };
   }

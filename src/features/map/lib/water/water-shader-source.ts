@@ -32,6 +32,7 @@ uniform float u_reflectionStrength;
 uniform float u_exposure;
 uniform float u_bloomStrength;
 uniform float u_highlightCompression;
+uniform float u_lodDetailFactor;
 uniform vec4 u_wakes[${MAX_WATER_WAKES}];
 
 varying vec2 v_world;
@@ -69,14 +70,15 @@ void main() {
   float weatherRippleBoost = u_weatherMode < 0.5 ? 1.0 : (u_weatherMode < 1.5 ? 1.36 : 0.78);
   float weatherMotion = u_weatherMode < 0.5 ? 1.0 : (u_weatherMode < 1.5 ? 1.12 : 0.7);
 
-  vec2 uv = v_world * (u_ripple_scale * weatherRippleBoost);
+  float lodFactor = clamp(u_lodDetailFactor, 0.35, 1.3);
+  vec2 uv = v_world * (u_ripple_scale * weatherRippleBoost * lodFactor);
   uv += flow * (u_time * 0.00003 * weatherMotion * max(0.4, u_flowSpeed));
 
   float low = wave(uv, flow, 2200.0, 0.18 * weatherMotion);
-  float mid = wave(uv, crossFlow, 3400.0, 0.12 * weatherMotion);
-  float high = wave(uv, normalize(flow + crossFlow * 0.45), 5200.0, 0.26 * weatherMotion);
+  float mid = wave(uv, crossFlow, 3400.0, 0.12 * weatherMotion * lodFactor);
+  float high = wave(uv, normalize(flow + crossFlow * 0.45), 5200.0, 0.26 * weatherMotion * lodFactor);
 
-  float ripple = low * 0.42 + mid * 0.34 + high * 0.24;
+  float ripple = low * 0.58 + mid * (0.28 * lodFactor) + high * (0.14 * lodFactor);
 
   float wakeContribution = 0.0;
   for (int i = 0; i < ${MAX_WATER_WAKES}; i += 1) {
@@ -116,7 +118,7 @@ void main() {
   vec3 color = mix(reflectionTint, highlightColor, shimmer * (0.26 + u_reflectionStrength * 0.34) + specular * 0.4);
 
   float brightness = dot(color, vec3(0.299, 0.587, 0.114));
-  float fakeBloom = smoothstep(0.64, 1.0, brightness) * u_bloomStrength;
+  float fakeBloom = smoothstep(0.64, 1.0, brightness) * u_bloomStrength * lodFactor;
   color += highlightColor * fakeBloom;
   color = tonemapFilmic(color, u_exposure, u_highlightCompression, 0.92);
 

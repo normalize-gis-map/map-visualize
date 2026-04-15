@@ -25,6 +25,11 @@ import {
   buildBuildingShadows,
   type ShadowSceneTuning,
 } from "@/features/map/lib/buildings/building-shadows";
+import {
+  computeSceneLodProfile,
+  weatherIntensityFromLod,
+  shadowMaxFeaturesFromLod,
+} from "@/features/map/lib/lod/scene-lod";
 import { SceneController } from "@/features/map/lib/scene/scene-controller";
 import { computeSceneProfile, type SceneProfile } from "@/features/map/lib/scene/scene-profile";
 import { buildToneMapping, type SceneToneMapping } from "@/features/map/lib/scene/scene-tonemapping";
@@ -122,6 +127,7 @@ export function MapLibreMap({
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
   const [mapBearing, setMapBearing] = useState(0);
+  const lodProfile = useMemo(() => computeSceneLodProfile(mapZoom), [mapZoom]);
   const [mapBounds, setMapBounds] = useState<{
     west: number;
     south: number;
@@ -560,6 +566,7 @@ export function MapLibreMap({
     [ambientNetworkRoutes, routePayload],
   );
   const trafficTuning = deriveTrafficSceneTuning(sceneUiProfile);
+  const lodTrafficMultiplier = lodProfile.trafficDensity;
 
   const { vehicles: ambientTraffic, minZoomToRender } = useAmbientTraffic({
     routes: ambientRoutes,
@@ -567,7 +574,7 @@ export function MapLibreMap({
     enabled: trafficVisualizationEnabled,
     density: trafficDensity,
     detailPreset,
-    densityMultiplier: trafficTuning.densityMultiplier,
+    densityMultiplier: trafficTuning.densityMultiplier * lodTrafficMultiplier,
     speedMultiplier: trafficTuning.speedMultiplier,
   });
   const visibleAmbientTraffic = useMemo(() => {
@@ -612,8 +619,8 @@ export function MapLibreMap({
               : 30
           : 16;
 
-    return Array.from(deduped.values()).slice(0, cap);
-  }, [ambientTraffic, detailPreset, mapBounds, mapZoom, trafficDensity]);
+    return Array.from(deduped.values()).slice(0, Math.max(8, Math.round(cap * lodTrafficMultiplier)));
+  }, [ambientTraffic, detailPreset, lodTrafficMultiplier, mapBounds, mapZoom, trafficDensity]);
 
   useEffect(() => {
     if (!mapInstance) return;
@@ -844,7 +851,7 @@ export function MapLibreMap({
         const tone = sceneControllerRef.current?.getToneMapping() ?? sceneToneRef.current;
         sceneToneRef.current = tone;
         setSceneToneMapping(tone);
-        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode, tone));
+        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode, tone, lodProfile));
         applySceneLighting(mapInstance, profile);
         const mapContainer = mapInstance.getContainer();
         mapContainer.style.filter = `contrast(${tone.contrast.toFixed(3)}) saturate(${tone.saturation.toFixed(3)})`;
@@ -865,6 +872,7 @@ export function MapLibreMap({
           phase: transportPhaseRef.current,
           bounds: mapBounds,
           enabled: transportVisibility.boats,
+          densityMultiplier: lodProfile.boatDensity,
         });
         const boatSource = mapInstance.getSource(boatEntitySourceId) as
           | maplibregl.GeoJSONSource
@@ -899,6 +907,8 @@ export function MapLibreMap({
             viewportBounds: bufferedBounds,
             detailPreset,
             mapZoom,
+            densityScale: lodProfile.vegetationScale,
+            densityMode: lodProfile.vegetationDensity,
           })
         : { type: "FeatureCollection", features: [] };
 
@@ -930,7 +940,7 @@ export function MapLibreMap({
           )
           .map((layer) => layer.id) ?? [];
 
-      if (visibleLayers.buildings && buildingLayerIds.length) {
+      if (visibleLayers.buildings && buildingLayerIds.length && lodProfile.shadowQuality !== "off") {
         const buildingFeatures = mapInstance.queryRenderedFeatures(queryBox, {
           layers: buildingLayerIds.slice(0, 3),
         });
@@ -942,7 +952,12 @@ export function MapLibreMap({
               shadowSoftness: shadowProfile.shadowSoftness,
             }
           : undefined;
-        const shadowData = buildBuildingShadows(buildingFeatures, timeMode, 220, shadowTuning);
+        const shadowData = buildBuildingShadows(
+          buildingFeatures,
+          timeMode,
+          shadowMaxFeaturesFromLod(lodProfile),
+          shadowTuning,
+        );
         const shadowSource = mapInstance.getSource(buildingShadowSourceId) as
           | maplibregl.GeoJSONSource
           | undefined;
@@ -1130,6 +1145,8 @@ export function MapLibreMap({
         routes: ambientRoutes,
         bounds: mapBounds,
         transportVisibility,
+        bikeDensity: lodProfile.bikeDensity,
+        peopleDensity: lodProfile.peopleDensity,
       });
       if (!transportSource) {
         mapInstance.addSource(transportEntitySourceId, {
@@ -1243,6 +1260,7 @@ export function MapLibreMap({
     transportVisibility,
     visibleLayers.buildings,
     weatherMode,
+    lodProfile,
   ]);
 
   useEffect(() => {
@@ -1259,7 +1277,7 @@ export function MapLibreMap({
         setSceneToneMapping(tone);
         const traffic = deriveTrafficSceneTuning(profile);
         phase += 0.23 * traffic.speedMultiplier;
-        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode, tone));
+        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode, tone, lodProfile));
         applySceneLighting(mapInstance, profile);
       } else {
         phase += 0.23;
@@ -1275,9 +1293,19 @@ export function MapLibreMap({
             buildTransportEntities({
               phase: transportPhaseRef.current,
               zoom: mapZoom,
-              routes: ambientRoutes.slice(0, Math.max(8, Math.floor(ambientRoutes.length * (sceneProfileRef.current?.trafficDensityMultiplier ?? 1)))),
+              routes: ambientRoutes
+                .filter((route) =>
+                  lodProfile.trafficRoadBias === "all"
+                    ? true
+                    : lodProfile.trafficRoadBias === "major_secondary"
+                      ? route.roadClass === "major" || route.roadClass === "medium"
+                      : route.roadClass === "major",
+                )
+                .slice(0, Math.max(8, Math.floor(ambientRoutes.length * (sceneProfileRef.current?.trafficDensityMultiplier ?? 1)))),
               bounds: mapBounds,
               transportVisibility,
+              bikeDensity: lodProfile.bikeDensity,
+              peopleDensity: lodProfile.peopleDensity,
             }),
           );
         }
@@ -1292,6 +1320,7 @@ export function MapLibreMap({
               phase: transportPhaseRef.current,
               bounds: mapBounds,
               enabled: transportVisibility.boats,
+              densityMultiplier: lodProfile.boatDensity,
             }),
           );
         }
@@ -1309,6 +1338,7 @@ export function MapLibreMap({
     transportEntitySourceId,
     timeMode,
     weatherMode,
+    lodProfile,
   ]);
 
   useEffect(() => {
@@ -1622,7 +1652,10 @@ export function MapLibreMap({
         mapBearing={mapBearing}
       />
 
-      <WeatherOverlay weather={weatherMode} intensity={sceneUiProfile.weatherParticleIntensity} />
+      <WeatherOverlay
+        weather={lodProfile.weatherParticleDensity === "off" ? "sun" : weatherMode}
+        intensity={weatherIntensityFromLod(lodProfile.weatherParticleDensity)}
+      />
       <ScenePostOverlay tone={sceneToneMapping} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (

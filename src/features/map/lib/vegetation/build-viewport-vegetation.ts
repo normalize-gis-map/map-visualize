@@ -1,5 +1,4 @@
 import type { FeatureCollection, GeoJsonProperties, Geometry, Position } from "geojson";
-
 import {
   classifyGreenArea,
   type GreenAreaRenderMode,
@@ -14,17 +13,13 @@ import {
   getGlobalTreeBudgetByZoom,
   getTreeBudgetByZoom,
 } from "@/features/map/lib/vegetation/zoom-density";
-
-
 type TreeType = "tall" | "compact" | "ornamental";
 type TreeArchetype = "pine" | "broadleaf" | "ornamental" | "waterside";
-
 type GreenFeature = {
   id?: string | number;
   geometry?: Geometry;
   properties?: GeoJsonProperties;
 };
-
 type Bounds = {
   west: number;
   south: number;
@@ -243,7 +238,6 @@ function acceptCandidate(params: {
       if (dist < clearingRadius) return false;
     }
   }
-
   if (!clusterCenters.length) {
     return mode === "dense_wooded" ? roll < 0.76 : roll < 0.56;
   }
@@ -265,14 +259,23 @@ export function buildViewportVegetation(params: {
   viewportBounds: Bounds;
   mapZoom: number;
   detailPreset: "balanced" | "high";
+  densityScale?: number;
+  densityMode?: "none" | "sparse" | "medium" | "high";
 }): FeatureCollection {
-  const { features, viewportBounds, mapZoom, detailPreset } = params;
-  if (mapZoom < 13) {
+  const {
+    features,
+    viewportBounds,
+    mapZoom,
+    detailPreset,
+    densityScale = 1,
+    densityMode = "high",
+  } = params;
+  if (mapZoom < 13 || densityMode === "none" || densityScale <= 0) {
     return { type: "FeatureCollection", features: [] };
   }
   const points: FeatureCollection["features"] = [];
   const usedCells = new Set<string>();
-  const globalBudget = getGlobalTreeBudgetByZoom(mapZoom, detailPreset);
+  const globalBudget = Math.max(0, Math.round(getGlobalTreeBudgetByZoom(mapZoom, detailPreset) * densityScale));
 
   for (const feature of features) {
     if (points.length >= globalBudget) break;
@@ -295,7 +298,7 @@ export function buildViewportVegetation(params: {
         if (!semanticBoost && unitFromStableHash(featureSeed, "midzoom-filter") < 0.72)
           continue;
       }
-      const perPolygonBudget = getTreeBudgetByZoom(mapZoom, detailPreset, mode);
+      const perPolygonBudget = Math.max(0, Math.round(getTreeBudgetByZoom(mapZoom, detailPreset, mode) * densityScale));
       if (perPolygonBudget <= 0) continue;
       let polygonTreeCount = 0;
 

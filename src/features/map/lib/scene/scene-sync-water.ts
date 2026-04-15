@@ -1,3 +1,4 @@
+import type { SceneLodProfile } from "@/features/map/lib/lod/lod-types";
 import type { SceneProfile } from "@/features/map/lib/scene/scene-profile";
 import type { SceneToneMapping } from "@/features/map/lib/scene/scene-tonemapping";
 import type { TimeMode, WeatherMode } from "@/features/map/lib/weather/weather-types";
@@ -8,6 +9,7 @@ export function buildWaterSceneContext(
   timeMode: TimeMode,
   weatherMode: WeatherMode,
   tone: SceneToneMapping,
+  lod: SceneLodProfile,
 ): WaterSceneContext {
   return {
     weatherMode,
@@ -20,5 +22,6 @@ export function buildWaterSceneContext(
     exposure: tone.exposure,
     bloomStrength: tone.bloomStrength,
     highlightCompression: tone.highlightCompression,
+    lodDetailFactor: lod.waterDetailFactor,
   };
 }

@@ -3,15 +3,15 @@ export type BoatDensityPlan = {
   ringCandidateScale: number;
 };
 
-export function getBoatDensityPlan(zoom: number, totalVisibleWaterArea: number): BoatDensityPlan {
+export function getBoatDensityPlan(zoom: number, totalVisibleWaterArea: number, densityMultiplier = 1): BoatDensityPlan {
   if (zoom < 12) {
-    return { maxBoats: totalVisibleWaterArea > 0.00045 ? 1 : 0, ringCandidateScale: 0 };
+    return { maxBoats: Math.round((totalVisibleWaterArea > 0.00045 ? 1 : 0) * densityMultiplier), ringCandidateScale: 0 };
   }
 
   if (zoom < 14) {
     const areaBoost = Math.min(3, Math.floor(totalVisibleWaterArea / 0.00042));
     return {
-      maxBoats: 2 + areaBoost,
+      maxBoats: Math.round((2 + areaBoost) * densityMultiplier),
       ringCandidateScale: 0.34,
     };
   }
@@ -19,14 +19,14 @@ export function getBoatDensityPlan(zoom: number, totalVisibleWaterArea: number):
   if (zoom < 16) {
     const areaBoost = Math.min(5, Math.floor(totalVisibleWaterArea / 0.00028));
     return {
-      maxBoats: 4 + areaBoost,
+      maxBoats: Math.round((4 + areaBoost) * densityMultiplier),
       ringCandidateScale: 0.5,
     };
   }
 
   const areaBoost = Math.min(9, Math.floor(totalVisibleWaterArea / 0.0002));
   return {
-    maxBoats: 7 + areaBoost,
+    maxBoats: Math.round((7 + areaBoost) * densityMultiplier),
     ringCandidateScale: 0.7,
   };
 }

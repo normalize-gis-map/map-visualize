@@ -21,6 +21,8 @@ type BuildTransportEntitiesParams = {
   routes: RouteLike[];
   bounds: Bounds | null;
   transportVisibility: Record<TransportMode, boolean>;
+  bikeDensity: number;
+  peopleDensity: number;
 };
 
 function pointAtFraction(coords: Position[], fraction: number): Position | null {
@@ -41,20 +43,20 @@ function inBounds(point: Position, bounds: Bounds | null) {
   return lng >= bounds.west && lng <= bounds.east && lat >= bounds.south && lat <= bounds.north;
 }
 
-function transportCap(zoom: number, mode: TransportMode) {
+function transportCap(zoom: number, mode: TransportMode, densityMultiplier: number) {
   if (mode === "cars" || mode === "boats") return 0;
 
   if (mode === "bike") {
     if (zoom < 13) return 0;
-    if (zoom < 15) return 3;
-    if (zoom < 17) return 7;
-    return 11;
+    if (zoom < 15) return Math.round(3 * densityMultiplier);
+    if (zoom < 17) return Math.round(7 * densityMultiplier);
+    return Math.round(11 * densityMultiplier);
   }
 
   if (zoom < 14) return 0;
-  if (zoom < 16) return 3;
-  if (zoom < 18) return 7;
-  return 12;
+  if (zoom < 16) return Math.round(3 * densityMultiplier);
+  if (zoom < 18) return Math.round(7 * densityMultiplier);
+  return Math.round(12 * densityMultiplier);
 }
 
 function routeEligibleForMode(mode: TransportMode, roadClass: AmbientRoadClass | undefined) {
@@ -87,6 +89,8 @@ export function buildTransportEntities({
   routes,
   bounds,
   transportVisibility,
+  bikeDensity,
+  peopleDensity,
 }: BuildTransportEntitiesParams): FeatureCollection {
   const features: FeatureCollection["features"] = [];
 
@@ -98,8 +102,12 @@ export function buildTransportEntities({
   for (const [mode] of activeModes) {
     if (mode === "cars") continue;
 
-    const cap = transportCap(zoom, mode);
-    if (!cap) continue;
+    const cap = transportCap(
+      zoom,
+      mode,
+      mode === "bike" ? bikeDensity : mode === "people" ? peopleDensity : 1,
+    );
+    if (!cap || cap <= 0) continue;
 
     const routePool = routes.filter(
       (route) =>
