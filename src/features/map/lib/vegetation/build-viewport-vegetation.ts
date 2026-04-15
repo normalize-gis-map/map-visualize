@@ -10,6 +10,11 @@ import {
   pointInPolygon,
   unitFromStableHash,
 } from "@/features/map/lib/vegetation/get-stable-seed-points";
+import {
+  getGlobalTreeBudgetByZoom,
+  getTreeBudgetByZoom,
+} from "@/features/map/lib/vegetation/zoom-density";
+
 
 type TreeType = "tall" | "compact" | "ornamental";
 type TreeArchetype = "pine" | "broadleaf" | "ornamental" | "waterside";
@@ -128,50 +133,6 @@ function minDistanceToRing(lng: number, lat: number, ring: Position[]): number {
     minDistance = Math.min(minDistance, distance);
   }
   return minDistance;
-}
-
-function getTreeBudget(
-  zoom: number,
-  detailPreset: "balanced" | "high",
-  mode: GreenAreaRenderMode,
-): number {
-  if (zoom < 15) {
-    const sparseBase = detailPreset === "high" ? 24 : 16;
-    if (mode === "dense_wooded") return Math.floor(sparseBase * 1.18);
-    if (mode === "park_trees") return sparseBase;
-    return 0;
-  }
-
-  if (zoom < 17) {
-    const midBase = detailPreset === "high" ? 84 : 62;
-    if (mode === "dense_wooded") return Math.floor(midBase * 1.18);
-    if (mode === "park_trees") return midBase;
-    return detailPreset === "high" ? 10 : 7;
-  }
-
-  const base =
-    zoom >= 17
-      ? detailPreset === "high"
-        ? 260
-        : 190
-      : zoom >= 15
-        ? detailPreset === "high"
-          ? 150
-          : 110
-        : 65;
-
-  if (mode === "grass_first") return Math.max(12, Math.floor(base * 0.2));
-  if (mode === "dense_wooded") return Math.floor(base * 1.2);
-  return base;
-}
-
-function getGlobalTreeBudget(
-  zoom: number,
-  detailPreset: "balanced" | "high",
-): number {
-  if (zoom < 15) return detailPreset === "high" ? 46 : 32;
-  if (zoom < 17) return detailPreset === "high" ? 140 : 102;
-  return detailPreset === "high" ? 320 : 240;
 }
 
 function readSemanticText(properties?: GeoJsonProperties): string {
@@ -311,7 +272,7 @@ export function buildViewportVegetation(params: {
   }
   const points: FeatureCollection["features"] = [];
   const usedCells = new Set<string>();
-  const globalBudget = getGlobalTreeBudget(mapZoom, detailPreset);
+  const globalBudget = getGlobalTreeBudgetByZoom(mapZoom, detailPreset);
 
   for (const feature of features) {
     if (points.length >= globalBudget) break;
@@ -334,7 +295,7 @@ export function buildViewportVegetation(params: {
         if (!semanticBoost && unitFromStableHash(featureSeed, "midzoom-filter") < 0.72)
           continue;
       }
-      const perPolygonBudget = getTreeBudget(mapZoom, detailPreset, mode);
+      const perPolygonBudget = getTreeBudgetByZoom(mapZoom, detailPreset, mode);
       if (perPolygonBudget <= 0) continue;
       let polygonTreeCount = 0;
 
