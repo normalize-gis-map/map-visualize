@@ -23,6 +23,7 @@ import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
 import { applyMapStyle } from "@/features/map/lib/style/apply-map-style";
 import { buildAmbientTrafficSource } from "@/features/map/lib/traffic/build-ambient-traffic-source";
+import { buildBoatEntities } from "@/features/map/lib/transport/boat-entities";
 import { buildTransportEntities } from "@/features/map/lib/transport/transport-entities";
 import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-viewport-vegetation";
 import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
@@ -179,7 +180,11 @@ export function MapLibreMap({
   const parkTreeCanopyLayerId = "map-park-tree-canopy-circles";
   const parkTreeHighlightLayerId = "map-park-tree-highlight-circles";
   const transportEntitySourceId = "map-transport-entities";
-  const boatLayerId = "map-boat-entities";
+  const boatEntitySourceId = "map-boat-entities";
+  const boatShadowLayerId = "map-boat-shadow";
+  const boatHullLayerId = "map-boat-hull";
+  const boatCabinLayerId = "map-boat-cabin";
+  const boatDeckLayerId = "map-boat-deck";
   const bikeLayerId = "map-bike-entities";
   const peopleLayerId = "map-people-entities";
   const programmaticMoveRef = useRef(false);
@@ -192,6 +197,7 @@ export function MapLibreMap({
   const mapPointerInsideRef = useRef(false);
   const mapPointerDownRef = useRef(false);
   const transportPhaseRef = useRef(0);
+  const visibleWaterFeaturesRef = useRef<FeatureCollection["features"]>([]);
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -773,6 +779,7 @@ export function MapLibreMap({
           layers: waterLayerIds,
         });
         const waterData = buildViewportWaterEffect(waterFeatures);
+        visibleWaterFeaturesRef.current = waterData.features;
         const waterSource = mapInstance.getSource(waterViewportSourceId) as
           | maplibregl.GeoJSONSource
           | undefined;
@@ -784,6 +791,27 @@ export function MapLibreMap({
         } else {
           waterSource.setData(waterData);
         }
+
+        const boatData = buildBoatEntities({
+          waterFeatures: waterData.features,
+          zoom: mapZoom,
+          phase: transportPhaseRef.current,
+          bounds: mapBounds,
+          enabled: transportVisibility.boats,
+        });
+        const boatSource = mapInstance.getSource(boatEntitySourceId) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+        if (!boatSource) {
+          mapInstance.addSource(boatEntitySourceId, {
+            type: "geojson",
+            data: boatData,
+          });
+        } else {
+          boatSource.setData(boatData);
+        }
+      } else {
+        visibleWaterFeaturesRef.current = [];
       }
 
       const parkLayerIds =
@@ -1018,15 +1046,48 @@ export function MapLibreMap({
       }
 
       addLayerIfMissing({
-        id: boatLayerId,
-        type: "circle",
-        source: transportEntitySourceId,
-        filter: ["==", ["get", "mode"], "boats"],
+        id: boatShadowLayerId,
+        type: "fill",
+        source: boatEntitySourceId,
+        filter: ["==", ["get", "part"], "shadow"],
+        minzoom: 12,
+        paint: {
+          "fill-color": "#0a1a25",
+          "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0.16, 17, 0.24],
+        },
+      });
+      addLayerIfMissing({
+        id: boatHullLayerId,
+        type: "fill",
+        source: boatEntitySourceId,
+        filter: ["==", ["get", "part"], "hull"],
+        minzoom: 12,
+        paint: {
+          "fill-color": "#f7fbff",
+          "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0.88, 17, 0.95],
+        },
+      });
+      addLayerIfMissing({
+        id: boatCabinLayerId,
+        type: "fill",
+        source: boatEntitySourceId,
+        filter: ["==", ["get", "part"], "cabin"],
+        minzoom: 12,
+        paint: {
+          "fill-color": "#dbe7f1",
+          "fill-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0.9, 17, 0.96],
+        },
+      });
+      addLayerIfMissing({
+        id: boatDeckLayerId,
+        type: "line",
+        source: boatEntitySourceId,
+        filter: ["==", ["get", "part"], "deck"],
         minzoom: 13,
         paint: {
-          "circle-color": "#8be9ff",
-          "circle-opacity": 0.88,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 1.4, 17, 2.8],
+          "line-color": "#b9cad8",
+          "line-opacity": 0.62,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 13, 0.6, 17, 1.2],
         },
       });
       addLayerIfMissing({
@@ -1090,6 +1151,20 @@ export function MapLibreMap({
             }),
           );
         }
+        const boatSource = mapInstance.getSource(boatEntitySourceId) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+        if (boatSource) {
+          boatSource.setData(
+            buildBoatEntities({
+              waterFeatures: visibleWaterFeaturesRef.current,
+              zoom: mapZoom,
+              phase: transportPhaseRef.current,
+              bounds: mapBounds,
+              enabled: transportVisibility.boats,
+            }),
+          );
+        }
         mapInstance.setPaintProperty(
           waterViewportBaseLayerId,
           "line-opacity",
@@ -1139,6 +1214,7 @@ export function MapLibreMap({
     return () => window.clearInterval(interval);
   }, [
     ambientRoutes,
+    boatEntitySourceId,
     mapBounds,
     mapInstance,
     mapZoom,

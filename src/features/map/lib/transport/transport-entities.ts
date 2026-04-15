@@ -40,11 +40,11 @@ function inBounds(point: Position, bounds: Bounds | null) {
 }
 
 function transportCap(zoom: number, mode: TransportMode) {
-  if (mode === "cars") return 0;
+  if (mode === "cars" || mode === "boats") return 0;
   if (zoom < 13) return 0;
-  if (zoom < 15) return mode === "boats" ? 3 : 2;
-  if (zoom < 17) return mode === "boats" ? 5 : 4;
-  return mode === "boats" ? 8 : 6;
+  if (zoom < 15) return 2;
+  if (zoom < 17) return 4;
+  return 6;
 }
 
 export function buildTransportEntities({
@@ -67,16 +67,13 @@ export function buildTransportEntities({
     const cap = transportCap(zoom, mode);
     if (!cap) continue;
 
-    const routePool =
-      mode === "boats"
-        ? routes.slice(0, Math.max(2, Math.floor(routes.length * 0.35)))
-        : routes;
+    const routePool = routes;
 
     for (let index = 0; index < Math.min(cap, routePool.length); index += 1) {
       const route = routePool[index];
       if (!route?.coordinates?.length) continue;
 
-      const speedFactor = mode === "boats" ? 0.0035 : mode === "bike" ? 0.0042 : 0.0028;
+      const speedFactor = mode === "bike" ? 0.0042 : 0.0028;
       const offset = (index * 0.137 + phase * speedFactor) % 1;
       const point = pointAtFraction(route.coordinates, offset);
       if (!point || !inBounds(point, bounds)) continue;
