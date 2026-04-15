@@ -5,6 +5,7 @@ import {
   type AmbientRoadClass,
 } from "@/features/map/lib/traffic/get-road-class-lane-offset";
 import { getClampedLaneOffsetMeters } from "@/features/map/lib/traffic/get-clamped-lane-offset";
+import { getRoadTrafficEnvelope } from "@/features/map/lib/traffic/get-road-traffic-envelope";
 import {
   normalizeBearing,
   offsetRouteSample,
@@ -317,19 +318,14 @@ export function useAmbientTraffic({
             : baseRoute;
         if (!route || route.length < 2) return null;
 
+        const envelope = getRoadTrafficEnvelope(vehicle.roadClass, zoom);
         const baseLaneOffset = getClampedLaneOffsetMeters(vehicle.roadClass, zoom);
-        const laneSpread = Math.min(
-          vehicle.roadClass === "major"
-            ? 0.62
-            : vehicle.roadClass === "medium"
-              ? 0.5
-              : 0.36,
-          baseLaneOffset * 0.22,
-        );
+        const laneSpread = vehicle.laneVariant === 1 ? envelope.laneJitter : 0;
         const directionSign = vehicle.direction === "forward" ? 1 : -1;
-        const laneOffset =
-          directionSign * baseLaneOffset +
-          (vehicle.laneVariant === 1 ? directionSign * laneSpread : 0);
+        const laneOffset = directionSign * Math.min(
+          envelope.maxLaneCenterOffset,
+          baseLaneOffset + laneSpread,
+        );
         const baseSpeed = 0.0095;
         const progressShift = simulationClock * baseSpeed * vehicle.speedFactor * speedMultiplier;
         const progress = ((vehicle.baseProgress + progressShift) % 1 + 1) % 1;

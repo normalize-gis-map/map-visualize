@@ -59,83 +59,29 @@ function withOptionalFilter(
   return layerDef;
 }
 
-function getRoadWidthExpression(
-  kind: "major" | "medium" | "local" | "casing",
+function buildCloseZoomBoostExpression(
+  originalWidth: unknown,
+  strength: number,
 ): unknown {
-  switch (kind) {
-    case "major":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        10,
-        1.4,
-        12,
-        2.4,
-        14,
-        4.8,
-        16,
-        8.9,
-        18,
-        14.8,
-        20,
-        22.5,
-      ];
-    case "medium":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        10,
-        1.1,
-        12,
-        1.95,
-        14,
-        3.6,
-        16,
-        6.5,
-        18,
-        11.2,
-        20,
-        17.2,
-      ];
-    case "local":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        10,
-        0.82,
-        12,
-        1.35,
-        14,
-        2.45,
-        16,
-        4.3,
-        18,
-        7.3,
-        20,
-        10.8,
-      ];
-    case "casing":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        10,
-        1.6,
-        12,
-        2.9,
-        14,
-        5.2,
-        16,
-        9.4,
-        18,
-        15.6,
-        20,
-        23.8,
-      ];
-  }
+  return [
+    "*",
+    ["coalesce", originalWidth ?? 1, 1],
+    [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      12,
+      1,
+      14,
+      1,
+      16,
+      1 + strength * 0.18,
+      18,
+      1 + strength * 0.3,
+      20,
+      1 + strength * 0.4,
+    ],
+  ];
 }
 
 export function applyMapStyle(
@@ -265,14 +211,16 @@ export function applyMapStyle(
         isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
       );
 
-      const widthKind: "major" | "medium" | "local" | "casing" = isCasing
-        ? "casing"
-        : isMajor
-          ? "major"
-          : isMedium
-            ? "medium"
-            : "local";
-      setPaintSafe(map, layerId, "line-width", getRoadWidthExpression(widthKind));
+      const originalWidth = map.getPaintProperty(layerId, "line-width");
+      if (originalWidth !== undefined && originalWidth !== null) {
+        const boostStrength = isCasing ? 0.34 : isMajor ? 0.28 : isMedium ? 0.2 : 0.12;
+        setPaintSafe(
+          map,
+          layerId,
+          "line-width",
+          buildCloseZoomBoostExpression(originalWidth, boostStrength),
+        );
+      }
       continue;
     }
 
