@@ -21,13 +21,13 @@ import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
+import { buildBuildingShadows } from "@/features/map/lib/buildings/building-shadows";
 import { applyMapStyle } from "@/features/map/lib/style/apply-map-style";
 import { buildAmbientTrafficSource } from "@/features/map/lib/traffic/build-ambient-traffic-source";
 import { buildBoatEntities } from "@/features/map/lib/transport/boat-entities";
 import { buildTransportEntities } from "@/features/map/lib/transport/transport-entities";
 import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-viewport-vegetation";
 import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
-import { getAnimatedWaterOpacities, getWaterPaint } from "@/features/map/lib/water/water-effects";
 import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -175,8 +175,8 @@ export function MapLibreMap({
   const ambientTrafficBodyLayerId = "ambient-traffic-body-3d";
   const ambientTrafficRoofLayerId = "ambient-traffic-roof-3d";
   const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
-  const waterViewportSourceId = "map-water-viewport-source";
-  const waterViewportToneLayerId = "map-water-viewport-tone-fill";
+  const buildingShadowSourceId = "map-building-shadows";
+  const buildingShadowLayerId = "map-building-shadows-fill";
   const parkTreeSourceId = "map-park-tree-points";
   const parkTreeShadowLayerId = "map-park-tree-shadow-circles";
   const parkTreeCanopyLayerId = "map-park-tree-canopy-circles";
@@ -200,6 +200,7 @@ export function MapLibreMap({
   const mapPointerDownRef = useRef(false);
   const transportPhaseRef = useRef(0);
   const visibleWaterFeaturesRef = useRef<FeatureCollection["features"]>([]);
+  const nativeWaterLayerIdsRef = useRef<string[]>([]);
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -775,6 +776,18 @@ export function MapLibreMap({
           )
           .map((layer) => layer.id)
           .slice(0, 4) ?? [];
+      nativeWaterLayerIdsRef.current = waterLayerIds;
+      const firstRoadBridgeLayerId = style.layers?.find((layer) =>
+        /(bridge|road|street|highway)/i.test(layer.id),
+      )?.id;
+      if (firstRoadBridgeLayerId) {
+        waterLayerIds.forEach((layerId) => {
+          if (!mapInstance.getLayer(layerId)) return;
+          try {
+            mapInstance.moveLayer(layerId, firstRoadBridgeLayerId);
+          } catch {}
+        });
+      }
 
       if (waterLayerIds.length) {
         const waterFeatures = mapInstance.queryRenderedFeatures(queryBox, {
@@ -782,17 +795,6 @@ export function MapLibreMap({
         });
         const waterData = buildViewportWaterEffect(waterFeatures);
         visibleWaterFeaturesRef.current = waterData.features;
-        const waterSource = mapInstance.getSource(waterViewportSourceId) as
-          | maplibregl.GeoJSONSource
-          | undefined;
-        if (!waterSource) {
-          mapInstance.addSource(waterViewportSourceId, {
-            type: "geojson",
-            data: waterData,
-          });
-        } else {
-          waterSource.setData(waterData);
-        }
 
         const boatData = buildBoatEntities({
           waterFeatures: waterData.features,
@@ -846,8 +848,6 @@ export function MapLibreMap({
         source.setData(treeData);
       }
 
-      const waterPaint = getWaterPaint(detailPreset);
-
       const addLayerIfMissing = (layer: maplibregl.LayerSpecification) => {
         if (mapInstance.getLayer(layer.id)) return;
         try {
@@ -855,13 +855,54 @@ export function MapLibreMap({
         } catch {}
       };
 
-      if (mapInstance.getSource(waterViewportSourceId)) {
-        addLayerIfMissing({
-          id: waterViewportToneLayerId,
-          type: "fill",
-          source: waterViewportSourceId,
-          paint: waterPaint.tone as any,
+      const buildingLayerIds =
+        style.layers
+          ?.filter(
+            (layer) =>
+              layer.type === "fill-extrusion" &&
+              layer.id.toLowerCase().includes("building"),
+          )
+          .map((layer) => layer.id) ?? [];
+
+      if (visibleLayers.buildings && buildingLayerIds.length) {
+        const buildingFeatures = mapInstance.queryRenderedFeatures(queryBox, {
+          layers: buildingLayerIds.slice(0, 3),
         });
+        const shadowData = buildBuildingShadows(buildingFeatures, timeMode);
+        const shadowSource = mapInstance.getSource(buildingShadowSourceId) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+
+        if (!shadowSource) {
+          mapInstance.addSource(buildingShadowSourceId, {
+            type: "geojson",
+            data: shadowData,
+          });
+        } else {
+          shadowSource.setData(shadowData);
+        }
+
+        const firstBuildingLayer = buildingLayerIds[0];
+        addLayerIfMissing({
+          id: buildingShadowLayerId,
+          type: "fill",
+          source: buildingShadowSourceId,
+          paint: {
+            "fill-color": "#0b1320",
+            "fill-opacity": ["coalesce", ["get", "alpha"], 0.16],
+            "fill-antialias": true,
+          },
+        });
+        if (firstBuildingLayer && mapInstance.getLayer(buildingShadowLayerId)) {
+          try {
+            mapInstance.moveLayer(buildingShadowLayerId, firstBuildingLayer);
+          } catch {}
+        }
+      } else {
+        const shadowSource = mapInstance.getSource(buildingShadowSourceId) as
+          | maplibregl.GeoJSONSource
+          | undefined;
+        shadowSource?.setData({ type: "FeatureCollection", features: [] });
       }
 
       addLayerIfMissing({
@@ -1118,16 +1159,24 @@ export function MapLibreMap({
       mapInstance.off("moveend", refreshEnvironmentViewport);
       mapInstance.off("style.load", refreshEnvironmentViewport);
     };
-  }, [ambientRoutes, detailPreset, mapBounds, mapInstance, mapZoom, transportVisibility]);
+  }, [
+    ambientRoutes,
+    detailPreset,
+    mapBounds,
+    mapInstance,
+    mapZoom,
+    timeMode,
+    transportVisibility,
+    visibleLayers.buildings,
+  ]);
 
   useEffect(() => {
     if (!mapInstance) return;
 
     let phase = 0;
     const interval = window.setInterval(() => {
-      if (!mapInstance.getLayer(waterViewportToneLayerId)) return;
+      const waterLayerIds = nativeWaterLayerIdsRef.current;
       phase += 0.23;
-      const { baseOpacity } = getAnimatedWaterOpacities(phase);
       transportPhaseRef.current = phase;
 
       try {
@@ -1159,17 +1208,36 @@ export function MapLibreMap({
             }),
           );
         }
-        mapInstance.setPaintProperty(waterViewportToneLayerId, "fill-opacity", [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          9,
-          Math.max(0.2, baseOpacity * 1.35),
-          14,
-          Math.max(0.28, baseOpacity * 1.56),
-          18,
-          Math.max(0.36, baseOpacity * 1.7),
-        ]);
+        const shimmer = 0.91 + Math.sin(phase * 0.7) * 0.05;
+        const brightness = Math.max(140, Math.min(176, Math.round(158 * shimmer)));
+        const mid = Math.max(122, Math.min(164, Math.round(146 * shimmer)));
+        const deep = Math.max(108, Math.min(152, Math.round(132 * shimmer)));
+
+        for (const layerId of waterLayerIds) {
+          if (!mapInstance.getLayer(layerId)) continue;
+          mapInstance.setPaintProperty(layerId, "fill-color", [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            8,
+            `rgb(${deep - 18}, ${mid - 12}, ${brightness - 8})`,
+            13,
+            `rgb(${deep}, ${mid}, ${brightness})`,
+            17,
+            `rgb(${deep - 6}, ${mid - 4}, ${brightness - 3})`,
+          ]);
+          mapInstance.setPaintProperty(layerId, "fill-opacity", [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            8,
+            0.88,
+            13,
+            0.92,
+            17,
+            0.95,
+          ]);
+        }
       } catch {}
     }, 280);
 
@@ -1182,7 +1250,6 @@ export function MapLibreMap({
     mapZoom,
     transportVisibility,
     transportEntitySourceId,
-    waterViewportToneLayerId,
   ]);
 
   useEffect(() => {
