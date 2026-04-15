@@ -3,10 +3,13 @@
 import type maplibregl from "maplibre-gl";
 import { useEffect } from "react";
 
+import { getShadowPreset } from "@/features/map/lib/weather/weather-effects";
+import type { TimeMode } from "@/features/map/store/map.store";
+
 export function useBuildingLayer(
   map: maplibregl.Map | null,
   visible: boolean,
-  opacity: number,
+  timeMode: TimeMode,
 ) {
   useEffect(() => {
     if (!map) return;
@@ -28,13 +31,9 @@ export function useBuildingLayer(
         map.setLayoutProperty(id, "visibility", visibility);
 
         if (layer.type === "fill-extrusion") {
-          map.setPaintProperty(id, "fill-extrusion-color", "#d1d5db");
+          map.setPaintProperty(id, "fill-extrusion-color", "#cbd5e1");
           map.setPaintProperty(id, "fill-extrusion-vertical-gradient", true);
-          map.setPaintProperty(
-            id,
-            "fill-extrusion-opacity",
-            Math.min(0.94, Math.max(0.4, opacity)),
-          );
+          map.setPaintProperty(id, "fill-extrusion-opacity", 1);
           map.setPaintProperty(id, "fill-extrusion-base", [
             "coalesce",
             ["get", "render_min_height"],
@@ -57,6 +56,14 @@ export function useBuildingLayer(
           ]);
         }
       });
+
+      const shadowPreset = getShadowPreset(timeMode);
+      map.setLight({
+        anchor: "viewport",
+        color: shadowPreset.color,
+        intensity: shadowPreset.intensity,
+        position: shadowPreset.position,
+      });
     };
 
     applyBuildingStyle();
@@ -65,5 +72,5 @@ export function useBuildingLayer(
     return () => {
       map.off("styledata", applyBuildingStyle);
     };
-  }, [map, visible, opacity]);
+  }, [map, timeMode, visible]);
 }

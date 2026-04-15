@@ -8,6 +8,8 @@ import Map, { NavigationControl } from "react-map-gl/maplibre";
 import floodData from "@/data/geojson/flood-sample.json";
 import type { PlaceItem } from "@/data/places";
 import type { FloodGeoJson } from "@/features/flood/types/flood.types";
+import { MapDataLayers } from "@/features/map/components/layers/map-data-layers";
+import { MapFeatureOverlays } from "@/features/map/components/overlays/map-feature-overlays";
 import {
   AMBIENT_TRAFFIC_ROUTE_SCAN,
   MAP_DETAIL_ZOOM,
@@ -23,9 +25,11 @@ import { applyMapStyle } from "@/features/map/lib/style/apply-map-style";
 import { buildAmbientTrafficSource } from "@/features/map/lib/traffic/build-ambient-traffic-source";
 import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-viewport-vegetation";
 import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
-import { useNavigationPlayback } from "@/features/navigation/hooks/use-navigation-playback";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
+import { NavigationHud } from "@/features/navigation/components/navigation-hud";
+import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
+import { useNavigationPlayback } from "@/features/navigation/hooks/use-navigation-playback";
 import {
   MAP_25D_DEFAULT_BEARING,
   MAP_25D_DEFAULT_PITCH,
@@ -33,11 +37,6 @@ import {
   MAP_STYLE_2D,
   MAP_STYLE_25D,
 } from "@/lib/constants/map.constants";
-
-import { MapDataLayers } from "@/features/map/components/layers/map-data-layers";
-import { MapFeatureOverlays } from "@/features/map/components/overlays/map-feature-overlays";
-import { NavigationHud } from "@/features/navigation/components/navigation-hud";
-import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
 
 type Props = {
   selectedPlace: PlaceItem | null;
@@ -91,7 +90,6 @@ export function MapLibreMap({
   const {
     mapMode,
     visibleLayers,
-    buildingOpacity,
     trafficVisualizationEnabled,
     trafficDensity,
     laneDetailEnabled,
@@ -100,6 +98,7 @@ export function MapLibreMap({
     toggleTrafficVisualization,
     notifyMapInteraction,
     setMapEngine,
+    timeMode,
   } = useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
@@ -128,7 +127,7 @@ export function MapLibreMap({
     [],
   );
 
-  useBuildingLayer(mapInstance, visibleLayers.buildings, buildingOpacity);
+  useBuildingLayer(mapInstance, visibleLayers.buildings, timeMode);
   useMapViewMode(mapInstance, mapMode);
   useMapFlyToPlace(mapInstance, selectedPlace);
 

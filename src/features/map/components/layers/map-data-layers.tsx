@@ -108,14 +108,7 @@ export function MapDataLayers({
                   2,
                   1200,
                 ],
-                "fill-extrusion-opacity": [
-                  "case",
-                  ["==", ["get", "id"], selectedId],
-                  1,
-                  ["==", ["get", "id"], hoveredId],
-                  0.95,
-                  0.64,
-                ],
+                "fill-extrusion-opacity": 0.72,
               }}
             />
           ) : (

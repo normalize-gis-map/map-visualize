@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { DashboardLeftRail } from "@/components/dashboard/dashboard-left-rail";
 import { DashboardOverlay } from "@/components/dashboard/dashboard-overlay";
@@ -10,6 +10,7 @@ import { MapEngineContainer } from "@/components/map/engines/map-engine-containe
 import type { PlaceItem } from "@/data/places";
 import { useFloodData } from "@/features/flood/hooks/use-flood-data";
 import { LayerCatalog } from "@/features/map/components/controls/layer-catalog";
+import { getSceneTone } from "@/features/map/lib/weather/weather-effects";
 import { useFloodStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
 
@@ -22,53 +23,64 @@ type RoutePayload = {
 
 function SceneEffectsOverlay() {
   const { transportVisibility, weatherMode, timeMode } = useFloodStore();
+  const tone = getSceneTone(weatherMode, timeMode);
 
-  const weatherTone =
-    weatherMode === "sun"
-      ? "bg-amber-300/10"
-      : weatherMode === "snows"
-        ? "bg-cyan-100/12"
-        : "bg-slate-700/18";
-
-  const timeTone =
-    timeMode === "night"
-      ? "bg-slate-950/45"
-      : timeMode === "morning"
-        ? "bg-amber-300/8"
-        : timeMode === "noon"
-          ? "bg-white/8"
-          : timeMode === "evening"
-            ? "bg-orange-400/10"
-            : "bg-transparent";
+  const transportBadges = useMemo(
+    () => [
+      {
+        key: "boats",
+        enabled: transportVisibility.boats,
+        label: "Boats active",
+        className:
+          "border-cyan-200/25 bg-cyan-300/12 text-cyan-100 bottom-16",
+      },
+      {
+        key: "bike",
+        enabled: transportVisibility.bike,
+        label: "Bike flow active",
+        className:
+          "border-lime-200/25 bg-lime-300/12 text-lime-100 bottom-24",
+      },
+      {
+        key: "people",
+        enabled: transportVisibility.people,
+        label: "Pedestrian flow active",
+        className:
+          "border-fuchsia-200/25 bg-fuchsia-300/12 text-fuchsia-100 bottom-32",
+      },
+    ],
+    [transportVisibility.bike, transportVisibility.boats, transportVisibility.people],
+  );
 
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${weatherTone}`}
+        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${tone.weatherTone}`}
       />
       <div
-        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${timeTone}`}
+        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${tone.timeTone}`}
+      />
+      <div
+        className={`pointer-events-none absolute inset-0 z-10 transition duration-300 ${tone.weatherContrast}`}
       />
 
-      {weatherMode === "rain" ? (
-        <div className="pointer-events-none absolute inset-0 z-10 bg-[linear-gradient(110deg,rgba(148,163,184,0.03)_0%,rgba(148,163,184,0.03)_45%,transparent_45%,transparent_55%,rgba(148,163,184,0.03)_55%,rgba(148,163,184,0.03)_100%)] bg-[length:28px_28px] opacity-70" />
+      {tone.rainPattern ? (
+        <div className="pointer-events-none absolute inset-0 z-10 bg-[repeating-linear-gradient(108deg,rgba(148,163,184,0.1)_0px,rgba(148,163,184,0.1)_1px,transparent_1px,transparent_12px)] opacity-45" />
+      ) : null}
+      {tone.snowPattern ? (
+        <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle,rgba(226,232,240,0.55)_1px,transparent_1px)] bg-[length:16px_16px] opacity-30" />
       ) : null}
 
-      {transportVisibility.boats ? (
-        <div className="pointer-events-none absolute right-10 bottom-16 z-20 rounded-full border border-cyan-200/25 bg-cyan-300/12 px-3 py-1 text-[10px] font-semibold tracking-[0.12em] text-cyan-100 uppercase">
-          Boats active
-        </div>
-      ) : null}
-      {transportVisibility.bike ? (
-        <div className="pointer-events-none absolute right-10 bottom-24 z-20 rounded-full border border-lime-200/25 bg-lime-300/12 px-3 py-1 text-[10px] font-semibold tracking-[0.12em] text-lime-100 uppercase">
-          Bike flow active
-        </div>
-      ) : null}
-      {transportVisibility.people ? (
-        <div className="pointer-events-none absolute right-10 bottom-32 z-20 rounded-full border border-fuchsia-200/25 bg-fuchsia-300/12 px-3 py-1 text-[10px] font-semibold tracking-[0.12em] text-fuchsia-100 uppercase">
-          Pedestrian flow active
-        </div>
-      ) : null}
+      {transportBadges.map((badge) =>
+        badge.enabled ? (
+          <div
+            key={badge.key}
+            className={`pointer-events-none absolute right-10 z-20 rounded-full border px-3 py-1 text-[10px] font-semibold tracking-[0.12em] uppercase ${badge.className}`}
+          >
+            {badge.label}
+          </div>
+        ) : null,
+      )}
     </>
   );
 }
