@@ -130,7 +130,11 @@ export function buildBoatEntities({
       if (heading === null) continue;
 
       const headingDeg = heading + headingJitter(seed);
+      const headingRad = (headingDeg * Math.PI) / 180;
+      const dirX = Math.cos(headingRad);
+      const dirY = Math.sin(headingRad);
       const scale = boatScaleForZoom(zoom, area) * (0.92 + (fleetIndex % 4) * 0.06);
+      const speed = Math.min(0.65, 0.12 + (scale * 26000) / Math.max(1, zoom));
       const hull = buildBoatHullPolygon(center, headingDeg, scale);
       const cabin = buildBoatCabinPolygon(center, headingDeg, scale);
       const deckLine = buildBoatDeckLine(center, headingDeg, scale);
@@ -139,26 +143,35 @@ export function buildBoatEntities({
       acceptedCenters.push(center);
       fleetIndex += 1;
 
+      const boatMeta = {
+        boatId: `${ringIndex}-${attempt}-${fleetIndex}`,
+        centerLng: center[0],
+        centerLat: center[1],
+        dirX,
+        dirY,
+        speed,
+      };
+
       features.push(
         {
           type: "Feature",
           geometry: { type: "Polygon", coordinates: [shadow] },
-          properties: { part: "shadow", mode: "boats" },
+          properties: { part: "shadow", mode: "boats", ...boatMeta },
         },
         {
           type: "Feature",
           geometry: { type: "Polygon", coordinates: [hull] },
-          properties: { part: "hull", mode: "boats" },
+          properties: { part: "hull", mode: "boats", ...boatMeta },
         },
         {
           type: "Feature",
           geometry: { type: "Polygon", coordinates: [cabin] },
-          properties: { part: "cabin", mode: "boats" },
+          properties: { part: "cabin", mode: "boats", ...boatMeta },
         },
         {
           type: "Feature",
           geometry: { type: "LineString", coordinates: deckLine },
-          properties: { part: "deck", mode: "boats" },
+          properties: { part: "deck", mode: "boats", ...boatMeta },
         },
       );
     }

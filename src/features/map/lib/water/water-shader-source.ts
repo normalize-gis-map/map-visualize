@@ -1,3 +1,5 @@
+import { MAX_WATER_WAKES } from "@/features/map/lib/water/water-animation";
+
 export const WATER_VERTEX_SHADER = `
 precision highp float;
 
@@ -17,9 +19,12 @@ precision mediump float;
 uniform float u_time;
 uniform float u_opacity;
 uniform float u_ripple_scale;
-uniform vec2 u_flow;
+uniform vec2 u_flowDirection;
 uniform vec3 u_base_color;
 uniform vec3 u_highlight_color;
+uniform float u_weatherMode;
+uniform float u_timeMode;
+uniform vec4 u_wakes[${MAX_WATER_WAKES}];
 
 varying vec2 v_world;
 
@@ -27,21 +32,72 @@ float wave(vec2 p, vec2 dir, float freq, float speed) {
   return sin(dot(p, dir) * freq + u_time * speed);
 }
 
+float wakeField(vec2 world, vec4 wake) {
+  float strength = length(wake.zw);
+  if (strength <= 0.00001) return 0.0;
+
+  vec2 dir = normalize(wake.zw);
+  vec2 rel = world - wake.xy;
+  float behind = dot(rel, -dir);
+  if (behind <= 0.0) return 0.0;
+
+  vec2 crossDir = vec2(-dir.y, dir.x);
+  float lateral = dot(rel, crossDir);
+  float trail = exp(-behind * 21000.0) * exp(-lateral * lateral * 180000000.0);
+  float ripple = 0.5 + 0.5 * sin(behind * 130000.0 - u_time * 3.2);
+  return ripple * trail * strength;
+}
+
 void main() {
-  vec2 uv = v_world * u_ripple_scale;
-  vec2 flow = normalize(u_flow);
+  vec2 flow = normalize(u_flowDirection);
   vec2 crossFlow = vec2(-flow.y, flow.x);
 
-  float low = wave(uv, flow, 2200.0, 0.18);
-  float mid = wave(uv, crossFlow, 3400.0, 0.12);
-  float high = wave(uv, normalize(flow + crossFlow * 0.45), 5200.0, 0.26);
+  float weatherRippleBoost = u_weatherMode < 0.5 ? 1.0 : (u_weatherMode < 1.5 ? 1.36 : 0.78);
+  float weatherMotion = u_weatherMode < 0.5 ? 1.0 : (u_weatherMode < 1.5 ? 1.12 : 0.7);
+
+  vec2 uv = v_world * (u_ripple_scale * weatherRippleBoost);
+  uv += flow * (u_time * 0.00003 * weatherMotion);
+
+  float low = wave(uv, flow, 2200.0, 0.18 * weatherMotion);
+  float mid = wave(uv, crossFlow, 3400.0, 0.12 * weatherMotion);
+  float high = wave(uv, normalize(flow + crossFlow * 0.45), 5200.0, 0.26 * weatherMotion);
 
   float ripple = low * 0.42 + mid * 0.34 + high * 0.24;
-  float shimmer = smoothstep(0.18, 0.92, ripple * 0.5 + 0.5);
 
-  vec3 color = mix(u_base_color, u_highlight_color, shimmer * 0.38);
-  float alpha = u_opacity * (0.82 + shimmer * 0.18);
+  float wakeContribution = 0.0;
+  for (int i = 0; i < ${MAX_WATER_WAKES}; i += 1) {
+    wakeContribution += wakeField(v_world, u_wakes[i]);
+  }
+  wakeContribution = min(0.28, wakeContribution);
 
+  float shimmer = smoothstep(0.18, 0.92, ripple * 0.5 + 0.5 + wakeContribution * 0.7);
+
+  vec3 baseColor = u_base_color;
+  vec3 highlightColor = u_highlight_color;
+
+  if (u_weatherMode > 0.5 && u_weatherMode < 1.5) {
+    baseColor *= vec3(0.84, 0.87, 0.9);
+    highlightColor *= vec3(0.88, 0.9, 0.92);
+  } else if (u_weatherMode >= 1.5) {
+    baseColor = mix(baseColor, vec3(0.62, 0.7, 0.76), 0.28);
+    highlightColor = mix(highlightColor, vec3(0.84, 0.88, 0.92), 0.52);
+  }
+
+  if (u_timeMode < 0.5) {
+    baseColor = mix(baseColor, vec3(0.49, 0.45, 0.39), 0.12);
+    highlightColor *= 0.88;
+  } else if (u_timeMode < 1.5) {
+    highlightColor *= 1.08;
+  } else if (u_timeMode < 2.5) {
+    baseColor = mix(baseColor, vec3(0.54, 0.38, 0.3), 0.18);
+    highlightColor = mix(highlightColor, vec3(0.94, 0.76, 0.62), 0.24);
+  } else {
+    baseColor *= vec3(0.56, 0.62, 0.72);
+    highlightColor *= vec3(0.46, 0.52, 0.62);
+  }
+
+  vec3 color = mix(baseColor, highlightColor, shimmer * 0.4);
+  float alpha = u_opacity * (0.8 + shimmer * 0.17 + wakeContribution * 0.45);
   gl_FragColor = vec4(color, alpha);
 }
 `;

@@ -30,6 +30,7 @@ import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-vie
 import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
 import { createWaterCustomLayer } from "@/features/map/lib/water/water-custom-layer";
 import { ensureWaterLayerOrder } from "@/features/map/lib/water/water-layer-order";
+import { extractBoatSamples } from "@/features/map/lib/water/water-wake-system";
 import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
@@ -800,6 +801,7 @@ export function MapLibreMap({
           );
         } catch {}
       }
+      waterCustomLayerRef.current?.setSceneContext({ weatherMode, timeMode });
       ensureWaterLayerOrder(mapInstance, "map-water-custom-layer");
 
       if (waterLayerIds.length) {
@@ -828,9 +830,11 @@ export function MapLibreMap({
         } else {
           boatSource.setData(boatData);
         }
+        waterCustomLayerRef.current?.setBoatSamples(extractBoatSamples(boatData));
       } else {
         visibleWaterFeaturesRef.current = [];
         waterCustomLayerRef.current?.setWaterFeatures([]);
+        waterCustomLayerRef.current?.setBoatSamples([]);
       }
 
       const parkLayerIds =
@@ -1183,6 +1187,7 @@ export function MapLibreMap({
     timeMode,
     transportVisibility,
     visibleLayers.buildings,
+    weatherMode,
   ]);
 
   useEffect(() => {

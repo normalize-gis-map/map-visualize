@@ -1,18 +1,34 @@
 import type maplibregl from "maplibre-gl";
 
-import { animationTimeSeconds, DEFAULT_WATER_SHADER_CONFIG } from "@/features/map/lib/water/water-animation";
+import {
+  animationTimeSeconds,
+  DEFAULT_WATER_SHADER_CONFIG,
+  MAX_WATER_WAKES,
+  timeModeToNumber,
+  weatherModeToNumber,
+} from "@/features/map/lib/water/water-animation";
+import { deriveWaterFlowDirection } from "@/features/map/lib/water/water-flow-direction";
 import { buildWaterGeometry } from "@/features/map/lib/water/water-geometry";
 import { WATER_FRAGMENT_SHADER, WATER_VERTEX_SHADER } from "@/features/map/lib/water/water-shader-source";
-import type { WaterCustomLayer, WaterFeature } from "@/features/map/lib/water/water-types";
+import type {
+  BoatSample,
+  WaterCustomLayer,
+  WaterFeature,
+  WaterSceneContext,
+} from "@/features/map/lib/water/water-types";
+import { WaterWakeSystem } from "@/features/map/lib/water/water-wake-system";
 
 type Uniforms = {
   matrix: WebGLUniformLocation | null;
   time: WebGLUniformLocation | null;
   opacity: WebGLUniformLocation | null;
   rippleScale: WebGLUniformLocation | null;
-  flow: WebGLUniformLocation | null;
+  flowDirection: WebGLUniformLocation | null;
   baseColor: WebGLUniformLocation | null;
   highlightColor: WebGLUniformLocation | null;
+  weatherMode: WebGLUniformLocation | null;
+  timeMode: WebGLUniformLocation | null;
+  wakes: WebGLUniformLocation | null;
 };
 
 function compileShader(gl: WebGLRenderingContext, type: number, source: string) {
@@ -56,17 +72,31 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
   let buffer: WebGLBuffer | null = null;
   let vertexCount = 0;
   const startTime = performance.now();
+  let prevFrame = startTime;
   let positionLocation = -1;
   let uniforms: Uniforms | null = null;
+  let flowDirection: [number, number] = DEFAULT_WATER_SHADER_CONFIG.flowDirection;
+  let sceneContext: WaterSceneContext = { weatherMode: "sun", timeMode: "live" };
+  const wakeSystem = new WaterWakeSystem(MAX_WATER_WAKES);
+  const wakeUniformBuffer = new Float32Array(MAX_WATER_WAKES * 4);
 
   const setWaterFeatures = (features: WaterFeature[]) => {
-    if (!gl || !buffer) return;
+    if (!buffer || !gl) return;
 
     const geometry = buildWaterGeometry(features);
     vertexCount = geometry.vertexCount;
+    flowDirection = deriveWaterFlowDirection(features, flowDirection);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, geometry.vertices, gl.DYNAMIC_DRAW);
+  };
+
+  const setBoatSamples = (boats: BoatSample[]) => {
+    wakeSystem.ingestBoats(boats);
+  };
+
+  const setSceneContext = (scene: WaterSceneContext) => {
+    sceneContext = scene;
   };
 
   return {
@@ -75,8 +105,8 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
     renderingMode: "2d",
     onAdd(mapInstance, glContext) {
       map = mapInstance;
-      gl = glContext;
 
+      gl = glContext;
       program = createProgram(glContext);
       if (!program) return;
 
@@ -89,9 +119,12 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
         time: glContext.getUniformLocation(program, "u_time"),
         opacity: glContext.getUniformLocation(program, "u_opacity"),
         rippleScale: glContext.getUniformLocation(program, "u_ripple_scale"),
-        flow: glContext.getUniformLocation(program, "u_flow"),
+        flowDirection: glContext.getUniformLocation(program, "u_flowDirection"),
         baseColor: glContext.getUniformLocation(program, "u_base_color"),
         highlightColor: glContext.getUniformLocation(program, "u_highlight_color"),
+        weatherMode: glContext.getUniformLocation(program, "u_weatherMode"),
+        timeMode: glContext.getUniformLocation(program, "u_timeMode"),
+        wakes: glContext.getUniformLocation(program, "u_wakes"),
       };
 
       glContext.bindBuffer(glContext.ARRAY_BUFFER, buffer);
@@ -99,6 +132,11 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
     },
     render(glContext, matrix) {
       if (!program || !buffer || !uniforms || vertexCount < 3 || positionLocation < 0) return;
+
+      const now = performance.now();
+      wakeSystem.step((now - prevFrame) / 1000);
+      prevFrame = now;
+      wakeSystem.fillUniforms(wakeUniformBuffer);
 
       glContext.useProgram(program);
       glContext.bindBuffer(glContext.ARRAY_BUFFER, buffer);
@@ -110,7 +148,7 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
       glContext.uniform1f(uniforms.time, animationTimeSeconds(startTime));
       glContext.uniform1f(uniforms.opacity, config.opacity);
       glContext.uniform1f(uniforms.rippleScale, config.rippleScale);
-      glContext.uniform2f(uniforms.flow, config.flowDirection[0], config.flowDirection[1]);
+      glContext.uniform2f(uniforms.flowDirection, flowDirection[0], flowDirection[1]);
       glContext.uniform3f(uniforms.baseColor, config.baseColor[0], config.baseColor[1], config.baseColor[2]);
       glContext.uniform3f(
         uniforms.highlightColor,
@@ -118,6 +156,9 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
         config.highlightColor[1],
         config.highlightColor[2],
       );
+      glContext.uniform1f(uniforms.weatherMode, weatherModeToNumber(sceneContext.weatherMode));
+      glContext.uniform1f(uniforms.timeMode, timeModeToNumber(sceneContext.timeMode));
+      glContext.uniform4fv(uniforms.wakes, wakeUniformBuffer);
 
       glContext.enable(glContext.BLEND);
       glContext.blendFunc(glContext.SRC_ALPHA, glContext.ONE_MINUS_SRC_ALPHA);
@@ -130,10 +171,12 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
       if (program) glContext.deleteProgram(program);
       buffer = null;
       program = null;
-      gl = null;
       map = null;
+      gl = null;
       uniforms = null;
     },
     setWaterFeatures,
+    setBoatSamples,
+    setSceneContext,
   };
 }
