@@ -3,8 +3,7 @@
 import type maplibregl from "maplibre-gl";
 import { useEffect } from "react";
 
-import { getShadowPreset } from "@/features/map/lib/weather/weather-effects";
-import type { TimeMode } from "@/features/map/store/map.store";
+import type { TimeMode } from "@/features/map/lib/weather/weather-effects";
 
 export function useBuildingLayer(
   map: maplibregl.Map | null,
@@ -57,13 +56,6 @@ export function useBuildingLayer(
         }
       });
 
-      const shadowPreset = getShadowPreset(timeMode);
-      map.setLight({
-        anchor: "viewport",
-        color: shadowPreset.color,
-        intensity: shadowPreset.intensity,
-        position: shadowPreset.position,
-      });
     };
 
     applyBuildingStyle();

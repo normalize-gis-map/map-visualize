@@ -88,7 +88,7 @@ const WEATHER_OPTIONS: Array<{
 }> = [
   { id: "sun", label: "Sun", icon: <Sun className="h-4 w-4" /> },
   { id: "rain", label: "Rain", icon: <CloudRain className="h-4 w-4" /> },
-  { id: "snows", label: "Snows", icon: <CloudSnow className="h-4 w-4" /> },
+  { id: "snow", label: "Snow", icon: <CloudSnow className="h-4 w-4" /> },
 ];
 
 const TIME_OPTIONS: Array<{ id: TimeMode; label: string; icon: React.ReactNode }> = [

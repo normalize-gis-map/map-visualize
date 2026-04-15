@@ -25,8 +25,10 @@ import { applyMapStyle } from "@/features/map/lib/style/apply-map-style";
 import { buildAmbientTrafficSource } from "@/features/map/lib/traffic/build-ambient-traffic-source";
 import { buildViewportVegetation } from "@/features/map/lib/vegetation/build-viewport-vegetation";
 import { buildViewportWaterEffect } from "@/features/map/lib/water/build-viewport-water-effect";
+import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
+import { WeatherOverlay } from "@/features/map/ui/weather-overlay";
 import { NavigationHud } from "@/features/navigation/components/navigation-hud";
 import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
 import { useNavigationPlayback } from "@/features/navigation/hooks/use-navigation-playback";
@@ -99,6 +101,7 @@ export function MapLibreMap({
     notifyMapInteraction,
     setMapEngine,
     timeMode,
+    weatherMode,
   } = useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
@@ -128,6 +131,12 @@ export function MapLibreMap({
   );
 
   useBuildingLayer(mapInstance, visibleLayers.buildings, timeMode);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+    applySceneStyle(mapInstance, weatherMode, timeMode);
+  }, [mapInstance, timeMode, weatherMode]);
+
   useMapViewMode(mapInstance, mapMode);
   useMapFlyToPlace(mapInstance, selectedPlace);
 
@@ -1449,6 +1458,8 @@ export function MapLibreMap({
         onToggleTraffic={toggleTrafficVisualization}
         mapBearing={mapBearing}
       />
+
+      <WeatherOverlay weather={weatherMode} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
         <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">

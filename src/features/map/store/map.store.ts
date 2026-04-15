@@ -13,7 +13,7 @@ export type LayerKey =
 export type TrafficDensity = "off" | "light" | "full";
 export type DetailPreset = "balanced" | "high";
 export type TransportMode = "cars" | "boats" | "bike" | "people";
-export type WeatherMode = "sun" | "rain" | "snows";
+export type WeatherMode = "sun" | "rain" | "snow";
 export type TimeMode = "live" | "night" | "morning" | "noon" | "evening";
 
 type VisibleLayers = Record<LayerKey, boolean>;
