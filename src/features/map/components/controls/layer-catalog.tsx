@@ -1,11 +1,16 @@
 "use client";
 
 import {
+  Bike,
   Building2,
   Car,
   Clock3,
   CloudRain,
   PanelLeftClose,
+  PersonStanding,
+  Sailboat,
+  Sun,
+  Umbrella,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -17,6 +22,9 @@ type LayerCatalogProps = {
 };
 
 type CategoryId = "buildings" | "transportation" | "weather" | "time";
+type TransportMode = "cars" | "boats" | "bike" | "people";
+type WeatherMode = "sun" | "rain" | "snows";
+type TimeMode = "live" | "night" | "morning" | "noon" | "evening";
 
 const CATEGORY_ITEMS: Array<{
   id: CategoryId;
@@ -30,30 +38,65 @@ const CATEGORY_ITEMS: Array<{
     label: "Buildings",
     icon: <Building2 className="h-4 w-4" />,
     layerKey: "buildings",
-    description: "3D building extrusions",
+    description: "3D building visibility controls",
   },
   {
     id: "transportation",
     label: "Transportation",
     icon: <Car className="h-4 w-4" />,
     layerKey: "roads",
-    description: "Road network overlays",
+    description: "Mobility overlays and transport filters",
   },
   {
     id: "weather",
     label: "Weather",
     icon: <CloudRain className="h-4 w-4" />,
     layerKey: "flood",
-    description: "Live weather / flood overlays",
+    description: "Weather scenario and flood context",
   },
   {
     id: "time",
     label: "Time",
     icon: <Clock3 className="h-4 w-4" />,
     layerKey: "riskZones",
-    description: "Temporal risk zoning layer",
+    description: "Temporal display presets",
   },
 ];
+
+const TRANSPORT_OPTIONS: Array<{
+  id: TransportMode;
+  label: string;
+  icon: React.ReactNode;
+}> = [
+  { id: "cars", label: "Cars", icon: <Car className="h-3.5 w-3.5" /> },
+  {
+    id: "boats",
+    label: "Boats",
+    icon: <Sailboat className="h-3.5 w-3.5" />,
+  },
+  { id: "bike", label: "Bike", icon: <Bike className="h-3.5 w-3.5" /> },
+  {
+    id: "people",
+    label: "People",
+    icon: <PersonStanding className="h-3.5 w-3.5" />,
+  },
+];
+
+const WEATHER_OPTIONS: Array<{
+  id: WeatherMode;
+  label: string;
+  icon: React.ReactNode;
+}> = [
+  { id: "sun", label: "Sun", icon: <Sun className="h-3.5 w-3.5" /> },
+  { id: "rain", label: "Rain", icon: <Umbrella className="h-3.5 w-3.5" /> },
+  {
+    id: "snows",
+    label: "Snows",
+    icon: <CloudRain className="h-3.5 w-3.5" />,
+  },
+];
+
+const TIME_OPTIONS: TimeMode[] = ["live", "night", "morning", "noon", "evening"];
 
 function FloatingToolbar({
   active,
@@ -86,6 +129,33 @@ function FloatingToolbar({
   );
 }
 
+function OptionChip({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-semibold transition ${
+        active
+          ? "border-cyan-300/60 bg-cyan-400/20 text-cyan-100"
+          : "border-slate-700 bg-slate-900/70 text-slate-200 hover:border-slate-500"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 function FloatingPanel({
   category,
   onClose,
@@ -93,8 +163,105 @@ function FloatingPanel({
   category: (typeof CATEGORY_ITEMS)[number];
   onClose: () => void;
 }) {
-  const { visibleLayers, toggleLayer } = useFloodStore();
+  const { visibleLayers, toggleLayer, trafficDensity, setTrafficDensity } =
+    useFloodStore();
+  const [transportModes, setTransportModes] = useState<TransportMode[]>(["cars"]);
+  const [weatherMode, setWeatherMode] = useState<WeatherMode>("rain");
+  const [timeMode, setTimeMode] = useState<TimeMode>("live");
   const active = visibleLayers[category.layerKey];
+
+  const toggleTransportMode = (mode: TransportMode) => {
+    setTransportModes((prev) =>
+      prev.includes(mode) ? prev.filter((item) => item !== mode) : [...prev, mode],
+    );
+
+    if (mode === "cars") {
+      setTrafficDensity(
+        transportModes.includes("cars") ? "off" : trafficDensity === "off" ? "light" : trafficDensity,
+      );
+    }
+  };
+
+  const renderCategoryContent = () => {
+    if (category.id === "buildings") {
+      return (
+        <>
+          <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
+          <OptionChip
+            active={active}
+            onClick={() => toggleLayer(category.layerKey)}
+            label={active ? "Visible" : "Hidden"}
+            icon={<Building2 className="h-3.5 w-3.5" />}
+          />
+          <p className="mt-3 text-[11px] text-slate-500">
+            Additional building controls can be connected here later.
+          </p>
+        </>
+      );
+    }
+
+    if (category.id === "transportation") {
+      return (
+        <>
+          <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
+          <div className="flex flex-wrap gap-2">
+            {TRANSPORT_OPTIONS.map((option) => (
+              <OptionChip
+                key={option.id}
+                active={transportModes.includes(option.id)}
+                onClick={() => toggleTransportMode(option.id)}
+                label={option.label}
+                icon={option.icon}
+              />
+            ))}
+          </div>
+        </>
+      );
+    }
+
+    if (category.id === "weather") {
+      return (
+        <>
+          <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
+          <div className="flex flex-wrap gap-2">
+            {WEATHER_OPTIONS.map((option) => (
+              <OptionChip
+                key={option.id}
+                active={weatherMode === option.id}
+                onClick={() => {
+                  setWeatherMode(option.id);
+                  toggleLayer(category.layerKey);
+                }}
+                label={option.label}
+                icon={option.icon}
+              />
+            ))}
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
+        <div className="flex flex-wrap gap-2">
+          {TIME_OPTIONS.map((option) => (
+            <OptionChip
+              key={option}
+              active={timeMode === option}
+              onClick={() => {
+                setTimeMode(option);
+                if (!visibleLayers[category.layerKey]) {
+                  toggleLayer(category.layerKey);
+                }
+              }}
+              label={option[0].toUpperCase() + option.slice(1)}
+            />
+          ))}
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="w-[248px] rounded-xl border border-slate-700/75 bg-slate-950/86 p-3 shadow-2xl backdrop-blur-2xl">
@@ -115,19 +282,7 @@ function FloatingPanel({
         </button>
       </div>
 
-      <p className="mb-3 text-xs leading-5 text-slate-400">{category.description}</p>
-
-      <button
-        type="button"
-        onClick={() => toggleLayer(category.layerKey)}
-        className={`inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition ${
-          active
-            ? "bg-cyan-500 text-slate-950"
-            : "border border-slate-700 bg-slate-900/70 text-slate-200"
-        }`}
-      >
-        {active ? "Visible" : "Enable layer"}
-      </button>
+      {renderCategoryContent()}
     </div>
   );
 }

@@ -49,13 +49,7 @@ export function TopAppHeader({
   const [selectedPreviewPlace, setSelectedPreviewPlace] =
     useState<PlaceItem | null>(null);
   const activeMode = mode;
-  const {
-    mapEngine,
-    trafficVisualizationEnabled,
-    setMapEngine,
-    setMapMode,
-    setTrafficDensity,
-  } = useFloodStore();
+  const { mapEngine, setMapEngine, setMapMode } = useFloodStore();
 
   const handleSelectPlace = (place: PlaceItem) => {
     setSelectedPreviewPlace(place);
@@ -135,22 +129,6 @@ export function TopAppHeader({
                 3D
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                setTrafficDensity(trafficVisualizationEnabled ? "off" : "light")
-              }
-              className={`hidden h-10 items-center justify-center rounded-xl border px-3 text-xs font-semibold transition md:inline-flex ${
-                trafficVisualizationEnabled
-                  ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-100"
-                  : "border-slate-700 bg-slate-900/70 text-slate-300"
-              }`}
-              aria-label="Toggle vehicles"
-            >
-              <CarFront className="mr-1 h-3.5 w-3.5" />
-              Vehicles
-            </button>
 
             <AlertDrawer
               open={alertOpen}
