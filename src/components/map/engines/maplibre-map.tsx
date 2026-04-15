@@ -11,7 +11,6 @@ import type { FloodGeoJson } from "@/features/flood/types/flood.types";
 import { MapDataLayers } from "@/features/map/components/layers/map-data-layers";
 import { MapFeatureOverlays } from "@/features/map/components/overlays/map-feature-overlays";
 import {
-  AMBIENT_TRAFFIC_ROUTE_SCAN,
   MAP_DETAIL_ZOOM,
 } from "@/features/map/constants/map-detail.constants";
 import { useAmbientTraffic } from "@/features/map/hooks/use-ambient-traffic";
@@ -20,6 +19,8 @@ import { useBuildingLayer } from "@/features/map/hooks/use-building-layer";
 import { useMapCursor } from "@/features/map/hooks/use-map-cursor";
 import { useMapFlyToPlace } from "@/features/map/hooks/use-map-fly-to-place";
 import { useMapViewMode } from "@/features/map/hooks/use-map-view-mode";
+import { useMaplibreGestureGuards } from "@/features/map/hooks/maplibre/use-maplibre-gesture-guards";
+import { useMaplibreRoadNetwork } from "@/features/map/hooks/maplibre/use-maplibre-road-network";
 import { useSelectedFeatures } from "@/features/map/hooks/use-selected-features";
 import {
   buildBuildingShadows,
@@ -243,6 +244,23 @@ export function MapLibreMap({
   const sceneProfileRef = useRef<SceneProfile>(computeSceneProfile(timeMode, weatherMode));
   const sceneToneRef = useRef<SceneToneMapping>(buildToneMapping(computeSceneProfile(timeMode, weatherMode), 1));
 
+  useMaplibreRoadNetwork({
+    mapInstance,
+    trafficVisualizationEnabled,
+    trafficDensity,
+    detailPreset,
+    setAmbientNetworkRoutes,
+    roadRefreshTickRef,
+    estimateRouteLengthMeters,
+    classifyRoadClass,
+  });
+
+  useMaplibreGestureGuards(
+    mapInstance,
+    mapPointerInsideRef,
+    mapPointerDownRef,
+  );
+
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
     const east = bounds.getEast();
@@ -331,174 +349,6 @@ export function MapLibreMap({
       mapInstance.off("style.load", applyStyleOncePerSignature);
     };
   }, [applyMapVisualStyle, mapInstance]);
-
-  useEffect(() => {
-    if (
-      !mapInstance ||
-      !trafficVisualizationEnabled ||
-      trafficDensity === "off"
-    )
-      return;
-
-    const refreshRoadNetwork = () => {
-      const now = performance.now();
-      if (
-        now - roadRefreshTickRef.current <
-        AMBIENT_TRAFFIC_ROUTE_SCAN.throttleMs
-      )
-        return;
-      roadRefreshTickRef.current = now;
-
-      if (mapInstance.getZoom() < MAP_DETAIL_ZOOM.LOW) {
-        setAmbientNetworkRoutes((prev) => (prev.length ? [] : prev));
-        return;
-      }
-
-      const style = mapInstance.getStyle();
-      const currentZoom = mapInstance.getZoom();
-      const roadLayerIds =
-        style.layers
-          ?.filter(
-            (layer) =>
-              layer.type === "line" && layer.id.toLowerCase().includes("road"),
-          )
-          .map((layer) => layer.id) ?? [];
-
-      if (!roadLayerIds.length) return;
-
-      const features = mapInstance.queryRenderedFeatures(undefined, {
-        layers: roadLayerIds.slice(0, AMBIENT_TRAFFIC_ROUTE_SCAN.layers),
-      });
-
-      const serviceSelectionMod = currentZoom >= MAP_DETAIL_ZOOM.CLOSE ? 3 : 5;
-      const maxCollected =
-        currentZoom >= MAP_DETAIL_ZOOM.CLOSE
-          ? detailPreset === "high"
-            ? 120
-            : 96
-          : currentZoom >= MAP_DETAIL_ZOOM.MID
-            ? detailPreset === "high"
-              ? 84
-              : 64
-            : 36;
-      const minLengthMeters =
-        currentZoom >= MAP_DETAIL_ZOOM.CLOSE
-          ? 90
-          : currentZoom >= MAP_DETAIL_ZOOM.MID
-            ? 130
-            : 190;
-
-      const collected = features
-        .flatMap((feature) => {
-          const geometry = feature.geometry;
-          const className = String(
-            (feature.properties?.class as string | undefined) ??
-              (feature.properties?.type as string | undefined) ??
-              "",
-          ).toLowerCase();
-
-          const isMotorway = className.includes("motorway");
-          const isTrunk = className.includes("trunk");
-          const isPrimary = className.includes("primary");
-          const isSecondary = className.includes("secondary");
-          const isTertiary = className.includes("tertiary");
-          const isResidential = className.includes("residential");
-          const isService = className.includes("service");
-
-          const isEligible =
-            isMotorway ||
-            isTrunk ||
-            isPrimary ||
-            isSecondary ||
-            isTertiary ||
-            isResidential ||
-            isService;
-          if (!isEligible) return [];
-
-          if (!geometry) return [];
-          if (geometry.type === "LineString") {
-            const lengthMeters = estimateRouteLengthMeters(geometry.coordinates);
-            if (lengthMeters < minLengthMeters) return [];
-
-            if (isService) {
-              const keep =
-                Math.floor((geometry.coordinates[0]?.[0] ?? 0) * 10000) %
-                  serviceSelectionMod ===
-                0;
-              if (!keep) return [];
-            }
-
-            return [
-              {
-                coordinates: geometry.coordinates,
-                roadClass: classifyRoadClass(className),
-                lengthMeters,
-              } satisfies AmbientTrafficRoute,
-            ];
-          }
-          if (geometry.type === "MultiLineString") {
-            return geometry.coordinates.map(
-              (coordinates) => {
-                const lengthMeters = estimateRouteLengthMeters(coordinates);
-                return {
-                  coordinates,
-                  roadClass: classifyRoadClass(className),
-                  lengthMeters,
-                } satisfies AmbientTrafficRoute;
-              },
-            );
-          }
-          return [];
-        })
-        .filter(
-          (route) =>
-            route.coordinates.length > 3 &&
-            (route.lengthMeters ?? 0) >= minLengthMeters,
-        )
-        .map((route) => {
-          const classScore =
-            route.roadClass === "major" ? 1.25 : route.roadClass === "medium" ? 1 : 0.82;
-          const zoomScore = currentZoom >= MAP_DETAIL_ZOOM.CLOSE ? 1.08 : 0.94;
-          const lengthScore = Math.min(1.4, Math.max(0.35, (route.lengthMeters ?? 0) / 520));
-          return {
-            route,
-            score: classScore * lengthScore * zoomScore,
-          };
-        })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, Math.min(maxCollected, AMBIENT_TRAFFIC_ROUTE_SCAN.maxRoutes * 2))
-        .map((item) => item.route);
-
-      setAmbientNetworkRoutes((prev) => {
-        if (prev.length === collected.length) {
-          const sameHead =
-            prev[0]?.coordinates?.[0]?.[0] === collected[0]?.coordinates?.[0]?.[0] &&
-            prev[0]?.coordinates?.[0]?.[1] === collected[0]?.coordinates?.[0]?.[1];
-          const sameTail =
-            prev[prev.length - 1]?.coordinates?.[0]?.[0] ===
-              collected[collected.length - 1]?.coordinates?.[0]?.[0] &&
-            prev[prev.length - 1]?.coordinates?.[0]?.[1] ===
-              collected[collected.length - 1]?.coordinates?.[0]?.[1];
-          if (sameHead && sameTail) return prev;
-        }
-        return collected;
-      });
-    };
-
-    refreshRoadNetwork();
-    mapInstance.on("moveend", refreshRoadNetwork);
-
-    return () => {
-      mapInstance.off("moveend", refreshRoadNetwork);
-    };
-  }, [
-    classifyRoadClass,
-    detailPreset,
-    estimateRouteLengthMeters,
-    mapInstance,
-    trafficDensity,
-    trafficVisualizationEnabled,
-  ]);
 
   const routeCollection: FeatureCollection | null = routePayload
     ? {
@@ -1340,59 +1190,6 @@ export function MapLibreMap({
     weatherMode,
     lodProfile,
   ]);
-
-  useEffect(() => {
-    if (!mapInstance) return;
-
-    const container = mapInstance.getContainer();
-    container.style.touchAction = "pan-x pan-y";
-    container.style.overscrollBehaviorX = "contain";
-    container.style.overscrollBehaviorY = "contain";
-
-    const markPointerEnter = () => {
-      mapPointerInsideRef.current = true;
-    };
-    const markPointerLeave = () => {
-      mapPointerInsideRef.current = false;
-      mapPointerDownRef.current = false;
-    };
-    const markPointerDown = () => {
-      mapPointerDownRef.current = true;
-    };
-    const markPointerUp = () => {
-      mapPointerDownRef.current = false;
-    };
-
-    const preventHorizontalGesture = (event: WheelEvent) => {
-      if (!event.cancelable) return;
-      const mapOwnsInteraction =
-        mapPointerInsideRef.current || mapPointerDownRef.current;
-      if (
-        mapOwnsInteraction &&
-        Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.1
-      ) {
-        event.preventDefault();
-      }
-    };
-
-    container.addEventListener("pointerenter", markPointerEnter);
-    container.addEventListener("pointerleave", markPointerLeave);
-    container.addEventListener("pointerdown", markPointerDown);
-    container.addEventListener("pointerup", markPointerUp);
-    container.addEventListener("pointercancel", markPointerUp);
-    container.addEventListener("wheel", preventHorizontalGesture, {
-      passive: false,
-    });
-
-    return () => {
-      container.removeEventListener("pointerenter", markPointerEnter);
-      container.removeEventListener("pointerleave", markPointerLeave);
-      container.removeEventListener("pointerdown", markPointerDown);
-      container.removeEventListener("pointerup", markPointerUp);
-      container.removeEventListener("pointercancel", markPointerUp);
-      container.removeEventListener("wheel", preventHorizontalGesture);
-    };
-  }, [mapInstance]);
 
   const resetRouteRuntime = () => {
     pause();
