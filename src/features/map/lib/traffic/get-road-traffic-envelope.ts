@@ -1,4 +1,7 @@
-import type { AmbientRoadClass } from "@/features/map/lib/traffic/get-road-class-lane-offset";
+import {
+  getRoadClassLaneOffsetMeters,
+  type AmbientRoadClass,
+} from "@/features/map/lib/traffic/get-road-class-lane-offset";
 
 function interpolate(zoom: number, z0: number, v0: number, z1: number, v1: number) {
   if (zoom <= z0) return v0;
@@ -17,13 +20,7 @@ export function getRoadTrafficEnvelope(roadClass: AmbientRoadClass, zoom: number
   const roadWidth = getRoadWidthMeters(roadClass, zoom);
   const vehicleWidth = roadWidth * 0.2;
   const vehicleLength = vehicleWidth * 2.75;
-  const rawLaneOffset = roadWidth * 0.25;
-  let laneOffset = Math.min(rawLaneOffset, roadWidth * 0.35);
-  laneOffset = Math.max(laneOffset, roadWidth * 0.15);
-
-  if (laneOffset * 2 + vehicleWidth * 2 > roadWidth) {
-    laneOffset *= 0.8;
-  }
+  let laneOffset = getRoadClassLaneOffsetMeters(roadClass, zoom);
 
   const maxLaneCenterOffset = Math.max(
     roadWidth * 0.12,
