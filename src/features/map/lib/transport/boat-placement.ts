@@ -53,12 +53,20 @@ export function pointAtRingFraction(ring: Position[], fraction: number): Positio
   return [start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t];
 }
 
+export function centerlinePointAtRingFraction(ring: Position[], fraction: number): Position | null {
+  const edgeA = pointAtRingFraction(ring, fraction);
+  const edgeB = pointAtRingFraction(ring, fraction + 0.5);
+  if (!edgeA || !edgeB) return edgeA ?? edgeB;
+
+  return [(edgeA[0] + edgeB[0]) * 0.5, (edgeA[1] + edgeB[1]) * 0.5];
+}
+
 export function headingAtRingFraction(ring: Position[], fraction: number): number | null {
-  const center = pointAtRingFraction(ring, fraction);
+  const center = centerlinePointAtRingFraction(ring, fraction);
   if (!center) return null;
 
-  const lookAhead = pointAtRingFraction(ring, fraction + 0.014) ?? center;
-  const lookBehind = pointAtRingFraction(ring, fraction - 0.01) ?? center;
+  const lookAhead = centerlinePointAtRingFraction(ring, fraction + 0.014) ?? center;
+  const lookBehind = centerlinePointAtRingFraction(ring, fraction - 0.01) ?? center;
 
   const deltaLng = lookAhead[0] - lookBehind[0];
   const deltaLat = lookAhead[1] - lookBehind[1];

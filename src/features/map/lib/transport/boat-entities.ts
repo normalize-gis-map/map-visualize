@@ -3,12 +3,12 @@ import type { FeatureCollection, Geometry, Position } from "geojson";
 import { getBoatDensityPlan, getRingBoatAllowance } from "@/features/map/lib/transport/boat-density";
 import {
   boatScaleForZoom,
+  centerlinePointAtRingFraction,
   headingAtRingFraction,
   headingJitter,
   inBounds,
   isFarEnough,
   jitteredFraction,
-  pointAtRingFraction,
   polygonRings,
   ringArea,
 } from "@/features/map/lib/transport/boat-placement";
@@ -121,7 +121,7 @@ export function buildBoatEntities({
 
       const seed = (ringIndex + 1) * 73.1 + (attempt + 1) * 11.7;
       const fraction = jitteredFraction(seed, attempt, phase);
-      const center = pointAtRingFraction(ring, fraction);
+      const center = centerlinePointAtRingFraction(ring, fraction);
       if (!center || !inBounds(center, bounds) || !isFarEnough(center, acceptedCenters, minSpacing)) {
         continue;
       }

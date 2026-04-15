@@ -119,6 +119,8 @@ function generateDirectionProgresses(
   count: number,
   seedRoot: string,
   roadClass: AmbientRoadClass,
+  routeLengthMeters: number,
+  convoyMode: boolean,
 ) {
   const progresses: number[] = [];
   let cursor = seededUnit(`${seedRoot}-start`);
@@ -127,19 +129,33 @@ function generateDirectionProgresses(
     const random = seededUnit(`${seedRoot}-gap-${index}`);
     const queueChance = seededUnit(`${seedRoot}-queue-${index}`);
 
-    let gap =
-      roadClass === "major"
-        ? 0.010 + random * 0.020
-        : roadClass === "medium"
-          ? 0.013 + random * 0.026
-          : 0.017 + random * 0.032;
-    if (queueChance < 0.35) {
-      gap *= 0.72; // compact micro-cluster
-    } else if (queueChance > 0.86) {
-      gap *= 1.24; // sparse pocket
+    let gap: number;
+    if (convoyMode) {
+      const baseGapMeters =
+        roadClass === "major"
+          ? 8.8 + random * 4.2
+          : roadClass === "medium"
+            ? 10.5 + random * 4.8
+            : 12.8 + random * 5.2;
+      const jitterScale = 0.82 + seededUnit(`${seedRoot}-gap-jitter-${index}`) * 0.36;
+      gap = (baseGapMeters * jitterScale) / Math.max(180, routeLengthMeters);
+      gap = Math.max(0.0048, Math.min(0.026, gap));
+    } else {
+      gap =
+        roadClass === "major"
+          ? 0.010 + random * 0.020
+          : roadClass === "medium"
+            ? 0.013 + random * 0.026
+            : 0.017 + random * 0.032;
+      if (queueChance < 0.35) {
+        gap *= 0.72; // compact micro-cluster
+      } else if (queueChance > 0.86) {
+        gap *= 1.24; // sparse pocket
+      }
+
+      gap = Math.max(0.007, Math.min(0.068, gap));
     }
 
-    gap = Math.max(0.007, Math.min(0.068, gap));
     cursor = (cursor + gap) % 1;
     progresses.push(cursor);
   }
@@ -190,6 +206,7 @@ export function useAmbientTraffic({
     };
     const classBudget = allocateByClass(targetCount);
     const generated: StreamVehicle[] = [];
+    const convoyMode = zoom >= 15;
     const addFromBucket = (
       entries: typeof eligibleRoutes,
       targetBudget: number,
@@ -216,13 +233,16 @@ export function useAmbientTraffic({
             count,
             `${routeIndex}-${direction}`,
             route.roadClass,
+            route.lengthMeters ?? 280,
+            convoyMode,
           );
 
           for (let slot = 0; slot < progresses.length; slot += 1) {
             const speedRange = getClassSpeedRange(route.roadClass);
             const speedBlend = seededUnit(`${routeIndex}-${direction}-speed-${slot}`);
-            const speedFactor =
-              speedRange.min + speedBlend * (speedRange.max - speedRange.min);
+            const speedFactor = convoyMode
+              ? (0.94 + speedBlend * 0.12) * ((speedRange.min + speedRange.max) / 2)
+              : speedRange.min + speedBlend * (speedRange.max - speedRange.min);
             const laneVariant =
               seededUnit(`${routeIndex}-${direction}-lane-${slot}`) > 0.62 ? 1 : 0;
 
