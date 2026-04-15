@@ -31,7 +31,6 @@ import { getAnimatedWaterOpacities, getWaterPaint } from "@/features/map/lib/wat
 import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
-import { WaterOverlay } from "@/features/map/ui/water-overlay";
 import { WeatherOverlay } from "@/features/map/ui/weather-overlay";
 import { NavigationHud } from "@/features/navigation/components/navigation-hud";
 import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
@@ -107,6 +106,7 @@ export function MapLibreMap({
     timeMode,
     weatherMode,
     transportVisibility,
+    hasHydrated,
   } = useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
@@ -120,10 +120,6 @@ export function MapLibreMap({
   const [cameraDistanceMeters, setCameraDistanceMeters] = useState<
     number | null
   >(null);
-  const [viewportWaterData, setViewportWaterData] = useState<FeatureCollection>({
-    type: "FeatureCollection",
-    features: [],
-  });
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -787,7 +783,6 @@ export function MapLibreMap({
         });
         const waterData = buildViewportWaterEffect(waterFeatures);
         visibleWaterFeaturesRef.current = waterData.features;
-        setViewportWaterData(waterData);
         const waterSource = mapInstance.getSource(waterViewportSourceId) as
           | maplibregl.GeoJSONSource
           | undefined;
@@ -820,7 +815,6 @@ export function MapLibreMap({
         }
       } else {
         visibleWaterFeaturesRef.current = [];
-        setViewportWaterData({ type: "FeatureCollection", features: [] });
       }
 
       const parkLayerIds =
@@ -1503,8 +1497,7 @@ export function MapLibreMap({
         mapBearing={mapBearing}
       />
 
-      <WaterOverlay map={mapInstance} waterData={viewportWaterData} />
-      <WeatherOverlay weather={weatherMode} />
+      <WeatherOverlay weather={weatherMode} hydrated={hasHydrated} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
         <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">
