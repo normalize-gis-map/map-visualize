@@ -106,7 +106,6 @@ export function MapLibreMap({
     timeMode,
     weatherMode,
     transportVisibility,
-    hasHydrated,
   } = useMapStore();
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const [mapZoom, setMapZoom] = useState(11.2);
@@ -1497,7 +1496,7 @@ export function MapLibreMap({
         mapBearing={mapBearing}
       />
 
-      <WeatherOverlay weather={weatherMode} hydrated={hasHydrated} />
+      <WeatherOverlay weather={weatherMode} intensity="medium" />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
         <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">

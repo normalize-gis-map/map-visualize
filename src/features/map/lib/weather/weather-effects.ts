@@ -1,7 +1,7 @@
 import type maplibregl from "maplibre-gl";
+import type { TimeMode, WeatherMode } from "@/features/map/lib/weather/weather-types";
 
-export type WeatherMode = "sun" | "rain" | "snow";
-export type TimeMode = "live" | "morning" | "noon" | "evening" | "night";
+export type { WeatherMode, TimeMode } from "@/features/map/lib/weather/weather-types";
 
 export type SceneTone = {
   weatherTone: string;

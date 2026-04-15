@@ -1,170 +1,138 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
-import type { WeatherMode } from "@/features/map/lib/weather/weather-effects";
+import {
+  createRainParticles,
+  createSnowParticles,
+  drawRain,
+  drawSnow,
+  getSafeDevicePixelRatio,
+  updateRainParticles,
+  updateSnowParticles,
+} from "@/features/map/lib/weather/weather-canvas";
+import type {
+  RainParticle,
+  SnowParticle,
+  WeatherIntensity,
+  WeatherMode,
+} from "@/features/map/lib/weather/weather-types";
 
 type WeatherOverlayProps = {
   weather: WeatherMode;
-  hydrated: boolean;
+  intensity?: WeatherIntensity;
+  className?: string;
 };
 
-type RainDrop = {
-  x: number;
-  y: number;
-  speed: number;
-  length: number;
-  alpha: number;
-  width: number;
-};
-
-type SnowFlake = {
-  x: number;
-  y: number;
-  speed: number;
-  drift: number;
-  size: number;
-  alpha: number;
-};
-
-function createRainLayer(count: number, baseSpeed: number, alphaRange: [number, number]): RainDrop[] {
-  return Array.from({ length: count }, () => ({
-    x: Math.random(),
-    y: Math.random(),
-    speed: baseSpeed + Math.random() * (baseSpeed * 0.9),
-    length: 10 + Math.random() * 16,
-    alpha: alphaRange[0] + Math.random() * (alphaRange[1] - alphaRange[0]),
-    width: 0.8 + Math.random() * 0.9,
-  }));
+function useMounted() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 }
 
-export function WeatherOverlay({ weather, hydrated }: WeatherOverlayProps) {
+export function WeatherOverlay({
+  weather,
+  intensity = "medium",
+  className,
+}: WeatherOverlayProps) {
+  const mounted = useMounted();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rainRef = useRef<RainParticle[]>([]);
+  const snowRef = useRef<SnowParticle[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!mounted || !canvas) return;
 
     const context = canvas.getContext("2d");
     if (!context) return;
 
+    let raf = 0;
     let width = 0;
     let height = 0;
-    let raf = 0;
+    let lastTick = performance.now();
+    let paused = document.visibilityState === "hidden";
 
-    const rainNear = createRainLayer(170, 0.013, [0.26, 0.5]);
-    const rainMid = createRainLayer(130, 0.009, [0.18, 0.35]);
-    const rainFar = createRainLayer(90, 0.006, [0.12, 0.22]);
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
 
-    const snowFlakes: SnowFlake[] = Array.from({ length: 150 }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      speed: 0.0012 + Math.random() * 0.0033,
-      drift: -0.001 + Math.random() * 0.002,
-      size: 0.8 + Math.random() * 2.4,
-      alpha: 0.28 + Math.random() * 0.44,
-    }));
+    const rebuildParticles = () => {
+      if (!width || !height) return;
+
+      if (weather === "rain") {
+        rainRef.current = createRainParticles(width, height, intensity, isMobile);
+        snowRef.current = [];
+      } else if (weather === "snow") {
+        snowRef.current = createSnowParticles(width, height, intensity, isMobile);
+        rainRef.current = [];
+      } else {
+        rainRef.current = [];
+        snowRef.current = [];
+      }
+    };
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       width = rect.width;
       height = rect.height;
-      canvas.width = Math.max(1, Math.floor(width * window.devicePixelRatio));
-      canvas.height = Math.max(1, Math.floor(height * window.devicePixelRatio));
-      context.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+
+      const dpr = getSafeDevicePixelRatio(isMobile);
+      canvas.width = Math.max(1, Math.floor(width * dpr));
+      canvas.height = Math.max(1, Math.floor(height * dpr));
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      rebuildParticles();
     };
 
-    const drawRainLayer = (drops: RainDrop[], slant: number) => {
-      for (const drop of drops) {
-        const x = drop.x * width;
-        const y = drop.y * height;
+    const animate = (now: number) => {
+      const dt = Math.min(0.05, (now - lastTick) / 1000);
+      lastTick = now;
 
-        context.strokeStyle = `rgba(196, 225, 245, ${drop.alpha})`;
-        context.lineWidth = drop.width;
-        context.beginPath();
-        context.moveTo(x, y);
-        context.lineTo(x - slant, y + drop.length);
-        context.stroke();
-
-        drop.y += drop.speed;
-        drop.x -= drop.speed * 0.28;
-
-        if (drop.y > 1.06 || drop.x < -0.08) {
-          drop.y = -0.08;
-          drop.x = Math.random() * 1.1;
+      if (!paused && weather !== "sun") {
+        context.clearRect(0, 0, width, height);
+        if (weather === "rain") {
+          updateRainParticles(rainRef.current, dt, width, height);
+          drawRain(context, rainRef.current, width, height);
+        } else if (weather === "snow") {
+          updateSnowParticles(snowRef.current, dt, width, height);
+          drawSnow(context, snowRef.current, width, height);
         }
+      } else {
+        context.clearRect(0, 0, width, height);
       }
+
+      raf = window.requestAnimationFrame(animate);
     };
 
-    const drawRain = () => {
-      context.fillStyle = "rgba(18, 32, 46, 0.12)";
-      context.fillRect(0, 0, width, height);
-
-      context.lineCap = "round";
-      drawRainLayer(rainFar, 2.9);
-      drawRainLayer(rainMid, 3.8);
-      drawRainLayer(rainNear, 4.9);
-    };
-
-    const drawSnow = () => {
-      const haze = context.createLinearGradient(0, 0, 0, height);
-      haze.addColorStop(0, "rgba(220, 232, 242, 0.14)");
-      haze.addColorStop(1, "rgba(203, 213, 225, 0.08)");
-      context.fillStyle = haze;
-      context.fillRect(0, 0, width, height);
-
-      for (const flake of snowFlakes) {
-        const x = flake.x * width;
-        const y = flake.y * height;
-
-        context.fillStyle = `rgba(247, 250, 252, ${flake.alpha})`;
-        context.beginPath();
-        context.arc(x, y, flake.size, 0, Math.PI * 2);
-        context.fill();
-
-        flake.y += flake.speed;
-        flake.x += flake.drift;
-
-        if (flake.y > 1.08) {
-          flake.y = -0.08;
-          flake.x = Math.random();
-        }
-        if (flake.x < -0.1) flake.x = 1.1;
-        if (flake.x > 1.1) flake.x = -0.1;
-      }
-    };
-
-    const draw = () => {
-      context.clearRect(0, 0, width, height);
-
-      if (hydrated && weather === "rain") {
-        drawRain();
-      }
-
-      if (hydrated && weather === "snow") {
-        drawSnow();
-      }
-
-      raf = window.requestAnimationFrame(draw);
+    const onVisibilityChange = () => {
+      paused = document.visibilityState === "hidden";
     };
 
     resize();
-    draw();
+    raf = window.requestAnimationFrame(animate);
 
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.cancelAnimationFrame(raf);
+      rainRef.current = [];
+      snowRef.current = [];
     };
-  }, [hydrated, weather]);
+  }, [intensity, mounted, weather]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none absolute inset-0 z-20"
+    <div
+      className={["pointer-events-none absolute inset-0 z-20", className]
+        .filter(Boolean)
+        .join(" ")}
       aria-hidden="true"
-    />
+    >
+      <canvas ref={canvasRef} className="h-full w-full" />
+    </div>
   );
 }
