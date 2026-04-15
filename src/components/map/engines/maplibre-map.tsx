@@ -27,6 +27,7 @@ import {
 } from "@/features/map/lib/buildings/building-shadows";
 import { SceneController } from "@/features/map/lib/scene/scene-controller";
 import { computeSceneProfile, type SceneProfile } from "@/features/map/lib/scene/scene-profile";
+import { buildToneMapping, type SceneToneMapping } from "@/features/map/lib/scene/scene-tonemapping";
 import { applySceneLighting } from "@/features/map/lib/scene/scene-sync-light";
 import { deriveTrafficSceneTuning } from "@/features/map/lib/scene/scene-sync-traffic";
 import { buildWaterSceneContext } from "@/features/map/lib/scene/scene-sync-water";
@@ -41,6 +42,7 @@ import { ensureWaterLayerOrder } from "@/features/map/lib/water/water-layer-orde
 import { extractBoatSamples } from "@/features/map/lib/water/water-wake-system";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
+import { ScenePostOverlay } from "@/features/map/ui/scene-post-overlay";
 import { WeatherOverlay } from "@/features/map/ui/weather-overlay";
 import { NavigationHud } from "@/features/navigation/components/navigation-hud";
 import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
@@ -129,6 +131,9 @@ export function MapLibreMap({
   const [sceneUiProfile, setSceneUiProfile] = useState(() =>
     computeSceneProfile(timeMode, weatherMode),
   );
+  const [sceneToneMapping, setSceneToneMapping] = useState<SceneToneMapping>(() =>
+    buildToneMapping(computeSceneProfile(timeMode, weatherMode), 1),
+  );
   const [cameraDistanceMeters, setCameraDistanceMeters] = useState<
     number | null
   >(null);
@@ -153,12 +158,16 @@ export function MapLibreMap({
     if (!sceneControllerRef.current) {
       sceneControllerRef.current = new SceneController(timeMode, weatherMode);
       sceneProfileRef.current = sceneControllerRef.current.getProfile();
+      sceneToneRef.current = sceneControllerRef.current.getToneMapping();
+      setSceneToneMapping(sceneToneRef.current);
     }
 
     sceneControllerRef.current.setModes(timeMode, weatherMode);
     const nextProfile = sceneControllerRef.current.tick();
     sceneProfileRef.current = nextProfile;
     setSceneUiProfile(nextProfile);
+    sceneToneRef.current = sceneControllerRef.current.getToneMapping();
+    setSceneToneMapping(sceneToneRef.current);
 
     if (!mapInstance) return;
     const apply = () => applySceneLighting(mapInstance, nextProfile);
@@ -226,6 +235,7 @@ export function MapLibreMap({
   const waterCustomLayerRef = useRef<ReturnType<typeof createWaterCustomLayer> | null>(null);
   const sceneControllerRef = useRef<SceneController | null>(null);
   const sceneProfileRef = useRef<SceneProfile>(computeSceneProfile(timeMode, weatherMode));
+  const sceneToneRef = useRef<SceneToneMapping>(buildToneMapping(computeSceneProfile(timeMode, weatherMode), 1));
 
   const estimateBoundsWidthMeters = (bounds: maplibregl.LngLatBounds) => {
     const west = bounds.getWest();
@@ -831,10 +841,13 @@ export function MapLibreMap({
       if (profile) {
         sceneProfileRef.current = profile;
         setSceneUiProfile(profile);
-        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode));
+        const tone = sceneControllerRef.current?.getToneMapping() ?? sceneToneRef.current;
+        sceneToneRef.current = tone;
+        setSceneToneMapping(tone);
+        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode, tone));
         applySceneLighting(mapInstance, profile);
         const mapContainer = mapInstance.getContainer();
-        mapContainer.style.filter = `contrast(${profile.contrast.toFixed(3)}) saturate(${profile.saturation.toFixed(3)})`;
+        mapContainer.style.filter = `contrast(${tone.contrast.toFixed(3)}) saturate(${tone.saturation.toFixed(3)})`;
       }
       ensureWaterLayerOrder(mapInstance, "map-water-custom-layer");
 
@@ -1241,9 +1254,12 @@ export function MapLibreMap({
       if (profile) {
         sceneProfileRef.current = profile;
         setSceneUiProfile(profile);
+        const tone = sceneControllerRef.current?.getToneMapping() ?? sceneToneRef.current;
+        sceneToneRef.current = tone;
+        setSceneToneMapping(tone);
         const traffic = deriveTrafficSceneTuning(profile);
         phase += 0.23 * traffic.speedMultiplier;
-        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode));
+        waterCustomLayerRef.current?.setSceneContext(buildWaterSceneContext(profile, timeMode, weatherMode, tone));
         applySceneLighting(mapInstance, profile);
       } else {
         phase += 0.23;
@@ -1607,6 +1623,7 @@ export function MapLibreMap({
       />
 
       <WeatherOverlay weather={weatherMode} intensity={sceneUiProfile.weatherParticleIntensity} />
+      <ScenePostOverlay tone={sceneToneMapping} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (
         <div className="pointer-events-none absolute right-4 bottom-36 z-20 rounded-xl border border-white/60 bg-white/85 px-3 py-1.5 text-[11px] text-slate-600 shadow">

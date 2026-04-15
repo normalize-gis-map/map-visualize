@@ -43,6 +43,9 @@ export type WaterSceneContext = {
   specularStrength: number;
   flowSpeed: number;
   reflectionStrength: number;
+  exposure: number;
+  bloomStrength: number;
+  highlightCompression: number;
 };
 
 export type WaterCustomLayer = maplibregl.CustomLayerInterface & {

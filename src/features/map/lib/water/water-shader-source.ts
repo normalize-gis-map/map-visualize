@@ -29,6 +29,9 @@ uniform vec2 u_lightDirection;
 uniform float u_specularStrength;
 uniform float u_flowSpeed;
 uniform float u_reflectionStrength;
+uniform float u_exposure;
+uniform float u_bloomStrength;
+uniform float u_highlightCompression;
 uniform vec4 u_wakes[${MAX_WATER_WAKES}];
 
 varying vec2 v_world;
@@ -51,6 +54,12 @@ float wakeField(vec2 world, vec4 wake) {
   float trail = exp(-behind * 21000.0) * exp(-lateral * lateral * 180000000.0);
   float ripple = 0.5 + 0.5 * sin(behind * 130000.0 - u_time * 3.2);
   return ripple * trail * strength;
+}
+
+vec3 tonemapFilmic(vec3 color, float exposure, float compression, float gammaVal) {
+  vec3 exposed = color * exposure;
+  vec3 compressed = exposed / (exposed + vec3(max(0.4, compression)));
+  return pow(clamp(compressed, 0.0, 1.0), vec3(gammaVal));
 }
 
 void main() {
@@ -105,6 +114,12 @@ void main() {
   float specular = pow(clamp(shimmer + wakeContribution * 0.4, 0.0, 1.0), 3.0) * u_specularStrength;
   vec3 reflectionTint = mix(baseColor, u_skyReflectionColor, u_reflectionStrength * (0.35 + lightFacing * 0.65));
   vec3 color = mix(reflectionTint, highlightColor, shimmer * (0.26 + u_reflectionStrength * 0.34) + specular * 0.4);
+
+  float brightness = dot(color, vec3(0.299, 0.587, 0.114));
+  float fakeBloom = smoothstep(0.64, 1.0, brightness) * u_bloomStrength;
+  color += highlightColor * fakeBloom;
+  color = tonemapFilmic(color, u_exposure, u_highlightCompression, 0.92);
+
   float alpha = u_opacity * (0.8 + shimmer * 0.17 + wakeContribution * 0.45);
   gl_FragColor = vec4(color, alpha);
 }

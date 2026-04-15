@@ -33,6 +33,9 @@ type Uniforms = {
   specularStrength: WebGLUniformLocation | null;
   flowSpeed: WebGLUniformLocation | null;
   reflectionStrength: WebGLUniformLocation | null;
+  exposure: WebGLUniformLocation | null;
+  bloomStrength: WebGLUniformLocation | null;
+  highlightCompression: WebGLUniformLocation | null;
   wakes: WebGLUniformLocation | null;
 };
 
@@ -89,6 +92,9 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
     specularStrength: 0.7,
     flowSpeed: 1,
     reflectionStrength: 0.8,
+    exposure: 1,
+    bloomStrength: 0.09,
+    highlightCompression: 1,
   };
   const wakeSystem = new WaterWakeSystem(MAX_WATER_WAKES);
   const wakeUniformBuffer = new Float32Array(MAX_WATER_WAKES * 4);
@@ -142,6 +148,9 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
         specularStrength: glContext.getUniformLocation(program, "u_specularStrength"),
         flowSpeed: glContext.getUniformLocation(program, "u_flowSpeed"),
         reflectionStrength: glContext.getUniformLocation(program, "u_reflectionStrength"),
+        exposure: glContext.getUniformLocation(program, "u_exposure"),
+        bloomStrength: glContext.getUniformLocation(program, "u_bloomStrength"),
+        highlightCompression: glContext.getUniformLocation(program, "u_highlightCompression"),
         wakes: glContext.getUniformLocation(program, "u_wakes"),
       };
 
@@ -186,6 +195,9 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
       glContext.uniform1f(uniforms.specularStrength, sceneContext.specularStrength);
       glContext.uniform1f(uniforms.flowSpeed, sceneContext.flowSpeed);
       glContext.uniform1f(uniforms.reflectionStrength, sceneContext.reflectionStrength);
+      glContext.uniform1f(uniforms.exposure, sceneContext.exposure);
+      glContext.uniform1f(uniforms.bloomStrength, sceneContext.bloomStrength);
+      glContext.uniform1f(uniforms.highlightCompression, sceneContext.highlightCompression);
       glContext.uniform4fv(uniforms.wakes, wakeUniformBuffer);
 
       glContext.enable(glContext.BLEND);
