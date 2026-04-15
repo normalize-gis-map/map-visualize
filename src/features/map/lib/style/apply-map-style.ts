@@ -186,11 +186,11 @@ export function applyMapStyle(
         ["linear"],
         ["zoom"],
         13,
-        0.82,
+        0.98,
         16,
-        0.88,
+        1,
         19,
-        0.92,
+        1,
       ]);
       setPaintSafe(map, layerId, "fill-extrusion-vertical-gradient", true);
       continue;

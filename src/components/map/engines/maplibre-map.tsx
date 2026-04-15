@@ -138,7 +138,12 @@ export function MapLibreMap({
 
   useEffect(() => {
     if (!mapInstance) return;
-    applySceneStyle(mapInstance, weatherMode, timeMode);
+    const apply = () => applySceneStyle(mapInstance, weatherMode, timeMode);
+    apply();
+    mapInstance.on("style.load", apply);
+    return () => {
+      mapInstance.off("style.load", apply);
+    };
   }, [mapInstance, timeMode, weatherMode]);
 
   useMapViewMode(mapInstance, mapMode);
@@ -1097,9 +1102,20 @@ export function MapLibreMap({
         filter: ["==", ["get", "mode"], "bike"],
         minzoom: 13,
         paint: {
-          "circle-color": "#9bf98f",
-          "circle-opacity": 0.84,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 1.1, 17, 2.1],
+          "circle-color": [
+            "match",
+            ["get", "roadClass"],
+            "local",
+            "#8ff3a5",
+            "medium",
+            "#84e9a9",
+            "#9bf98f",
+          ],
+          "circle-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.78, 17, 0.9],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 0.95, 17, 1.75],
+          "circle-stroke-color": "#1f5138",
+          "circle-stroke-opacity": 0.62,
+          "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 13, 0.2, 17, 0.5],
         },
       });
       addLayerIfMissing({
@@ -1107,11 +1123,14 @@ export function MapLibreMap({
         type: "circle",
         source: transportEntitySourceId,
         filter: ["==", ["get", "mode"], "people"],
-        minzoom: 13,
+        minzoom: 14,
         paint: {
-          "circle-color": "#fca5f4",
-          "circle-opacity": 0.78,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 1, 17, 1.8],
+          "circle-color": "#f8c6ee",
+          "circle-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0.72, 18, 0.86],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 0.62, 18, 1.25],
+          "circle-stroke-color": "#7a3a6d",
+          "circle-stroke-opacity": 0.48,
+          "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 14, 0.18, 18, 0.36],
         },
       });
     };

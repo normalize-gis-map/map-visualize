@@ -5,11 +5,44 @@ import { useEffect } from "react";
 
 import type { TimeMode } from "@/features/map/lib/weather/weather-effects";
 
-export function useBuildingLayer(
-  map: maplibregl.Map | null,
-  visible: boolean,
-  timeMode: TimeMode,
-) {
+function buildingPalette(timeMode: TimeMode) {
+  if (timeMode === "morning") {
+    return {
+      base: "#d3d8df",
+      mid: "#c6ced8",
+      top: "#b6c1cd",
+    };
+  }
+  if (timeMode === "noon") {
+    return {
+      base: "#e0e6ee",
+      mid: "#d3dbe6",
+      top: "#c4d0dc",
+    };
+  }
+  if (timeMode === "evening") {
+    return {
+      base: "#d3c8c0",
+      mid: "#c6b8af",
+      top: "#b3a59f",
+    };
+  }
+  if (timeMode === "night") {
+    return {
+      base: "#4a5568",
+      mid: "#3f4a5e",
+      top: "#374355",
+    };
+  }
+
+  return {
+    base: "#d8dee7",
+    mid: "#cad2dd",
+    top: "#bcc7d4",
+  };
+}
+
+export function useBuildingLayer(map: maplibregl.Map | null, visible: boolean, timeMode: TimeMode) {
   useEffect(() => {
     if (!map) return;
 
@@ -18,6 +51,7 @@ export function useBuildingLayer(
       if (!style?.layers) return;
 
       const visibility = visible ? "visible" : "none";
+      const palette = buildingPalette(timeMode);
       const buildingLayers = style.layers.filter((layer) =>
         layer.id.toLowerCase().includes("building"),
       );
@@ -30,7 +64,17 @@ export function useBuildingLayer(
         map.setLayoutProperty(id, "visibility", visibility);
 
         if (layer.type === "fill-extrusion") {
-          map.setPaintProperty(id, "fill-extrusion-color", "#cbd5e1");
+          map.setPaintProperty(id, "fill-extrusion-color", [
+            "interpolate",
+            ["linear"],
+            ["coalesce", ["get", "render_height"], ["get", "height"], 0],
+            0,
+            palette.base,
+            38,
+            palette.mid,
+            120,
+            palette.top,
+          ]);
           map.setPaintProperty(id, "fill-extrusion-vertical-gradient", true);
           map.setPaintProperty(id, "fill-extrusion-opacity", 1);
           map.setPaintProperty(id, "fill-extrusion-base", [
@@ -55,7 +99,6 @@ export function useBuildingLayer(
           ]);
         }
       });
-
     };
 
     applyBuildingStyle();

@@ -1,9 +1,11 @@
 import type { FeatureCollection, Position } from "geojson";
 
+import type { AmbientRoadClass } from "@/features/map/lib/traffic/get-road-class-lane-offset";
 import type { TransportMode } from "@/features/map/store/map.store";
 
 type RouteLike = {
   coordinates: Position[];
+  roadClass?: AmbientRoadClass;
 };
 
 type Bounds = {
@@ -41,10 +43,42 @@ function inBounds(point: Position, bounds: Bounds | null) {
 
 function transportCap(zoom: number, mode: TransportMode) {
   if (mode === "cars" || mode === "boats") return 0;
-  if (zoom < 13) return 0;
-  if (zoom < 15) return 2;
-  if (zoom < 17) return 4;
-  return 6;
+
+  if (mode === "bike") {
+    if (zoom < 13) return 0;
+    if (zoom < 15) return 3;
+    if (zoom < 17) return 7;
+    return 11;
+  }
+
+  if (zoom < 14) return 0;
+  if (zoom < 16) return 3;
+  if (zoom < 18) return 7;
+  return 12;
+}
+
+function routeEligibleForMode(mode: TransportMode, roadClass: AmbientRoadClass | undefined) {
+  if (mode === "bike") {
+    return roadClass === "local" || roadClass === "medium";
+  }
+
+  if (mode === "people") {
+    return roadClass === "local";
+  }
+
+  return true;
+}
+
+function speedByMode(mode: TransportMode) {
+  if (mode === "bike") return 0.0038;
+  if (mode === "people") return 0.0018;
+  return 0.0028;
+}
+
+function phaseShiftByMode(mode: TransportMode, index: number) {
+  if (mode === "bike") return index * 0.089;
+  if (mode === "people") return index * 0.11;
+  return index * 0.137;
 }
 
 export function buildTransportEntities({
@@ -67,14 +101,19 @@ export function buildTransportEntities({
     const cap = transportCap(zoom, mode);
     if (!cap) continue;
 
-    const routePool = routes;
+    const routePool = routes.filter(
+      (route) =>
+        route.coordinates.length > 2 && routeEligibleForMode(mode, route.roadClass),
+    );
+
+    if (!routePool.length) continue;
 
     for (let index = 0; index < Math.min(cap, routePool.length); index += 1) {
       const route = routePool[index];
       if (!route?.coordinates?.length) continue;
 
-      const speedFactor = mode === "bike" ? 0.0042 : 0.0028;
-      const offset = (index * 0.137 + phase * speedFactor) % 1;
+      const offset =
+        (phaseShiftByMode(mode, index) + phase * speedByMode(mode)) % 1;
       const point = pointAtFraction(route.coordinates, offset);
       if (!point || !inBounds(point, bounds)) continue;
 
@@ -86,7 +125,8 @@ export function buildTransportEntities({
         },
         properties: {
           mode,
-          heading: ((offset * 360 + index * 23) % 360) - 180,
+          heading: ((offset * 360 + index * 17) % 360) - 180,
+          roadClass: route.roadClass ?? "local",
         },
       });
     }

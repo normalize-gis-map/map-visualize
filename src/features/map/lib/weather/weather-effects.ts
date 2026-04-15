@@ -11,36 +11,38 @@ export type SceneTone = {
   snowPattern: boolean;
 };
 
-export type ShadowPreset = {
+type LightPreset = {
   intensity: number;
   color: string;
   position: [number, number, number];
 };
 
+type FogPreset = Record<string, string | number | number[]>;
+
 export function getSceneTone(weatherMode: WeatherMode, timeMode: TimeMode): SceneTone {
   const weatherTone =
     weatherMode === "sun"
-      ? "bg-amber-200/8"
+      ? "bg-amber-100/7"
       : weatherMode === "snow"
-        ? "bg-cyan-100/14"
-        : "bg-slate-700/22";
+        ? "bg-cyan-100/12"
+        : "bg-slate-700/24";
 
   const weatherContrast =
     weatherMode === "sun"
-      ? "contrast-110 saturate-110"
+      ? "contrast-110 saturate-112"
       : weatherMode === "snow"
-        ? "contrast-105 saturate-90"
-        : "contrast-95 saturate-85";
+        ? "contrast-103 saturate-86"
+        : "contrast-94 saturate-80";
 
   const timeTone =
     timeMode === "night"
-      ? "bg-slate-950/50"
+      ? "bg-slate-950/58"
       : timeMode === "morning"
         ? "bg-amber-200/10"
         : timeMode === "noon"
-          ? "bg-white/6"
+          ? "bg-white/4"
           : timeMode === "evening"
-            ? "bg-orange-400/12"
+            ? "bg-orange-500/14"
             : "bg-transparent";
 
   return {
@@ -52,106 +54,140 @@ export function getSceneTone(weatherMode: WeatherMode, timeMode: TimeMode): Scen
   };
 }
 
-export function getShadowPreset(timeMode: TimeMode): ShadowPreset {
+function getTimeLightPreset(timeMode: TimeMode): LightPreset {
   if (timeMode === "morning") {
     return {
-      intensity: 0.46,
-      color: "hsl(215, 35%, 74%)",
-      position: [1.2, 90, 60],
+      intensity: 0.52,
+      color: "hsl(36, 62%, 84%)",
+      position: [1.25, 95, 58],
     };
   }
 
   if (timeMode === "noon") {
     return {
-      intensity: 0.72,
-      color: "hsl(212, 25%, 83%)",
-      position: [1.2, 180, 20],
+      intensity: 0.74,
+      color: "hsl(210, 40%, 92%)",
+      position: [1.35, 180, 22],
     };
   }
 
   if (timeMode === "evening") {
     return {
-      intensity: 0.4,
-      color: "hsl(20, 40%, 62%)",
-      position: [1.2, 270, 58],
+      intensity: 0.42,
+      color: "hsl(22, 70%, 72%)",
+      position: [1.2, 278, 60],
     };
   }
 
   if (timeMode === "night") {
     return {
-      intensity: 0.1,
-      color: "hsl(220, 23%, 36%)",
-      position: [1.2, 330, 75],
+      intensity: 0.16,
+      color: "hsl(220, 30%, 54%)",
+      position: [1.1, 340, 74],
     };
   }
 
   return {
-    intensity: 0.36,
-    color: "hsl(213, 30%, 75%)",
-    position: [1.2, 150, 38],
+    intensity: 0.46,
+    color: "hsl(210, 36%, 84%)",
+    position: [1.2, 150, 40],
   };
 }
 
-export function applySceneStyle(
-  map: maplibregl.Map,
-  weather: WeatherMode,
-  time: TimeMode,
-) {
-  const shadow = getShadowPreset(time);
+function getWeatherLightModifier(weather: WeatherMode): Pick<LightPreset, "intensity" | "color"> {
+  if (weather === "rain") {
+    return {
+      intensity: 0.82,
+      color: "hsl(210, 24%, 72%)",
+    };
+  }
+  if (weather === "snow") {
+    return {
+      intensity: 0.92,
+      color: "hsl(205, 25%, 90%)",
+    };
+  }
 
-  map.setLight({
-    anchor: "viewport",
-    color: shadow.color,
-    intensity: shadow.intensity,
-    position: shadow.position,
-  });
+  return {
+    intensity: 1,
+    color: "",
+  };
+}
 
-  const fogByWeather: Record<WeatherMode, Record<string, string | number | number[]>> = {
+function getFogPreset(weather: WeatherMode, time: TimeMode): FogPreset {
+  const weatherFog: Record<WeatherMode, FogPreset> = {
     sun: {
-      range: [0.8, 14],
-      color: "hsl(205, 35%, 90%)",
-      "high-color": "hsl(202, 28%, 96%)",
-      "space-color": "hsl(206, 20%, 98%)",
+      range: [1, 14.5],
+      color: "hsl(203, 44%, 90%)",
+      "high-color": "hsl(203, 34%, 96%)",
+      "space-color": "hsl(208, 26%, 98%)",
       "horizon-blend": 0.08,
       "star-intensity": 0,
     },
     rain: {
-      range: [0.4, 7.5],
-      color: "hsl(214, 24%, 45%)",
-      "high-color": "hsl(217, 22%, 36%)",
-      "space-color": "hsl(220, 18%, 25%)",
+      range: [0.45, 8],
+      color: "hsl(212, 22%, 42%)",
+      "high-color": "hsl(216, 20%, 34%)",
+      "space-color": "hsl(220, 16%, 25%)",
       "horizon-blend": 0.22,
       "star-intensity": 0,
     },
     snow: {
-      range: [0.55, 9],
-      color: "hsl(205, 28%, 82%)",
-      "high-color": "hsl(207, 20%, 88%)",
-      "space-color": "hsl(208, 18%, 78%)",
-      "horizon-blend": 0.18,
+      range: [0.6, 10.2],
+      color: "hsl(205, 30%, 82%)",
+      "high-color": "hsl(206, 24%, 88%)",
+      "space-color": "hsl(210, 18%, 80%)",
+      "horizon-blend": 0.16,
       "star-intensity": 0,
     },
   };
 
-  const fog = fogByWeather[weather];
+  if (time === "night") {
+    return {
+      ...weatherFog[weather],
+      range: weather === "rain" ? [0.32, 5.4] : [0.42, 6.2],
+      color: weather === "snow" ? "hsl(219, 22%, 20%)" : "hsl(222, 27%, 15%)",
+      "high-color": weather === "snow" ? "hsl(218, 20%, 16%)" : "hsl(222, 24%, 12%)",
+      "space-color": "hsl(226, 26%, 9%)",
+      "horizon-blend": 0.32,
+      "star-intensity": weather === "sun" ? 0.24 : 0.08,
+    };
+  }
+
+  if (time === "morning") {
+    return {
+      ...weatherFog[weather],
+      "horizon-blend": 0.16,
+      color: weather === "rain" ? "hsl(212, 24%, 48%)" : "hsl(200, 34%, 88%)",
+    };
+  }
+
+  if (time === "evening") {
+    return {
+      ...weatherFog[weather],
+      "horizon-blend": 0.24,
+      "high-color": weather === "rain" ? "hsl(217, 20%, 30%)" : "hsl(24, 46%, 82%)",
+    };
+  }
+
+  return weatherFog[weather];
+}
+
+export function applySceneStyle(map: maplibregl.Map, weather: WeatherMode, time: TimeMode) {
+  const timeLight = getTimeLightPreset(time);
+  const weatherMod = getWeatherLightModifier(weather);
+
+  map.setLight({
+    anchor: "viewport",
+    color: weatherMod.color || timeLight.color,
+    intensity: timeLight.intensity * weatherMod.intensity,
+    position: timeLight.position,
+  });
+
   const fogApi = map as unknown as {
     setFog?: (fog: Record<string, string | number | number[]>) => void;
   };
 
   if (!fogApi.setFog) return;
-
-  if (time === "night") {
-    fogApi.setFog({
-      ...fog,
-      range: [0.35, 5.5],
-      color: "hsl(221, 27%, 17%)",
-      "high-color": "hsl(221, 24%, 14%)",
-      "space-color": "hsl(226, 24%, 10%)",
-      "horizon-blend": 0.34,
-      "star-intensity": 0.25,
-    });
-    return;
-  }
-
-  fogApi.setFog(fog);
+  fogApi.setFog(getFogPreset(weather, time));
 }
