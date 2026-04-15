@@ -1,5 +1,5 @@
 import type { Position } from "geojson";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type AmbientRoadClass,
@@ -184,6 +184,7 @@ export function useAmbientTraffic({
   speedMultiplier = 1,
 }: UseAmbientTrafficInput) {
   const [simulationClock, setSimulationClock] = useState(0);
+  const hasLoggedEnvelopeDebugRef = useRef(false);
 
   const shouldRender =
     enabled &&
@@ -349,6 +350,21 @@ export function useAmbientTraffic({
       })
       .filter((item): item is AmbientTrafficVehicle => Boolean(item));
   }, [routes, shouldRender, simulationClock, speedMultiplier, streamVehicles, zoom]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (hasLoggedEnvelopeDebugRef.current) return;
+    const firstVehicle = vehicles[0];
+    if (!firstVehicle) return;
+
+    const envelope = getRoadTrafficEnvelope(firstVehicle.roadClass, zoom);
+    console.log({
+      roadWidth: envelope.roadWidth,
+      laneOffset: envelope.laneOffset,
+      vehicleWidth: envelope.vehicleWidth,
+    });
+    hasLoggedEnvelopeDebugRef.current = true;
+  }, [vehicles, zoom]);
 
   return { vehicles, minZoomToRender: MIN_ZOOM_TO_RENDER };
 }

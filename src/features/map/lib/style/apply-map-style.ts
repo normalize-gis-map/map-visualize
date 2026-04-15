@@ -61,7 +61,7 @@ function withOptionalFilter(
 
 function buildCloseZoomBoostExpression(
   originalWidth: unknown,
-  strength: number,
+  multipliers: [number, number, number, number],
 ): unknown {
   return [
     "*",
@@ -71,15 +71,13 @@ function buildCloseZoomBoostExpression(
       ["linear"],
       ["zoom"],
       12,
-      1,
+      multipliers[0],
       14,
-      1,
+      multipliers[1],
       16,
-      1 + strength * 0.18,
+      multipliers[2],
       18,
-      1 + strength * 0.3,
-      20,
-      1 + strength * 0.4,
+      multipliers[3],
     ],
   ];
 }
@@ -213,12 +211,21 @@ export function applyMapStyle(
 
       const originalWidth = map.getPaintProperty(layerId, "line-width");
       if (originalWidth !== undefined && originalWidth !== null) {
-        const boostStrength = isCasing ? 0.34 : isMajor ? 0.28 : isMedium ? 0.2 : 0.12;
+        const nearZoomMultipliers: [number, number, number, number] = isCasing
+          ? [1, 1.25, 1.9, 2.5]
+          : isMajor
+            ? [1, 1.2, 1.8, 2.4]
+            : isMedium
+              ? [1, 1.14, 1.55, 2.05]
+              : [1, 1.08, 1.35, 1.75];
         setPaintSafe(
           map,
           layerId,
           "line-width",
-          buildCloseZoomBoostExpression(originalWidth, boostStrength),
+          buildCloseZoomBoostExpression(
+            originalWidth,
+            nearZoomMultipliers,
+          ),
         );
       }
       continue;

@@ -15,21 +15,25 @@ function getRoadWidthMeters(roadClass: AmbientRoadClass, zoom: number) {
 
 export function getRoadTrafficEnvelope(roadClass: AmbientRoadClass, zoom: number) {
   const roadWidth = getRoadWidthMeters(roadClass, zoom);
-  const vehicleWidthFactor =
-    roadClass === "major" ? 0.19 : roadClass === "medium" ? 0.21 : 0.23;
-  const vehicleWidth = roadWidth * vehicleWidthFactor;
+  const vehicleWidth = roadWidth * 0.2;
   const vehicleLength = vehicleWidth * 2.75;
-  const shoulder = roadWidth * 0.06;
+  const rawLaneOffset = roadWidth * 0.25;
+  let laneOffset = Math.min(rawLaneOffset, roadWidth * 0.35);
+  laneOffset = Math.max(laneOffset, roadWidth * 0.15);
+
+  if (laneOffset * 2 + vehicleWidth * 2 > roadWidth) {
+    laneOffset *= 0.8;
+  }
+
   const maxLaneCenterOffset = Math.max(
-    roadWidth * 0.14,
-    (roadWidth - vehicleWidth) / 2 - shoulder,
+    roadWidth * 0.12,
+    (roadWidth - vehicleWidth) / 2,
   );
-  const laneTargetFactor =
-    roadClass === "major" ? 0.28 : roadClass === "medium" ? 0.25 : 0.22;
-  const laneOffset = Math.min(maxLaneCenterOffset, roadWidth * laneTargetFactor);
+  laneOffset = Math.min(laneOffset, maxLaneCenterOffset);
+
   const laneJitter = Math.max(
     0,
-    Math.min(roadWidth * 0.03, maxLaneCenterOffset - laneOffset),
+    Math.min(roadWidth * 0.025, maxLaneCenterOffset - laneOffset),
   );
 
   return {
