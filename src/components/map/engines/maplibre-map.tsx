@@ -31,6 +31,7 @@ import { getAnimatedWaterOpacities, getWaterPaint } from "@/features/map/lib/wat
 import { applySceneStyle } from "@/features/map/lib/weather/weather-effects";
 import { useMapStore } from "@/features/map/store/map.store";
 import type { RouteAlternative } from "@/features/map/types/route.types";
+import { WaterOverlay } from "@/features/map/ui/water-overlay";
 import { WeatherOverlay } from "@/features/map/ui/weather-overlay";
 import { NavigationHud } from "@/features/navigation/components/navigation-hud";
 import { RouteVisualLayers } from "@/features/navigation/components/route-visual-layers";
@@ -119,6 +120,10 @@ export function MapLibreMap({
   const [cameraDistanceMeters, setCameraDistanceMeters] = useState<
     number | null
   >(null);
+  const [viewportWaterData, setViewportWaterData] = useState<FeatureCollection>({
+    type: "FeatureCollection",
+    features: [],
+  });
   const activeFloodData =
     (serverFloodData as FeatureCollection | null) ??
     (floodData as FeatureCollection);
@@ -177,9 +182,6 @@ export function MapLibreMap({
   const ambientTrafficWindshieldLayerId = "ambient-traffic-windshield-3d";
   const waterViewportSourceId = "map-water-viewport-source";
   const waterViewportToneLayerId = "map-water-viewport-tone-fill";
-  const waterViewportShoreLayerId = "map-water-viewport-shore-line";
-  const waterViewportBaseLayerId = "map-water-viewport-shimmer-base";
-  const waterViewportDetailLayerId = "map-water-viewport-shimmer-detail";
   const parkTreeSourceId = "map-park-tree-points";
   const parkTreeShadowLayerId = "map-park-tree-shadow-circles";
   const parkTreeCanopyLayerId = "map-park-tree-canopy-circles";
@@ -785,6 +787,7 @@ export function MapLibreMap({
         });
         const waterData = buildViewportWaterEffect(waterFeatures);
         visibleWaterFeaturesRef.current = waterData.features;
+        setViewportWaterData(waterData);
         const waterSource = mapInstance.getSource(waterViewportSourceId) as
           | maplibregl.GeoJSONSource
           | undefined;
@@ -817,6 +820,7 @@ export function MapLibreMap({
         }
       } else {
         visibleWaterFeaturesRef.current = [];
+        setViewportWaterData({ type: "FeatureCollection", features: [] });
       }
 
       const parkLayerIds =
@@ -864,28 +868,6 @@ export function MapLibreMap({
           type: "fill",
           source: waterViewportSourceId,
           paint: waterPaint.tone as any,
-        });
-
-        addLayerIfMissing({
-          id: waterViewportShoreLayerId,
-          type: "line",
-          source: waterViewportSourceId,
-          paint: waterPaint.shore as any,
-        });
-
-        addLayerIfMissing({
-          id: waterViewportBaseLayerId,
-          type: "line",
-          source: waterViewportSourceId,
-          paint: waterPaint.base as any,
-        });
-
-        addLayerIfMissing({
-          id: waterViewportDetailLayerId,
-          type: "line",
-          source: waterViewportSourceId,
-          minzoom: 14.5,
-          paint: waterPaint.detail as any,
         });
       }
 
@@ -1150,9 +1132,9 @@ export function MapLibreMap({
 
     let phase = 0;
     const interval = window.setInterval(() => {
-      if (!mapInstance.getLayer(waterViewportBaseLayerId)) return;
+      if (!mapInstance.getLayer(waterViewportToneLayerId)) return;
       phase += 0.23;
-      const { baseOpacity, detailOpacity, shoreOpacity } = getAnimatedWaterOpacities(phase);
+      const { baseOpacity } = getAnimatedWaterOpacities(phase);
       transportPhaseRef.current = phase;
 
       try {
@@ -1184,49 +1166,17 @@ export function MapLibreMap({
             }),
           );
         }
-        mapInstance.setPaintProperty(
-          waterViewportBaseLayerId,
-          "line-opacity",
-          [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            9,
-            baseOpacity * 0.62,
-            14,
-            baseOpacity,
-            18,
-            baseOpacity * 1.08,
-          ],
-        );
-        mapInstance.setPaintProperty(
-          waterViewportDetailLayerId,
-          "line-opacity",
-          [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            14.5,
-            detailOpacity * 0.8,
-            18,
-            detailOpacity * 1.12,
-          ],
-        );
-        mapInstance.setPaintProperty(
-          waterViewportShoreLayerId,
-          "line-opacity",
-          [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            10,
-            shoreOpacity * 0.6,
-            15,
-            shoreOpacity,
-            18,
-            shoreOpacity * 1.08,
-          ],
-        );
+        mapInstance.setPaintProperty(waterViewportToneLayerId, "fill-opacity", [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          9,
+          Math.max(0.2, baseOpacity * 1.35),
+          14,
+          Math.max(0.28, baseOpacity * 1.56),
+          18,
+          Math.max(0.36, baseOpacity * 1.7),
+        ]);
       } catch {}
     }, 280);
 
@@ -1239,9 +1189,7 @@ export function MapLibreMap({
     mapZoom,
     transportVisibility,
     transportEntitySourceId,
-    waterViewportBaseLayerId,
-    waterViewportDetailLayerId,
-    waterViewportShoreLayerId,
+    waterViewportToneLayerId,
   ]);
 
   useEffect(() => {
@@ -1555,6 +1503,7 @@ export function MapLibreMap({
         mapBearing={mapBearing}
       />
 
+      <WaterOverlay map={mapInstance} waterData={viewportWaterData} />
       <WeatherOverlay weather={weatherMode} />
 
       {trafficVisualizationEnabled && mapZoom < minZoomToRender ? (

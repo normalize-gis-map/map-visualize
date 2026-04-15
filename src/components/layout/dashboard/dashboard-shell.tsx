@@ -22,7 +22,7 @@ type RoutePayload = {
 };
 
 function SceneEffectsOverlay() {
-  const { transportVisibility, weatherMode, timeMode } = useFloodStore();
+  const { transportVisibility, weatherMode, timeMode, hasHydrated } = useFloodStore();
   const tone = getSceneTone(weatherMode, timeMode);
 
   const transportBadges = useMemo(
@@ -55,23 +55,23 @@ function SceneEffectsOverlay() {
   return (
     <>
       <div
-        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${tone.weatherTone}`}
+        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${hasHydrated ? tone.weatherTone : "bg-transparent"}`}
       />
       <div
-        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${tone.timeTone}`}
+        className={`pointer-events-none absolute inset-0 z-10 transition-colors duration-300 ${hasHydrated ? tone.timeTone : "bg-transparent"}`}
       />
       <div
-        className={`pointer-events-none absolute inset-0 z-10 transition duration-300 ${tone.weatherContrast}`}
+        className={`pointer-events-none absolute inset-0 z-10 transition duration-300 ${hasHydrated ? tone.weatherContrast : "contrast-100 saturate-100"}`}
       />
 
-      {tone.rainPattern ? (
+      {hasHydrated && tone.rainPattern ? (
         <div className="pointer-events-none absolute inset-0 z-10 bg-[repeating-linear-gradient(108deg,rgba(148,163,184,0.1)_0px,rgba(148,163,184,0.1)_1px,transparent_1px,transparent_12px)] opacity-45" />
       ) : null}
-      {tone.snowPattern ? (
+      {hasHydrated && tone.snowPattern ? (
         <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle,rgba(226,232,240,0.55)_1px,transparent_1px)] bg-[length:16px_16px] opacity-30" />
       ) : null}
 
-      {transportBadges.map((badge) =>
+      {hasHydrated && transportBadges.map((badge) =>
         badge.enabled ? (
           <div
             key={badge.key}
