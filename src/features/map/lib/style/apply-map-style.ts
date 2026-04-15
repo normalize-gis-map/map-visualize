@@ -29,7 +29,8 @@ const ROAD_NAME_RE =
   /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|living|unclassified|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
 const MEDIUM_ROAD_RE = /(secondary|tertiary|collector)/i;
-const LOCAL_ROAD_RE = /(residential|service|living|unclassified|local)/i;
+const LOCAL_ROAD_RE = /(residential|living|unclassified|local)/i;
+const SERVICE_ROAD_RE = /(service|access)/i;
 const CASING_RE = /(casing|outline|border)/i;
 const RAIL_TRANSIT_HATCH_RE = /(rail|transit|hatching|hatch)/i;
 const NON_ROAD_OR_DECOR_RE =
@@ -59,27 +60,21 @@ function withOptionalFilter(
   return layerDef;
 }
 
-function buildCloseZoomBoostExpression(
-  originalWidth: unknown,
-  multipliers: [number, number, number, number],
+function getRoadWidthExpression(
+  kind: "major" | "medium" | "local" | "service" | "casing",
 ): unknown {
-  return [
-    "*",
-    ["coalesce", originalWidth ?? 1, 1],
-    [
-      "interpolate",
-      ["linear"],
-      ["zoom"],
-      12,
-      multipliers[0],
-      14,
-      multipliers[1],
-      16,
-      multipliers[2],
-      18,
-      multipliers[3],
-    ],
-  ];
+  switch (kind) {
+    case "major":
+      return ["interpolate", ["linear"], ["zoom"], 10, 1.4, 12, 2.4, 14, 4.8, 16, 9.5, 18, 17, 20, 28];
+    case "medium":
+      return ["interpolate", ["linear"], ["zoom"], 10, 1.0, 12, 1.9, 14, 3.8, 16, 7.2, 18, 13, 20, 21];
+    case "local":
+      return ["interpolate", ["linear"], ["zoom"], 10, 0.7, 12, 1.4, 14, 2.8, 16, 5.8, 18, 10.5, 20, 17];
+    case "service":
+      return ["interpolate", ["linear"], ["zoom"], 10, 0.5, 12, 1.0, 14, 2.0, 16, 4.0, 18, 7.0, 20, 11];
+    case "casing":
+      return ["interpolate", ["linear"], ["zoom"], 10, 1.8, 12, 3.0, 14, 5.8, 16, 10.8, 18, 18.5, 20, 30];
+  }
 }
 
 export function applyMapStyle(
@@ -186,10 +181,11 @@ export function applyMapStyle(
       const isMajor = MAJOR_ROAD_RE.test(id);
       const isMedium = MEDIUM_ROAD_RE.test(id);
       const isLocal = LOCAL_ROAD_RE.test(id);
+      const isService = SERVICE_ROAD_RE.test(id);
       const shouldPatchRoadFamily =
         !isRailTransitHatch &&
         !isDecorativeTransport &&
-        (isMajor || isMedium || isLocal || isCasing);
+        (isMajor || isMedium || isLocal || isService || isCasing);
       if (!shouldPatchRoadFamily) continue;
 
       setPaintSafe(
@@ -209,25 +205,16 @@ export function applyMapStyle(
         isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
       );
 
-      const originalWidth = map.getPaintProperty(layerId, "line-width");
-      if (originalWidth !== undefined && originalWidth !== null) {
-        const nearZoomMultipliers: [number, number, number, number] = isCasing
-          ? [1, 1.25, 1.9, 2.5]
-          : isMajor
-            ? [1, 1.2, 1.8, 2.4]
-            : isMedium
-              ? [1, 1.14, 1.55, 2.05]
-              : [1, 1.08, 1.35, 1.75];
-        setPaintSafe(
-          map,
-          layerId,
-          "line-width",
-          buildCloseZoomBoostExpression(
-            originalWidth,
-            nearZoomMultipliers,
-          ),
-        );
-      }
+      const widthKind: "major" | "medium" | "local" | "service" | "casing" = isCasing
+        ? "casing"
+        : isMajor
+          ? "major"
+          : isMedium
+            ? "medium"
+            : isService
+              ? "service"
+              : "local";
+      setPaintSafe(map, layerId, "line-width", getRoadWidthExpression(widthKind));
       continue;
     }
 
