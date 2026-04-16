@@ -69,6 +69,26 @@ export function useMaplibreRoadNetwork({
             ? 130
             : 190;
 
+      const classifyByFeature = (className: string, layerId: string) => {
+        const lowerClass = className.toLowerCase();
+        const lowerLayer = layerId.toLowerCase();
+        const majorByClass =
+          lowerClass.includes("motorway") ||
+          lowerClass.includes("trunk") ||
+          lowerClass.includes("primary") ||
+          lowerClass.includes("motorway_link");
+        const majorByLayer =
+          lowerLayer.includes("bridge_motorway") ||
+          lowerLayer.includes("bridge_trunk_primary") ||
+          lowerLayer.includes("tunnel_motorway") ||
+          lowerLayer.includes("tunnel_trunk_primary");
+        if (majorByClass || majorByLayer) return "major" as const;
+        if (lowerClass.includes("secondary") || lowerClass.includes("tertiary")) {
+          return "medium" as const;
+        }
+        return classifyRoadClass(lowerClass);
+      };
+
       const collected = features
         .flatMap((feature) => {
           const geometry = feature.geometry;
@@ -77,10 +97,17 @@ export function useMaplibreRoadNetwork({
               (feature.properties?.type as string | undefined) ??
               "",
           ).toLowerCase();
+          const layerId = feature.layer?.id?.toLowerCase() ?? "";
 
           const isMotorway = className.includes("motorway");
           const isTrunk = className.includes("trunk");
           const isPrimary = className.includes("primary");
+          const isMotorwayLink = className.includes("motorway_link");
+          const isBridgeOrTunnelMajor =
+            layerId.includes("bridge_motorway") ||
+            layerId.includes("bridge_trunk_primary") ||
+            layerId.includes("tunnel_motorway") ||
+            layerId.includes("tunnel_trunk_primary");
           const isSecondary = className.includes("secondary");
           const isTertiary = className.includes("tertiary");
           const isResidential = className.includes("residential");
@@ -90,6 +117,8 @@ export function useMaplibreRoadNetwork({
             isMotorway ||
             isTrunk ||
             isPrimary ||
+            isMotorwayLink ||
+            isBridgeOrTunnelMajor ||
             isSecondary ||
             isTertiary ||
             isResidential ||
@@ -109,7 +138,7 @@ export function useMaplibreRoadNetwork({
             return [
               {
                 coordinates: geometry.coordinates,
-                roadClass: classifyRoadClass(className),
+                roadClass: classifyByFeature(className, layerId),
                 lengthMeters,
               } satisfies AmbientTrafficRoute,
             ];
@@ -118,19 +147,19 @@ export function useMaplibreRoadNetwork({
           if (geometry.type === "MultiLineString") {
             return geometry.coordinates.map((coordinates) => {
               const lengthMeters = estimateRouteLengthMeters(coordinates as [number, number][]);
-              return {
-                coordinates,
-                roadClass: classifyRoadClass(className),
-                lengthMeters,
-              } satisfies AmbientTrafficRoute;
-            });
+                return {
+                  coordinates,
+                  roadClass: classifyByFeature(className, layerId),
+                  lengthMeters,
+                } satisfies AmbientTrafficRoute;
+              });
           }
 
           return [];
         })
         .filter((route) => route.coordinates.length > 3 && (route.lengthMeters ?? 0) >= minLengthMeters)
         .map((route) => {
-          const classScore = route.roadClass === "major" ? 1.25 : route.roadClass === "medium" ? 1 : 0.82;
+          const classScore = route.roadClass === "major" ? 1.62 : route.roadClass === "medium" ? 1.02 : 0.8;
           const zoomScore = currentZoom >= MAP_DETAIL_ZOOM.CLOSE ? 1.08 : 0.94;
           const lengthScore = Math.min(1.4, Math.max(0.35, (route.lengthMeters ?? 0) / 520));
           return {
@@ -138,11 +167,29 @@ export function useMaplibreRoadNetwork({
             score: classScore * lengthScore * zoomScore,
           };
         })
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => b.score - a.score);
+
+      const majorTarget = Math.max(1, Math.round(maxCollected * 0.45));
+      const mediumTarget = Math.max(1, Math.round(maxCollected * 0.35));
+      const localTarget = Math.max(1, maxCollected - majorTarget - mediumTarget);
+      const majorEntries = collected.filter((entry) => entry.route.roadClass === "major");
+      const mediumEntries = collected.filter((entry) => entry.route.roadClass === "medium");
+      const localEntries = collected.filter((entry) => entry.route.roadClass === "local");
+
+      const selected = [
+        ...majorEntries.slice(0, majorTarget),
+        ...mediumEntries.slice(0, mediumTarget),
+        ...localEntries.slice(0, localTarget),
+      ];
+      const selectedIds = new Set(selected.map((entry) => `${entry.route.coordinates[0]?.[0]}:${entry.route.coordinates[0]?.[1]}`));
+      const fallback = collected.filter(
+        (entry) => !selectedIds.has(`${entry.route.coordinates[0]?.[0]}:${entry.route.coordinates[0]?.[1]}`),
+      );
+      const finalRoutes = [...selected, ...fallback]
         .slice(0, maxCollected)
         .map((entry) => entry.route);
 
-      setAmbientNetworkRoutes(collected);
+      setAmbientNetworkRoutes(finalRoutes);
     };
 
     refreshRoadNetwork();

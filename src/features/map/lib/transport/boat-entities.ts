@@ -3,14 +3,17 @@ import type { FeatureCollection, Geometry, Position } from "geojson";
 import { getBoatDensityPlan, getRingBoatAllowance } from "@/features/map/lib/transport/boat-density";
 import {
   boatScaleForZoom,
-  centerlinePointAtRingFraction,
   headingAtRingFraction,
   headingJitter,
   inBounds,
   isFarEnough,
   jitteredFraction,
+  minDistanceToRingEdge,
+  pointInRing,
   polygonRings,
+  ringPerimeter,
   ringArea,
+  safeCenterBiasedPointAtRingFraction,
 } from "@/features/map/lib/transport/boat-placement";
 
 type Bounds = {
@@ -116,6 +119,12 @@ export function buildBoatEntities({
 
     const { ring, area } = rings[ringIndex] ?? {};
     if (!ring) continue;
+    const perimeter = ringPerimeter(ring);
+    const estimatedWaterHalfWidth = perimeter > 0 ? area / perimeter : 0;
+    const shoreBuffer = Math.max(
+      estimatedWaterHalfWidth * 0.28,
+      (zoom >= 16 ? 0.000045 : zoom >= 14 ? 0.00006 : 0.000075) * 0.7,
+    );
 
     const attempts = Math.max(1, Math.floor(getRingBoatAllowance(area, zoom) * (2 + densityPlan.ringCandidateScale)));
     for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -123,8 +132,14 @@ export function buildBoatEntities({
 
       const seed = (ringIndex + 1) * 73.1 + (attempt + 1) * 11.7;
       const fraction = jitteredFraction(seed, attempt, phase);
-      const center = centerlinePointAtRingFraction(ring, fraction);
-      if (!center || !inBounds(center, bounds) || !isFarEnough(center, acceptedCenters, minSpacing)) {
+      const center = safeCenterBiasedPointAtRingFraction(ring, fraction, 0.22);
+      if (
+        !center ||
+        !pointInRing(center, ring) ||
+        minDistanceToRingEdge(center, ring) < shoreBuffer ||
+        !inBounds(center, bounds) ||
+        !isFarEnough(center, acceptedCenters, minSpacing)
+      ) {
         continue;
       }
 
