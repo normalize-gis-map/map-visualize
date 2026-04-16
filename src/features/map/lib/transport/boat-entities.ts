@@ -83,6 +83,16 @@ function buildBoatDeckLine(center: Position, headingDeg: number, scale: number):
   return [rotate(scale * 1.45, 0), rotate(-scale * 1.6, 0)];
 }
 
+function buildBoatWakeLine(center: Position, headingDeg: number, scale: number): Position[] {
+  const [lng, lat] = center;
+  const rad = (headingDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const rotate = (x: number, y: number): Position => [lng + x * cos - y * sin, lat + x * sin + y * cos];
+
+  return [rotate(-scale * 1.8, 0), rotate(-scale * 4.8, 0)];
+}
+
 export function buildBoatEntities({
   waterFeatures,
   zoom,
@@ -155,6 +165,7 @@ export function buildBoatEntities({
       const hull = buildBoatHullPolygon(center, headingDeg, scale);
       const cabin = buildBoatCabinPolygon(center, headingDeg, scale);
       const deckLine = buildBoatDeckLine(center, headingDeg, scale);
+      const wakeLine = buildBoatWakeLine(center, headingDeg, scale);
       const shadow = hull.map(([lng, lat]) => [lng + scale * 0.25, lat - scale * 0.18] as Position);
 
       acceptedCenters.push(center);
@@ -189,6 +200,11 @@ export function buildBoatEntities({
           type: "Feature",
           geometry: { type: "LineString", coordinates: deckLine },
           properties: { part: "deck", mode: "boats", ...boatMeta },
+        },
+        {
+          type: "Feature",
+          geometry: { type: "LineString", coordinates: wakeLine },
+          properties: { part: "wake", mode: "boats", wakeOpacity: 0.26, ...boatMeta },
         },
       );
     }

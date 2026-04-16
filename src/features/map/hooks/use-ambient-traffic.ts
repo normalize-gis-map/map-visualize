@@ -136,11 +136,14 @@ function generateDirectionProgresses(
     if (convoyMode) {
       const baseGapMeters =
         roadClass === "major"
-          ? 8.8 + random * 4.2
+          ? 9.6 + random * 3.1
           : roadClass === "medium"
             ? 10.5 + random * 4.8
             : 12.8 + random * 5.2;
-      const jitterScale = 0.82 + seededUnit(`${seedRoot}-gap-jitter-${index}`) * 0.36;
+      const jitterScale =
+        roadClass === "major"
+          ? 0.92 + seededUnit(`${seedRoot}-gap-jitter-${index}`) * 0.14
+          : 0.82 + seededUnit(`${seedRoot}-gap-jitter-${index}`) * 0.36;
       gap = (baseGapMeters * jitterScale) / Math.max(180, routeLengthMeters);
       gap = Math.max(0.0048, Math.min(0.026, gap));
     } else {
@@ -172,6 +175,18 @@ function allocateByClass(total: number) {
     medium: Math.max(1, Math.round(total * 0.34)),
     local: Math.max(1, Math.round(total * 0.14)),
   };
+}
+
+function smoothedBearingAtProgress(route: Position[], progress: number): number | null {
+  const ahead = sampleRouteAtProgress(route, Math.min(0.999, progress + 0.006));
+  const behind = sampleRouteAtProgress(route, Math.max(0, progress - 0.006));
+  if (!ahead || !behind) return null;
+
+  const deltaLng = ahead.lng - behind.lng;
+  const deltaLat = ahead.lat - behind.lat;
+  if (Math.abs(deltaLng) < 1e-7 && Math.abs(deltaLat) < 1e-7) return null;
+
+  return normalizeBearing((Math.atan2(deltaLng, deltaLat) * 180) / Math.PI);
 }
 
 export function useAmbientTraffic({
@@ -224,7 +239,9 @@ export function useAmbientTraffic({
           fallbackCount,
           getBaseVehiclesPerDirection(route.roadClass, zoom),
         );
-        const asymmetry = 0.92 + seededUnit(`flow-bias-${routeIndex}`) * 0.2;
+        const asymmetry = route.roadClass === "major"
+          ? 0.97 + seededUnit(`flow-bias-${routeIndex}`) * 0.06
+          : 0.92 + seededUnit(`flow-bias-${routeIndex}`) * 0.2;
         const forwardCount = Math.max(1, Math.round(basePerDirection * asymmetry));
         const backwardCount = Math.max(
           1,
@@ -332,7 +349,7 @@ export function useAmbientTraffic({
         const progress = ((vehicle.baseProgress + progressShift) % 1 + 1) % 1;
         const nextSample = sampleRouteAtProgress(route, progress);
         if (!nextSample) return null;
-        const directionalBearing = normalizeBearing(nextSample.bearing);
+        const directionalBearing = smoothedBearingAtProgress(route, progress) ?? normalizeBearing(nextSample.bearing);
         const shifted = offsetRouteSample(
           { ...nextSample, bearing: directionalBearing },
           laneOffset,

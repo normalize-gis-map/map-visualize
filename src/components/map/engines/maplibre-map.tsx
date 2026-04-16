@@ -214,6 +214,7 @@ export function MapLibreMap({
   const boatHullLayerId = "map-boat-hull";
   const boatCabinLayerId = "map-boat-cabin";
   const boatDeckLayerId = "map-boat-deck";
+  const boatWakeLayerId = "map-boat-wake";
   const bikeLayerId = "map-bike-entities";
   const peopleLayerId = "map-people-entities";
   const programmaticMoveRef = useRef(false);
@@ -492,6 +493,7 @@ export function MapLibreMap({
     boatEntitySourceId,
     boatCabinLayerId,
     boatDeckLayerId,
+    boatWakeLayerId,
     boatHullLayerId,
     boatShadowLayerId,
     buildingShadowLayerId,

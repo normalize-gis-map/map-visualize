@@ -35,6 +35,7 @@ type Params = {
   boatEntitySourceId: string;
   boatCabinLayerId: string;
   boatDeckLayerId: string;
+  boatWakeLayerId: string;
   boatHullLayerId: string;
   boatShadowLayerId: string;
   buildingShadowLayerId: string;
@@ -76,6 +77,7 @@ export function useMaplibreEnvironmentRuntime({
   boatEntitySourceId,
   boatCabinLayerId,
   boatDeckLayerId,
+  boatWakeLayerId,
   boatHullLayerId,
   boatShadowLayerId,
   buildingShadowLayerId,
@@ -509,6 +511,23 @@ export function useMaplibreEnvironmentRuntime({
         },
       });
       addLayerIfMissing({
+        id: boatWakeLayerId,
+        type: "line",
+        source: boatEntitySourceId,
+        filter: ["==", ["get", "part"], "wake"],
+        minzoom: 12,
+        paint: {
+          "line-color": "#d7efff",
+          "line-opacity": [
+            "*",
+            ["coalesce", ["get", "wakeOpacity"], 0.24],
+            ["interpolate", ["linear"], ["zoom"], 12, 0.55, 17, 0.3],
+          ],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.3, 17, 0.85],
+          "line-blur": ["interpolate", ["linear"], ["zoom"], 12, 0.35, 17, 0.6],
+        },
+      });
+      addLayerIfMissing({
         id: bikeLayerId,
         type: "circle",
         source: transportEntitySourceId,
@@ -553,6 +572,7 @@ export function useMaplibreEnvironmentRuntime({
     bikeLayerId,
     boatCabinLayerId,
     boatDeckLayerId,
+    boatWakeLayerId,
     boatEntitySourceId,
     boatHullLayerId,
     boatShadowLayerId,
