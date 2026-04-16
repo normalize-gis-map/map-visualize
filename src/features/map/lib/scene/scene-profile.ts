@@ -1,6 +1,10 @@
 import type { TimeMode, WeatherMode } from "@/features/map/lib/weather/weather-types";
+import { buildSunShadowSync } from "@/features/map/lib/scene/scene-shadow-sync";
+import { computeSunState, type SunState } from "@/features/map/lib/scene/scene-sun";
+import { lerpSunState } from "@/features/map/lib/scene/scene-time-transition";
 
 export type SceneProfile = {
+  sun: SunState;
   skyColor: [number, number, number];
   ambientLight: number;
   lightDirection: [number, number];
@@ -28,6 +32,7 @@ function resolveTimeBucket(timeMode: TimeMode): Exclude<TimeMode, "live"> {
 
 const TIME_PROFILES: Record<Exclude<TimeMode, "live">, SceneProfile> = {
   morning: {
+    sun: { azimuth: 78, elevation: 18, intensity: 0.64 },
     skyColor: [0.95, 0.78, 0.62],
     ambientLight: 0.56,
     lightDirection: [0.82, -0.45],
@@ -44,6 +49,7 @@ const TIME_PROFILES: Record<Exclude<TimeMode, "live">, SceneProfile> = {
     weatherParticleIntensity: "medium",
   },
   noon: {
+    sun: { azimuth: 182, elevation: 67, intensity: 1 },
     skyColor: [0.74, 0.86, 0.98],
     ambientLight: 0.74,
     lightDirection: [0.15, -0.98],
@@ -60,6 +66,7 @@ const TIME_PROFILES: Record<Exclude<TimeMode, "live">, SceneProfile> = {
     weatherParticleIntensity: "medium",
   },
   evening: {
+    sun: { azimuth: 286, elevation: 14, intensity: 0.56 },
     skyColor: [0.98, 0.68, 0.45],
     ambientLight: 0.48,
     lightDirection: [-0.86, -0.44],
@@ -76,6 +83,7 @@ const TIME_PROFILES: Record<Exclude<TimeMode, "live">, SceneProfile> = {
     weatherParticleIntensity: "medium",
   },
   night: {
+    sun: { azimuth: 332, elevation: -7, intensity: 0.08 },
     skyColor: [0.26, 0.36, 0.56],
     ambientLight: 0.23,
     lightDirection: [0.35, -0.92],
@@ -131,7 +139,18 @@ function applyWeatherAdjustments(base: SceneProfile, weatherMode: WeatherMode): 
 
 export function computeSceneProfile(timeMode: TimeMode, weatherMode: WeatherMode): SceneProfile {
   const timeProfile = TIME_PROFILES[resolveTimeBucket(timeMode)];
-  return applyWeatherAdjustments(timeProfile, weatherMode);
+  const sun = computeSunState(timeMode, weatherMode);
+  const synced = buildSunShadowSync(sun);
+  return applyWeatherAdjustments({
+    ...timeProfile,
+    sun,
+    lightDirection: synced.lightDirection,
+    shadowLength: synced.shadowLength,
+    shadowSoftness: synced.shadowSoftness,
+    specularStrength: synced.specularStrength,
+    waterReflectionStrength: synced.waterReflectionStrength,
+    ambientLight: Math.max(0.18, timeProfile.ambientLight * (0.72 + sun.intensity * 0.5)),
+  }, weatherMode);
 }
 
 function lerp(a: number, b: number, t: number) {
@@ -139,17 +158,17 @@ function lerp(a: number, b: number, t: number) {
 }
 
 export function lerpSceneProfile(current: SceneProfile, target: SceneProfile, t: number): SceneProfile {
+  const sun = lerpSunState(current.sun, target.sun, t);
+  const synced = buildSunShadowSync(sun);
   return {
+    sun,
     skyColor: [
       lerp(current.skyColor[0], target.skyColor[0], t),
       lerp(current.skyColor[1], target.skyColor[1], t),
       lerp(current.skyColor[2], target.skyColor[2], t),
     ],
     ambientLight: lerp(current.ambientLight, target.ambientLight, t),
-    lightDirection: [
-      lerp(current.lightDirection[0], target.lightDirection[0], t),
-      lerp(current.lightDirection[1], target.lightDirection[1], t),
-    ],
+    lightDirection: synced.lightDirection,
     contrast: lerp(current.contrast, target.contrast, t),
     saturation: lerp(current.saturation, target.saturation, t),
     waterTone: [
@@ -157,13 +176,13 @@ export function lerpSceneProfile(current: SceneProfile, target: SceneProfile, t:
       lerp(current.waterTone[1], target.waterTone[1], t),
       lerp(current.waterTone[2], target.waterTone[2], t),
     ],
-    waterReflectionStrength: lerp(current.waterReflectionStrength, target.waterReflectionStrength, t),
+    waterReflectionStrength: synced.waterReflectionStrength,
     trafficDensityMultiplier: lerp(current.trafficDensityMultiplier, target.trafficDensityMultiplier, t),
     trafficSpeedMultiplier: lerp(current.trafficSpeedMultiplier, target.trafficSpeedMultiplier, t),
-    shadowLength: lerp(current.shadowLength, target.shadowLength, t),
-    shadowSoftness: lerp(current.shadowSoftness, target.shadowSoftness, t),
+    shadowLength: synced.shadowLength,
+    shadowSoftness: synced.shadowSoftness,
     flowSpeed: lerp(current.flowSpeed, target.flowSpeed, t),
-    specularStrength: lerp(current.specularStrength, target.specularStrength, t),
+    specularStrength: synced.specularStrength,
     weatherParticleIntensity:
       t < 0.5 ? current.weatherParticleIntensity : target.weatherParticleIntensity,
   };

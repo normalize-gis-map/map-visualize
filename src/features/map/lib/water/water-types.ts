@@ -38,6 +38,9 @@ export type WakeState = {
 export type WaterSceneContext = {
   weatherMode: WeatherMode;
   timeMode: TimeMode;
+  sunAzimuth: number;
+  sunElevation: number;
+  sunIntensity: number;
   skyReflectionColor: [number, number, number];
   lightDirection: [number, number];
   specularStrength: number;

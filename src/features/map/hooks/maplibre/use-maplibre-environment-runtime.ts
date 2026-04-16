@@ -360,6 +360,7 @@ export function useMaplibreEnvironmentRuntime({
               lightDirection: shadowProfile.lightDirection,
               shadowLength: shadowProfile.shadowLength,
               shadowSoftness: shadowProfile.shadowSoftness,
+              shadowIntensity: shadowProfile.sun.intensity,
             }
           : undefined;
         const shadowData = buildBuildingShadows(

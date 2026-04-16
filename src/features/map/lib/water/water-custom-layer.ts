@@ -107,6 +107,9 @@ export function createWaterCustomLayer(layerId: string): WaterCustomLayer {
   let sceneContext: WaterSceneContext = {
     weatherMode: "sun",
     timeMode: "live",
+    sunAzimuth: 180,
+    sunElevation: 52,
+    sunIntensity: 0.9,
     skyReflectionColor: [0.74, 0.86, 0.98],
     lightDirection: [0.2, -0.9],
     specularStrength: 0.7,

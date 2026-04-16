@@ -14,6 +14,9 @@ export function buildWaterSceneContext(
   return {
     weatherMode,
     timeMode,
+    sunAzimuth: profile.sun.azimuth,
+    sunElevation: profile.sun.elevation,
+    sunIntensity: profile.sun.intensity,
     skyReflectionColor: profile.skyColor,
     lightDirection: profile.lightDirection,
     specularStrength: profile.specularStrength,

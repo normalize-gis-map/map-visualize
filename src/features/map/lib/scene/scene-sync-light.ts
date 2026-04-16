@@ -7,11 +7,12 @@ function toHslColor(rgb: [number, number, number]) {
 }
 
 export function applySceneLighting(map: maplibregl.Map, profile: SceneProfile) {
+  const sunElevation = Math.max(-8, profile.sun.elevation);
   map.setLight({
     anchor: "viewport",
     color: toHslColor(profile.skyColor),
-    intensity: profile.ambientLight,
-    position: [1.2, profile.lightDirection[0] * 180, Math.max(15, Math.abs(profile.lightDirection[1]) * 82)],
+    intensity: Math.max(0.08, profile.ambientLight * (0.5 + profile.sun.intensity * 0.7)),
+    position: [1.2, profile.sun.azimuth, Math.max(5, sunElevation + 12)],
   });
 
   const fogApi = map as unknown as {
@@ -23,6 +24,6 @@ export function applySceneLighting(map: maplibregl.Map, profile: SceneProfile) {
     color: toHslColor([profile.skyColor[0] * 0.78, profile.skyColor[1] * 0.8, profile.skyColor[2] * 0.88]),
     "high-color": toHslColor(profile.skyColor),
     "horizon-blend": 0.08 + profile.shadowSoftness * 0.18,
-    "star-intensity": profile.ambientLight < 0.3 ? 0.22 : 0,
+    "star-intensity": sunElevation < 0 ? 0.24 : 0,
   });
 }

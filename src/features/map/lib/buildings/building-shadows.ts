@@ -17,6 +17,7 @@ export type ShadowSceneTuning = {
   lightDirection: [number, number];
   shadowLength: number;
   shadowSoftness: number;
+  shadowIntensity?: number;
 };
 
 function getShadowPreset(timeMode: TimeMode): ShadowPreset {
@@ -90,9 +91,11 @@ export function buildBuildingShadows(
   const basePreset = getShadowPreset(timeMode);
   const preset: ShadowPreset = sceneTuning
     ? {
-        offsetLngPerMeter: basePreset.offsetLngPerMeter * sceneTuning.shadowLength * sceneTuning.lightDirection[0],
-        offsetLatPerMeter: basePreset.offsetLatPerMeter * sceneTuning.shadowLength * Math.abs(sceneTuning.lightDirection[1]),
-        strength: basePreset.strength * (1 - sceneTuning.shadowSoftness * 0.45),
+        offsetLngPerMeter: 0.00000125 * sceneTuning.shadowLength * sceneTuning.lightDirection[0],
+        offsetLatPerMeter: 0.00000125 * sceneTuning.shadowLength * sceneTuning.lightDirection[1],
+        strength:
+          Math.max(0.03, 0.34 * (1 - sceneTuning.shadowSoftness * 0.58)) *
+          (sceneTuning.shadowIntensity ?? 1),
       }
     : basePreset;
 
