@@ -36,57 +36,53 @@ export function AlertDrawer({
     : 0;
 
   const summaryContent = (
-    <div className="grid grid-cols-1 gap-3">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+    <div className="grid grid-cols-1 gap-2.5">
+      <div className="rounded-xl border border-cyan-300/20 bg-cyan-500/10 p-3">
         <div className="mb-2 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-400/20 text-cyan-100">
             <Waves className="h-4 w-4" />
           </div>
-          <div className="text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
+          <div className="text-[11px] font-semibold tracking-[0.12em] text-cyan-100 uppercase">
             Flood Areas
           </div>
         </div>
 
-        <div className="text-2xl font-bold text-slate-900">{totalAreas}</div>
+        <div className="text-2xl font-bold text-white">{totalAreas}</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-red-100 bg-red-50/70 p-3">
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="rounded-xl border border-red-500/35 bg-red-500/10 p-3">
           <div className="mb-2 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-100 text-red-600">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500/20 text-red-200">
               <AlertTriangle className="h-4 w-4" />
             </div>
-            <div className="text-xs font-semibold tracking-[0.12em] text-red-600 uppercase">
+            <div className="text-[11px] font-semibold tracking-[0.12em] text-red-200 uppercase">
               High
             </div>
           </div>
 
-          <div className="text-xl font-bold text-red-700">{highRiskAreas}</div>
+          <div className="text-xl font-bold text-red-100">{highRiskAreas}</div>
         </div>
 
-        <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+        <div className="rounded-xl border border-amber-400/35 bg-amber-400/10 p-3">
           <div className="mb-2 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-400/20 text-amber-100">
               <ShieldAlert className="h-4 w-4" />
             </div>
-            <div className="text-xs font-semibold tracking-[0.12em] text-amber-600 uppercase">
+            <div className="text-[11px] font-semibold tracking-[0.12em] text-amber-100 uppercase">
               Medium
             </div>
           </div>
 
-          <div className="text-xl font-bold text-amber-700">
-            {mediumRiskAreas}
-          </div>
+          <div className="text-xl font-bold text-amber-100">{mediumRiskAreas}</div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">
+      <div className="rounded-xl border border-slate-700 bg-slate-900/75 p-3">
+        <div className="mb-1 text-[11px] font-semibold tracking-[0.12em] text-slate-400 uppercase">
           Max Depth
         </div>
-        <div className="text-2xl font-bold text-slate-900">
-          {maxDepth.toFixed(1)}m
-        </div>
+        <div className="text-2xl font-bold text-slate-100">{maxDepth.toFixed(1)}m</div>
       </div>
     </div>
   );
@@ -97,10 +93,10 @@ export function AlertDrawer({
         <button
           type="button"
           onClick={onToggle}
-          className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100"
+          className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 bg-slate-900/80 text-slate-200 transition hover:border-cyan-400/40 hover:text-cyan-100"
           aria-label="Alerts and summary"
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-4.5 w-4.5" />
           {totalAreas > 0 ? (
             <span className="absolute -top-1 -right-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-semibold text-white">
               {Math.min(totalAreas, 99)}
@@ -109,29 +105,23 @@ export function AlertDrawer({
         </button>
 
         {open ? (
-          <div className="absolute top-12 right-0 z-50 w-[min(90vw,360px)] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+          <div className="absolute top-12 right-0 z-50 w-[min(90vw,340px)] rounded-2xl border border-slate-700 bg-slate-950/94 p-3 shadow-2xl backdrop-blur-2xl">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <div className="text-sm font-semibold text-slate-900">
-                  Alerts & Summary
-                </div>
-                <div className="text-xs text-slate-500">
-                  Flood impact snapshot
-                </div>
+                <div className="text-sm font-semibold text-slate-100">Alerts & Summary</div>
+                <div className="text-xs text-slate-400">Flood impact snapshot</div>
               </div>
               <button
                 type="button"
                 onClick={onToggle}
-                className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800"
                 aria-label="Close alerts"
               >
                 <ChevronUp className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="max-h-[52vh] overflow-y-auto pr-1">
-              {summaryContent}
-            </div>
+            <div className="max-h-[52vh] overflow-y-auto pr-1">{summaryContent}</div>
           </div>
         ) : null}
       </div>
@@ -139,36 +129,30 @@ export function AlertDrawer({
   }
 
   return (
-    <div className="w-full max-w-[640px] rounded-3xl border border-slate-200/80 bg-white/88 shadow-2xl backdrop-blur-xl">
+    <div className="w-full max-w-[560px] rounded-2xl border border-slate-700 bg-slate-950/82 shadow-2xl backdrop-blur-xl">
       <button
         type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
-            <Bell className="h-5 w-5" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-400/20 text-cyan-100">
+            <Bell className="h-4.5 w-4.5" />
           </div>
 
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-slate-900">
-              Alerts & Summary
-            </div>
-            <div className="text-xs text-slate-500">Flood impact snapshot</div>
+            <div className="truncate text-sm font-semibold text-slate-100">Alerts & Summary</div>
+            <div className="text-xs text-slate-400">Flood impact snapshot</div>
           </div>
         </div>
 
-        <div className="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-slate-500 transition hover:bg-slate-100">
-          {open ? (
-            <ChevronDown className="h-5 w-5" />
-          ) : (
-            <ChevronUp className="h-5 w-5" />
-          )}
+        <div className="ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-800">
+          {open ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
         </div>
       </button>
 
       {open && (
-        <div className="max-h-[42vh] overflow-y-auto border-t border-slate-200/70 px-4 pt-3 pb-4">
+        <div className="max-h-[42vh] overflow-y-auto border-t border-slate-700 px-4 pt-3 pb-4">
           {summaryContent}
         </div>
       )}

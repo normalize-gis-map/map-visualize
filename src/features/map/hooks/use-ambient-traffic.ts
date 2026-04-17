@@ -1,10 +1,11 @@
 import type { Position } from "geojson";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type AmbientRoadClass,
 } from "@/features/map/lib/traffic/get-road-class-lane-offset";
 import { getClampedLaneOffsetMeters } from "@/features/map/lib/traffic/get-clamped-lane-offset";
+import { getRoadTrafficEnvelope } from "@/features/map/lib/traffic/get-road-traffic-envelope";
 import {
   normalizeBearing,
   offsetRouteSample,
@@ -47,9 +48,11 @@ type UseAmbientTrafficInput = {
   enabled: boolean;
   density: TrafficDensity;
   detailPreset: DetailPreset;
+  densityMultiplier?: number;
+  speedMultiplier?: number;
 };
 
-const MIN_ZOOM_TO_RENDER = 13;
+const MIN_ZOOM_TO_RENDER = 11.6;
 
 function hashNumber(seed: string) {
   let hash = 2166136261;
@@ -77,25 +80,51 @@ function getTargetVehicleCount(
 ) {
   if (density === "off") return 0;
 
-  const byZoom = zoom >= 16.8 ? 320 : zoom >= 15.6 ? 236 : zoom >= 14.4 ? 138 : 44;
-  const densityFactor = density === "full" ? 1 : 0.66;
-  const detailFactor = detailPreset === "high" ? 1.12 : 1;
+  const byZoom =
+    zoom >= 16.8
+      ? 640
+      : zoom >= 15.6
+        ? 460
+        : zoom >= 14.4
+          ? 280
+          : zoom >= 12.4
+            ? 150
+            : 72;
+  const densityFactor = density === "full" ? 1.08 : 0.82;
+  const detailFactor = detailPreset === "high" ? 1.08 : 1;
 
-  return Math.max(12, Math.round(byZoom * densityFactor * detailFactor));
+  return Math.max(18, Math.round(byZoom * densityFactor * detailFactor));
 }
 
 function getRoadLimitByZoom(zoom: number) {
-  return zoom >= 16.8 ? 108 : zoom >= 15.6 ? 82 : zoom >= 14.4 ? 56 : 30;
+  return zoom >= 16.8 ? 168 : zoom >= 15.6 ? 128 : zoom >= 14.4 ? 92 : zoom >= 12.4 ? 56 : 32;
 }
 
 function getBaseVehiclesPerDirection(roadClass: AmbientRoadClass, zoom: number) {
-  const zoomBoost = zoom >= 16.8 ? 2 : zoom >= 15.6 ? 1 : 0;
-  if (roadClass === "major") return 2 + zoomBoost + (zoom >= 15.2 ? 1 : 0);
-  if (roadClass === "medium") return 2 + (zoom >= 14.8 ? 1 : 0);
-  return zoom >= 16.2 ? 2 : 1;
+  if (roadClass === "major") {
+    if (zoom < 12) return 2;
+    if (zoom < 14) return 4;
+    if (zoom < 16) return 6;
+    return 8;
+  }
+  if (roadClass === "medium") {
+    if (zoom < 12) return 1;
+    if (zoom < 14) return 2;
+    if (zoom < 16) return 4;
+    return 6;
+  }
+  if (zoom < 14) return 1;
+  if (zoom < 16) return 2;
+  return 3;
 }
 
-function generateDirectionProgresses(count: number, seedRoot: string) {
+function generateDirectionProgresses(
+  count: number,
+  seedRoot: string,
+  roadClass: AmbientRoadClass,
+  routeLengthMeters: number,
+  convoyMode: boolean,
+) {
   const progresses: number[] = [];
   let cursor = seededUnit(`${seedRoot}-start`);
 
@@ -103,14 +132,36 @@ function generateDirectionProgresses(count: number, seedRoot: string) {
     const random = seededUnit(`${seedRoot}-gap-${index}`);
     const queueChance = seededUnit(`${seedRoot}-queue-${index}`);
 
-    let gap = 0.02 + random * 0.055;
-    if (queueChance < 0.28) {
-      gap *= 0.58; // compact micro-cluster
-    } else if (queueChance > 0.86) {
-      gap *= 1.55; // sparse pocket
+    let gap: number;
+    if (convoyMode) {
+      const baseGapMeters =
+        roadClass === "major"
+          ? 9.6 + random * 3.1
+          : roadClass === "medium"
+            ? 10.5 + random * 4.8
+            : 12.8 + random * 5.2;
+      const jitterScale =
+        roadClass === "major"
+          ? 0.92 + seededUnit(`${seedRoot}-gap-jitter-${index}`) * 0.14
+          : 0.82 + seededUnit(`${seedRoot}-gap-jitter-${index}`) * 0.36;
+      gap = (baseGapMeters * jitterScale) / Math.max(180, routeLengthMeters);
+      gap = Math.max(0.0048, Math.min(0.026, gap));
+    } else {
+      gap =
+        roadClass === "major"
+          ? 0.010 + random * 0.020
+          : roadClass === "medium"
+            ? 0.013 + random * 0.026
+            : 0.017 + random * 0.032;
+      if (queueChance < 0.35) {
+        gap *= 0.72; // compact micro-cluster
+      } else if (queueChance > 0.86) {
+        gap *= 1.24; // sparse pocket
+      }
+
+      gap = Math.max(0.007, Math.min(0.068, gap));
     }
 
-    gap = Math.max(0.012, Math.min(0.12, gap));
     cursor = (cursor + gap) % 1;
     progresses.push(cursor);
   }
@@ -120,10 +171,22 @@ function generateDirectionProgresses(count: number, seedRoot: string) {
 
 function allocateByClass(total: number) {
   return {
-    major: Math.max(1, Math.round(total * 0.44)),
-    medium: Math.max(1, Math.round(total * 0.36)),
-    local: Math.max(1, Math.round(total * 0.2)),
+    major: Math.max(1, Math.round(total * 0.52)),
+    medium: Math.max(1, Math.round(total * 0.34)),
+    local: Math.max(1, Math.round(total * 0.14)),
   };
+}
+
+function smoothedBearingAtProgress(route: Position[], progress: number): number | null {
+  const ahead = sampleRouteAtProgress(route, Math.min(0.999, progress + 0.006));
+  const behind = sampleRouteAtProgress(route, Math.max(0, progress - 0.006));
+  if (!ahead || !behind) return null;
+
+  const deltaLng = ahead.lng - behind.lng;
+  const deltaLat = ahead.lat - behind.lat;
+  if (Math.abs(deltaLng) < 1e-7 && Math.abs(deltaLat) < 1e-7) return null;
+
+  return normalizeBearing((Math.atan2(deltaLng, deltaLat) * 180) / Math.PI);
 }
 
 export function useAmbientTraffic({
@@ -132,8 +195,11 @@ export function useAmbientTraffic({
   enabled,
   density,
   detailPreset,
+  densityMultiplier = 1,
+  speedMultiplier = 1,
 }: UseAmbientTrafficInput) {
   const [simulationClock, setSimulationClock] = useState(0);
+  const hasLoggedEnvelopeDebugRef = useRef(false);
 
   const shouldRender =
     enabled &&
@@ -142,8 +208,8 @@ export function useAmbientTraffic({
     routes.some((r) => r.coordinates.length > 1);
 
   const targetCount = useMemo(
-    () => getTargetVehicleCount(zoom, density, detailPreset),
-    [zoom, density, detailPreset],
+    () => Math.max(0, Math.round(getTargetVehicleCount(zoom, density, detailPreset) * densityMultiplier)),
+    [zoom, density, densityMultiplier, detailPreset],
   );
 
   const streamVehicles = useMemo<StreamVehicle[]>(() => {
@@ -161,6 +227,7 @@ export function useAmbientTraffic({
     };
     const classBudget = allocateByClass(targetCount);
     const generated: StreamVehicle[] = [];
+    const convoyMode = zoom >= 15;
     const addFromBucket = (
       entries: typeof eligibleRoutes,
       targetBudget: number,
@@ -172,7 +239,9 @@ export function useAmbientTraffic({
           fallbackCount,
           getBaseVehiclesPerDirection(route.roadClass, zoom),
         );
-        const asymmetry = 0.78 + seededUnit(`flow-bias-${routeIndex}`) * 0.5;
+        const asymmetry = route.roadClass === "major"
+          ? 0.97 + seededUnit(`flow-bias-${routeIndex}`) * 0.06
+          : 0.92 + seededUnit(`flow-bias-${routeIndex}`) * 0.2;
         const forwardCount = Math.max(1, Math.round(basePerDirection * asymmetry));
         const backwardCount = Math.max(
           1,
@@ -186,13 +255,17 @@ export function useAmbientTraffic({
           const progresses = generateDirectionProgresses(
             count,
             `${routeIndex}-${direction}`,
+            route.roadClass,
+            route.lengthMeters ?? 280,
+            convoyMode,
           );
 
           for (let slot = 0; slot < progresses.length; slot += 1) {
             const speedRange = getClassSpeedRange(route.roadClass);
             const speedBlend = seededUnit(`${routeIndex}-${direction}-speed-${slot}`);
-            const speedFactor =
-              speedRange.min + speedBlend * (speedRange.max - speedRange.min);
+            const speedFactor = convoyMode
+              ? (0.94 + speedBlend * 0.12) * ((speedRange.min + speedRange.max) / 2)
+              : speedRange.min + speedBlend * (speedRange.max - speedRange.min);
             const laneVariant =
               seededUnit(`${routeIndex}-${direction}-lane-${slot}`) > 0.62 ? 1 : 0;
 
@@ -263,25 +336,20 @@ export function useAmbientTraffic({
             : baseRoute;
         if (!route || route.length < 2) return null;
 
+        const envelope = getRoadTrafficEnvelope(vehicle.roadClass, zoom);
         const baseLaneOffset = getClampedLaneOffsetMeters(vehicle.roadClass, zoom);
-        const laneSpread = Math.min(
-          vehicle.roadClass === "major"
-            ? 0.62
-            : vehicle.roadClass === "medium"
-              ? 0.5
-              : 0.36,
-          baseLaneOffset * 0.22,
-        );
+        const laneSpread = vehicle.laneVariant === 1 ? envelope.laneJitter : 0;
         const directionSign = vehicle.direction === "forward" ? 1 : -1;
-        const laneOffset =
-          directionSign * baseLaneOffset +
-          (vehicle.laneVariant === 1 ? directionSign * laneSpread : 0);
+        const laneOffset = directionSign * Math.min(
+          envelope.maxLaneCenterOffset,
+          baseLaneOffset + laneSpread,
+        );
         const baseSpeed = 0.0095;
-        const progressShift = simulationClock * baseSpeed * vehicle.speedFactor;
+        const progressShift = simulationClock * baseSpeed * vehicle.speedFactor * speedMultiplier;
         const progress = ((vehicle.baseProgress + progressShift) % 1 + 1) % 1;
         const nextSample = sampleRouteAtProgress(route, progress);
         if (!nextSample) return null;
-        const directionalBearing = normalizeBearing(nextSample.bearing);
+        const directionalBearing = smoothedBearingAtProgress(route, progress) ?? normalizeBearing(nextSample.bearing);
         const shifted = offsetRouteSample(
           { ...nextSample, bearing: directionalBearing },
           laneOffset,
@@ -298,7 +366,22 @@ export function useAmbientTraffic({
         };
       })
       .filter((item): item is AmbientTrafficVehicle => Boolean(item));
-  }, [routes, shouldRender, simulationClock, streamVehicles, zoom]);
+  }, [routes, shouldRender, simulationClock, speedMultiplier, streamVehicles, zoom]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (hasLoggedEnvelopeDebugRef.current) return;
+    const firstVehicle = vehicles[0];
+    if (!firstVehicle) return;
+
+    const envelope = getRoadTrafficEnvelope(firstVehicle.roadClass, zoom);
+    console.log({
+      roadWidth: envelope.roadWidth,
+      laneOffset: envelope.laneOffset,
+      vehicleWidth: envelope.vehicleWidth,
+    });
+    hasLoggedEnvelopeDebugRef.current = true;
+  }, [vehicles, zoom]);
 
   return { vehicles, minZoomToRender: MIN_ZOOM_TO_RENDER };
 }

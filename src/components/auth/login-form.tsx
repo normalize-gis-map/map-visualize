@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { z } from "zod";
 
 import { persistAuthSession } from "@/features/auth/utils/auth-session";
@@ -44,35 +45,39 @@ export function LoginForm() {
   return (
     <form
       action={onSubmit}
-      className="space-y-5 rounded-3xl border border-white/20 bg-white/95 p-7 shadow-[0_30px_80px_-25px_rgba(15,23,42,0.55)] backdrop-blur"
+      className="mx-auto flex h-full max-w-md flex-col justify-center rounded-[1.75rem] border border-white/12 bg-slate-950/55 p-6 shadow-[0_24px_90px_-40px_rgba(14,116,144,0.8)] backdrop-blur-2xl sm:p-8"
     >
       <div>
-        <p className="text-[11px] font-semibold tracking-[0.16em] text-blue-600 uppercase">
+        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-300/10 px-3 py-1 text-[11px] font-semibold tracking-[0.14em] text-cyan-100 uppercase">
+          <ShieldCheck className="h-3.5 w-3.5" />
           Secure Access
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">Sign in</h1>
-        <p className="mt-1.5 text-sm text-slate-500">
-          Access the map command center and monitoring tools.
+        </div>
+        <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">
+          Welcome back
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Sign in to access the live flood map, critical layer controls, and
+          response-routing workspace.
         </p>
       </div>
 
-      <div className="space-y-3">
+      <div className="mt-7 space-y-4">
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">
-            Email
+          <span className="mb-1.5 block text-xs font-semibold tracking-[0.12em] text-slate-300 uppercase">
+            Work Email
           </span>
           <input
             name="email"
             type="email"
             autoComplete="email"
             required
-            className="w-full rounded-xl border border-slate-300/90 bg-white px-3 py-2.5 text-sm ring-blue-200 outline-none focus:border-blue-500 focus:ring-2"
+            className="w-full rounded-xl border border-slate-700/90 bg-slate-900/90 px-3.5 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/80 focus:ring-2 focus:ring-cyan-400/30"
             placeholder="you@company.com"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-slate-700">
+          <span className="mb-1.5 block text-xs font-semibold tracking-[0.12em] text-slate-300 uppercase">
             Password
           </span>
           <input
@@ -80,14 +85,14 @@ export function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className="w-full rounded-xl border border-slate-300/90 bg-white px-3 py-2.5 text-sm ring-blue-200 outline-none focus:border-blue-500 focus:ring-2"
+            className="w-full rounded-xl border border-slate-700/90 bg-slate-900/90 px-3.5 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/80 focus:ring-2 focus:ring-cyan-400/30"
             placeholder="••••••••"
           />
         </label>
       </div>
 
       {error && (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+        <p className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
           {error}
         </p>
       )}
@@ -95,9 +100,10 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-700 to-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:from-blue-800 hover:to-blue-700 disabled:opacity-60"
+        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-500 to-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_42px_-24px_rgba(14,165,233,1)] transition hover:from-cyan-400 hover:via-blue-500 hover:to-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {loading ? "Signing in..." : "Sign in"}
+        {loading ? "Signing in..." : "Enter command center"}
+        <ArrowRight className="h-4 w-4" />
       </button>
     </form>
   );
