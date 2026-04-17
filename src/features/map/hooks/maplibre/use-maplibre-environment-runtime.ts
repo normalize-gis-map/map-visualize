@@ -339,7 +339,12 @@ export function useMaplibreEnvironmentRuntime({
       }
 
       const addLayerIfMissing = (layer: maplibregl.LayerSpecification) => {
+        if (!mapInstance.isStyleLoaded()) return;
         if (mapInstance.getLayer(layer.id)) return;
+
+        const sourceId = "source" in layer && typeof layer.source === "string" ? layer.source : null;
+        if (sourceId && !mapInstance.getSource(sourceId)) return;
+
         try {
           mapInstance.addLayer(layer);
         } catch {}
