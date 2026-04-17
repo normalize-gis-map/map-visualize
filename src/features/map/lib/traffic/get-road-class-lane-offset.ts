@@ -13,17 +13,24 @@ function interpolateLinear(
   return v0 + (v1 - v0) * t;
 }
 
+function getRoadWidthMeters(roadClass: AmbientRoadClass, zoom: number) {
+  if (roadClass === "major") return interpolateLinear(zoom, 12, 7.8, 20, 22.5);
+  if (roadClass === "medium") return interpolateLinear(zoom, 12, 5.8, 20, 16.5);
+  return interpolateLinear(zoom, 12, 4.6, 20, 12.4);
+}
+
 export function getRoadClassLaneOffsetMeters(
   roadClass: AmbientRoadClass,
   zoom: number,
 ) {
-  if (roadClass === "major") {
-    return interpolateLinear(zoom, 13, 3.5, 20, 5);
+  const roadWidth = getRoadWidthMeters(roadClass, zoom);
+  let laneOffset = Math.min(roadWidth * 0.25, roadWidth * 0.35);
+  laneOffset = Math.max(laneOffset, roadWidth * 0.15);
+  const vehicleWidth = roadWidth * 0.2;
+
+  if (laneOffset * 2 + vehicleWidth * 2 > roadWidth) {
+    laneOffset *= 0.8;
   }
 
-  if (roadClass === "medium") {
-    return interpolateLinear(zoom, 13, 2.5, 20, 3.5);
-  }
-
-  return interpolateLinear(zoom, 13, 1.5, 20, 2.5);
+  return laneOffset;
 }

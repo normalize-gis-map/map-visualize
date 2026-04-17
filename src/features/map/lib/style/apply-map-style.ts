@@ -29,7 +29,8 @@ const ROAD_NAME_RE =
   /(road|street|highway|transport|motorway|primary|trunk|arterial|secondary|tertiary|residential|service|living|unclassified|local)/i;
 const MAJOR_ROAD_RE = /(motorway|trunk|primary|highway|arterial|major)/i;
 const MEDIUM_ROAD_RE = /(secondary|tertiary|collector)/i;
-const LOCAL_ROAD_RE = /(residential|service|living|unclassified|local)/i;
+const LOCAL_ROAD_RE = /(residential|living|unclassified|local)/i;
+const SERVICE_ROAD_RE = /(service|access)/i;
 const CASING_RE = /(casing|outline|border)/i;
 const RAIL_TRANSIT_HATCH_RE = /(rail|transit|hatching|hatch)/i;
 const NON_ROAD_OR_DECOR_RE =
@@ -60,74 +61,34 @@ function withOptionalFilter(
 }
 
 function getRoadWidthExpression(
-  kind: "major" | "medium" | "local" | "casing",
+  kind: "major" | "medium" | "local" | "service" | "casing",
 ): unknown {
   switch (kind) {
     case "major":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        1.8,
-        14,
-        3.6,
-        16,
-        6.8,
-        18,
-        11.8,
-        20,
-        18.5,
-      ];
+      return ["interpolate", ["linear"], ["zoom"], 10, 1.4, 12, 2.4, 14, 4.8, 16, 9.5, 18, 17, 20, 28];
     case "medium":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        1.45,
-        14,
-        2.9,
-        16,
-        5.2,
-        18,
-        8.9,
-        20,
-        13.8,
-      ];
+      return ["interpolate", ["linear"], ["zoom"], 10, 1.0, 12, 1.9, 14, 3.8, 16, 7.2, 18, 13, 20, 21];
     case "local":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        1.05,
-        14,
-        2.0,
-        16,
-        3.5,
-        18,
-        5.8,
-        20,
-        8.6,
-      ];
+      return ["interpolate", ["linear"], ["zoom"], 10, 0.7, 12, 1.4, 14, 2.8, 16, 5.8, 18, 10.5, 20, 17];
+    case "service":
+      return ["interpolate", ["linear"], ["zoom"], 10, 0.5, 12, 1.0, 14, 2.0, 16, 4.0, 18, 7.0, 20, 11];
     case "casing":
-      return [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        12,
-        2.0,
-        14,
-        3.9,
-        16,
-        7.1,
-        18,
-        12.2,
-        20,
-        19.2,
-      ];
+      return ["interpolate", ["linear"], ["zoom"], 10, 1.8, 12, 3.0, 14, 5.8, 16, 10.8, 18, 18.5, 20, 30];
   }
+}
+
+function classifyRoadWidthKindById(
+  layerId: string,
+): "major" | "medium" | "local" | "service" | "casing" | null {
+  const id = layerId.toLowerCase();
+  if (!ROAD_NAME_RE.test(id)) return null;
+  if (RAIL_TRANSIT_HATCH_RE.test(id) || NON_ROAD_OR_DECOR_RE.test(id)) return null;
+  if (CASING_RE.test(id)) return "casing";
+  if (MAJOR_ROAD_RE.test(id)) return "major";
+  if (MEDIUM_ROAD_RE.test(id)) return "medium";
+  if (SERVICE_ROAD_RE.test(id)) return "service";
+  if (LOCAL_ROAD_RE.test(id)) return "local";
+  return null;
 }
 
 export function applyMapStyle(
@@ -186,11 +147,11 @@ export function applyMapStyle(
         ["linear"],
         ["zoom"],
         13,
-        0.82,
+        0.98,
         16,
-        0.88,
+        1,
         19,
-        0.92,
+        1,
       ]);
       setPaintSafe(map, layerId, "fill-extrusion-vertical-gradient", true);
       continue;
@@ -228,17 +189,11 @@ export function applyMapStyle(
     }
 
     if (layer.type === "line" && ROAD_NAME_RE.test(id)) {
-      const isCasing = CASING_RE.test(id);
-      const isRailTransitHatch = RAIL_TRANSIT_HATCH_RE.test(id);
-      const isDecorativeTransport = NON_ROAD_OR_DECOR_RE.test(id);
-      const isMajor = MAJOR_ROAD_RE.test(id);
-      const isMedium = MEDIUM_ROAD_RE.test(id);
-      const isLocal = LOCAL_ROAD_RE.test(id);
-      const shouldPatchRoadFamily =
-        !isRailTransitHatch &&
-        !isDecorativeTransport &&
-        (isMajor || isMedium || isLocal || isCasing);
-      if (!shouldPatchRoadFamily) continue;
+      const widthKind = classifyRoadWidthKindById(layerId);
+      if (!widthKind) continue;
+      const isCasing = widthKind === "casing";
+      const isMajor = widthKind === "major";
+      const isMedium = widthKind === "medium";
 
       setPaintSafe(
         map,
@@ -256,14 +211,6 @@ export function applyMapStyle(
         "line-opacity",
         isCasing ? 0.92 : isMajor ? 0.97 : isMedium ? 0.94 : 0.9,
       );
-
-      const widthKind: "major" | "medium" | "local" | "casing" = isCasing
-        ? "casing"
-        : isMajor
-          ? "major"
-          : isMedium
-            ? "medium"
-            : "local";
       setPaintSafe(map, layerId, "line-width", getRoadWidthExpression(widthKind));
       continue;
     }
