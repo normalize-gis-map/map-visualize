@@ -1,0 +1,18 @@
+services:
+  app:
+    image: beenguyen0601/map-fe:prod
+    container_name: map-fe
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    networks:
+      - app-net
+
+    ports:
+      - "4001:3000"
+
+networks:
+  app-net:
+    external: true
